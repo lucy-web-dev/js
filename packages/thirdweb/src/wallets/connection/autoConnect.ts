@@ -1,8 +1,8 @@
-import type { Wallet } from "ethers5";
-import { getDefaultWallets } from "src/react/native/wallets/defaultWallets.js";
-import { webLocalStorage } from "src/utils/storage/webStorage.js";
+import { webLocalStorage } from "../../utils/storage/webStorage.js";
 import { createWallet } from "../create-wallet.js";
+import { getDefaultWallets } from "../defaultWallets.js";
 import { getInstalledWalletProviders } from "../injected/mipdStore.js";
+import type { Wallet } from "../interfaces/wallet.js";
 import type { ConnectionManager } from "../manager/index.js";
 import { autoConnectCore } from "./autoConnectCore.js";
 import type { AutoConnectProps } from "./types.js";
