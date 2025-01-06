@@ -160,3 +160,6 @@ export * as EIP1193 from "../adapters/eip1193/index.js";
 export { injectedProvider } from "../wallets/injected/mipdStore.js";
 
 export type { ConnectionManager } from "../wallets/manager/index.js";
+
+export type { AutoConnectProps } from "../wallets/connection/types.js";
+export { autoConnect } from "../wallets/connection/autoConnect.js";
