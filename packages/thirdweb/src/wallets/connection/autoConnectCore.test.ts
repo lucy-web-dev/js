@@ -1,4 +1,4 @@
-import { beforeEach } from "node:test";
+import { afterEach } from "node:test";
 import { isAddress } from "ethers6";
 import { describe, expect, it, vi } from "vitest";
 import { MockStorage } from "~test/mocks/storage.js";
@@ -8,6 +8,7 @@ import { createWalletAdapter } from "../../adapters/wallet-adapter.js";
 import { ethereum } from "../../chains/chain-definitions/ethereum.js";
 import { AUTH_TOKEN_LOCAL_STORAGE_NAME } from "../in-app/core/constants/settings.js";
 import { getUrlToken } from "../in-app/web/lib/get-url-token.js";
+import type { Wallet } from "../interfaces/wallet.js";
 import { createConnectionManager } from "../manager/index.js";
 import type { WalletId } from "../wallet-types.js";
 import { autoConnectCore, handleWalletConnection } from "./autoConnectCore.js";
@@ -18,8 +19,8 @@ describe("useAutoConnectCore", () => {
   const mockStorage = new MockStorage();
   const manager = createConnectionManager(mockStorage);
 
-  beforeEach(() => {
-    vi.resetAllMocks();
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it("should return a useQuery result", async () => {
@@ -186,7 +187,8 @@ describe("useAutoConnectCore", () => {
 
     const addConnectedWalletSpy = vi
       .spyOn(manager, "connect")
-      .mockRejectedValue(new Error("Connection failed"));
+      .mockRejectedValueOnce(new Error("Connection failed"));
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     await autoConnectCore({
       storage: mockStorage,
@@ -198,6 +200,12 @@ describe("useAutoConnectCore", () => {
       manager,
     });
     expect(addConnectedWalletSpy).toHaveBeenCalled();
+
+    expect(warnSpy).toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledWith(
+      "Error auto connecting wallet:",
+      "Connection failed",
+    );
   });
 
   it("should connect multiple wallets correctly", async () => {
@@ -224,7 +232,6 @@ describe("useAutoConnectCore", () => {
       JSON.stringify([wallet1.id, wallet2.id]),
     );
 
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const addConnectedWalletSpy = vi.spyOn(manager, "addConnectedWallet");
 
     await autoConnectCore({
@@ -238,11 +245,133 @@ describe("useAutoConnectCore", () => {
     });
 
     expect(addConnectedWalletSpy).toHaveBeenCalledWith(wallet2);
+  });
 
-    expect(warnSpy).toHaveBeenCalled();
-    expect(warnSpy).toHaveBeenCalledWith(
-      "Error auto connecting wallet:",
-      "Connection failed",
+  it("should handle onConnect callback correctly", async () => {
+    const mockOnConnect = vi.fn();
+    const wallet = createWalletAdapter({
+      adaptedAccount: TEST_ACCOUNT_A,
+      client: TEST_CLIENT,
+      chain: ethereum,
+      onDisconnect: () => {},
+      switchChain: () => {},
+    });
+
+    vi.mocked(getUrlToken).mockReturnValue({});
+    mockStorage.setItem("thirdweb:active-wallet-id", wallet.id);
+    mockStorage.setItem(
+      "thirdweb:connected-wallet-ids",
+      JSON.stringify([wallet.id]),
+    );
+    await autoConnectCore({
+      storage: mockStorage,
+      props: {
+        wallets: [wallet],
+        client: TEST_CLIENT,
+        onConnect: mockOnConnect,
+      },
+      createWalletFn: () => wallet,
+      manager,
+    });
+
+    expect(mockOnConnect).toHaveBeenCalledWith(wallet);
+  });
+  it("should continue even if onConnect callback throws", async () => {
+    const mockOnConnect = vi.fn();
+    mockOnConnect.mockImplementation(() => {
+      throw new Error("onConnect error");
+    });
+    const wallet = createWalletAdapter({
+      adaptedAccount: TEST_ACCOUNT_A,
+      client: TEST_CLIENT,
+      chain: ethereum,
+      onDisconnect: () => {},
+      switchChain: () => {},
+    });
+
+    vi.mocked(getUrlToken).mockReturnValue({});
+    mockStorage.setItem("thirdweb:active-wallet-id", wallet.id);
+    mockStorage.setItem(
+      "thirdweb:connected-wallet-ids",
+      JSON.stringify([wallet.id]),
+    );
+    await autoConnectCore({
+      storage: mockStorage,
+      props: {
+        wallets: [wallet],
+        client: TEST_CLIENT,
+        onConnect: mockOnConnect,
+      },
+      createWalletFn: () => wallet,
+      manager,
+    });
+
+    expect(mockOnConnect).toHaveBeenCalledWith(wallet);
+  });
+  it("should call setLastAuthProvider if authProvider is present", async () => {
+    const wallet = createWalletAdapter({
+      adaptedAccount: TEST_ACCOUNT_A,
+      client: TEST_CLIENT,
+      chain: ethereum,
+      onDisconnect: () => {},
+      switchChain: () => {},
+    });
+    vi.mocked(getUrlToken).mockReturnValue({
+      authProvider: "email",
+      walletId: wallet.id,
+    });
+    const mockSetLastAuthProvider = vi.fn();
+
+    mockStorage.setItem("thirdweb:active-wallet-id", wallet.id);
+    mockStorage.setItem(
+      "thirdweb:connected-wallet-ids",
+      JSON.stringify([wallet.id]),
+    );
+    await autoConnectCore({
+      storage: mockStorage,
+      props: {
+        wallets: [wallet],
+        client: TEST_CLIENT,
+      },
+      createWalletFn: () => wallet,
+      manager,
+      setLastAuthProvider: mockSetLastAuthProvider,
+    });
+
+    expect(mockSetLastAuthProvider).toHaveBeenCalledWith("email", mockStorage);
+  });
+  it("should set connection status to disconnect if no connectedWallet is returned", async () => {
+    const wallet = createWalletAdapter({
+      adaptedAccount: TEST_ACCOUNT_A,
+      client: TEST_CLIENT,
+      chain: ethereum,
+      onDisconnect: () => {},
+      switchChain: () => {},
+    });
+
+    mockStorage.setItem("thirdweb:active-wallet-id", wallet.id);
+    mockStorage.setItem(
+      "thirdweb:connected-wallet-ids",
+      JSON.stringify([wallet.id]),
+    );
+
+    const addConnectedWalletSpy = vi
+      .spyOn(manager, "connect")
+      .mockResolvedValueOnce(null as unknown as Wallet);
+
+    await autoConnectCore({
+      storage: mockStorage,
+      props: {
+        wallets: [wallet],
+        client: TEST_CLIENT,
+      },
+      createWalletFn: () => wallet,
+      manager,
+    });
+
+    expect(addConnectedWalletSpy).toHaveBeenCalled();
+    expect(manager.activeWalletConnectionStatusStore.getValue()).toBe(
+      "disconnected",
     );
   });
 });
