@@ -100,26 +100,26 @@ export const autoConnectCore = async ({
       createWalletFn(lastActiveWalletId));
 
   if (activeWallet) {
-    try {
-      manager.activeWalletConnectionStatusStore.setValue("connecting"); // only set connecting status if we are connecting the last active EOA
-      await timeoutPromise(
-        handleWalletConnection({
-          wallet: activeWallet,
-          client: props.client,
-          lastConnectedChain,
-          authResult,
-        }),
-        {
-          ms: timeout,
-          message: `AutoConnect timeout: ${timeout}ms limit exceeded.`,
-        },
-      ).catch((err) => {
-        console.warn(err.message);
-        if (props.onTimeout) {
-          props.onTimeout();
-        }
-      });
+    manager.activeWalletConnectionStatusStore.setValue("connecting"); // only set connecting status if we are connecting the last active EOA
+    await timeoutPromise(
+      handleWalletConnection({
+        wallet: activeWallet,
+        client: props.client,
+        lastConnectedChain,
+        authResult,
+      }),
+      {
+        ms: timeout,
+        message: `AutoConnect timeout: ${timeout}ms limit exceeded.`,
+      },
+    ).catch((err) => {
+      console.warn(err.message);
+      if (props.onTimeout) {
+        props.onTimeout();
+      }
+    });
 
+    try {
       // connected wallet could be activeWallet or smart wallet
       const connectedWallet = await (connectOverride
         ? connectOverride(activeWallet)
@@ -154,7 +154,6 @@ export const autoConnectCore = async ({
   const otherWallets = availableWallets.filter(
     (w) => w.id !== lastActiveWalletId && lastConnectedWalletIds.includes(w.id),
   );
-
   for (const wallet of otherWallets) {
     try {
       await handleWalletConnection({
