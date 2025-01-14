@@ -1,5 +1,27 @@
 # thirdweb
 
+## 5.83.2
+
+### Patch Changes
+
+- [#5926](https://github.com/thirdweb-dev/js/pull/5926) [`4b5661b`](https://github.com/thirdweb-dev/js/commit/4b5661b9817d1e0d67a8574d7c5931d3e892a006) Thanks [@MananTank](https://github.com/MananTank)! - Export `toEventSelector` utility function from "thirdweb/utils"
+
+- [#5923](https://github.com/thirdweb-dev/js/pull/5923) [`42a313f`](https://github.com/thirdweb-dev/js/commit/42a313f3b2d89696d5374e5a705e9f144bf46ebe) Thanks [@kumaryash90](https://github.com/kumaryash90)! - Fix deploy version for published contracts
+
+- [#5924](https://github.com/thirdweb-dev/js/pull/5924) [`7fb5ce1`](https://github.com/thirdweb-dev/js/commit/7fb5ce1cc3af8bc9d99fef52018d3e1c7b558eaa) Thanks [@joaquim-verges](https://github.com/joaquim-verges)! - Ensure resetting deploy flag on bundler errors
+
+- [#5937](https://github.com/thirdweb-dev/js/pull/5937) [`0e2b3df`](https://github.com/thirdweb-dev/js/commit/0e2b3df42aee57f30b7e8c32dbf034f5deb37303) Thanks [@MananTank](https://github.com/MananTank)! - Add `isValidENSName` utility function for checking if a string is a valid ENS name. It does not check if the name is actually registered, it only checks if the string is in a valid format.
+
+  ```ts
+  import { isValidENSName } from "thirdweb/utils";
+
+  isValidENSName("thirdweb.eth"); // true
+  isValidENSName("foo.bar.com"); // true
+  isValidENSName("foo"); // false
+  ```
+
+- [#5914](https://github.com/thirdweb-dev/js/pull/5914) [`c5c6f9d`](https://github.com/thirdweb-dev/js/commit/c5c6f9d7415a438ddb0823764884d9c77b687163) Thanks [@MananTank](https://github.com/MananTank)! - Do not prompt user for signing message for SIWE auth in Connect UI for Ecosystem wallets
+
 ## 5.83.1
 
 ### Patch Changes
