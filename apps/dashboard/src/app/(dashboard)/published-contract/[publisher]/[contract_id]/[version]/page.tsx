@@ -76,7 +76,7 @@ export default async function PublishedContractPage(
       >
         <PublishedActions
           {...params}
-          dispayName={publishedContract.displayName || publishedContract.name}
+          displayName={publishedContract.displayName || publishedContract.name}
         />
       </DeployContractHeader>
       <Separator />
@@ -85,7 +85,6 @@ export default async function PublishedContractPage(
         <SimpleGrid columns={12} gap={{ base: 6, md: 10 }} w="full">
           <PublishedContract
             publishedContract={publishedContract}
-            walletOrEns={params.publisher}
             twAccount={account}
           />
         </SimpleGrid>

@@ -18,7 +18,7 @@ import { type ContextFilters, promptNebula } from "../api/chat";
 import { createSession, updateSession } from "../api/session";
 import type { ExecuteConfig, SessionInfo } from "../api/types";
 import { newChatPageUrlStore, newSessionsStore } from "../stores";
-import { Chatbar } from "./ChatBar";
+import { ChatBar } from "./ChatBar";
 import { type ChatMessage, Chats } from "./Chats";
 import ContextFiltersButton from "./ContextFilters";
 import { EmptyStateChatPageContent } from "./EmptyStateChatPageContent";
@@ -43,7 +43,6 @@ export function ChatPageContent(props: {
           try {
             const content = JSON.parse(message.content) as {
               session_id: string;
-              request_id: string;
               data: string;
               type: "sign_transaction" | (string & {});
             };
@@ -398,7 +397,7 @@ export function ChatPageContent(props: {
               isChatStreaming={isChatStreaming}
               authToken={props.authToken}
               sessionId={sessionId}
-              className="min-w-0 pt-10 pb-32"
+              className="min-w-0 pt-6 pb-32"
               twAccount={props.account}
               client={client}
               enableAutoScroll={enableAutoScroll}
@@ -406,7 +405,7 @@ export function ChatPageContent(props: {
             />
 
             <div className="container max-w-[800px]">
-              <Chatbar
+              <ChatBar
                 sendMessage={handleSendMessage}
                 isChatStreaming={isChatStreaming}
                 abortChatStream={() => {

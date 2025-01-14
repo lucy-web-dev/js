@@ -45,7 +45,7 @@ export default async function PublishedContractPage(
       >
         <PublishedActions
           {...params}
-          dispayName={publishedContract.displayName || publishedContract.name}
+          displayName={publishedContract.displayName || publishedContract.name}
         />
       </DeployContractHeader>
       <Separator />
@@ -54,7 +54,6 @@ export default async function PublishedContractPage(
         <div className="grid w-full grid-cols-12 gap-6 md:gap-10">
           <PublishedContract
             publishedContract={publishedContract}
-            walletOrEns={params.publisher}
             twAccount={account}
           />
         </div>
