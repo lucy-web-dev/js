@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { MockStorage } from "~test/mocks/storage.js";
 import { TEST_CLIENT } from "~test/test-clients.js";
 import { TEST_ACCOUNT_A } from "~test/test-wallets.js";
 import { createWalletAdapter } from "../../adapters/wallet-adapter.js";
@@ -7,7 +6,6 @@ import { ethereum } from "../../chains/chain-definitions/ethereum.js";
 import { webLocalStorage } from "../../utils/storage/webStorage.js";
 import { createWallet } from "../create-wallet.js";
 import { getInstalledWalletProviders } from "../injected/mipdStore.js";
-import { createConnectionManager } from "../manager/index.js";
 import { autoConnect } from "./autoConnect.js";
 import { autoConnectCore } from "./autoConnectCore.js";
 
@@ -24,8 +22,6 @@ describe("autoConnect", () => {
     onDisconnect: () => {},
     switchChain: () => {},
   });
-  const mockStorage = new MockStorage();
-  const mockWalletManager = createConnectionManager(mockStorage);
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -38,7 +34,6 @@ describe("autoConnect", () => {
     const result = await autoConnect({
       client: TEST_CLIENT,
       wallets: [mockWallet],
-      walletManager: mockWalletManager,
     });
 
     expect(autoConnectCore).toHaveBeenCalledWith({
@@ -46,11 +41,10 @@ describe("autoConnect", () => {
       props: {
         client: TEST_CLIENT,
         wallets: [mockWallet],
-        walletManager: mockWalletManager,
       },
       createWalletFn: createWallet,
       getInstalledWallets: expect.any(Function),
-      manager: mockWalletManager,
+      manager: expect.any(Object),
     });
     expect(result).toBe(true);
   });
@@ -58,7 +52,6 @@ describe("autoConnect", () => {
   it("should use default wallets when no wallets are provided", async () => {
     await autoConnect({
       wallets: [],
-      walletManager: mockWalletManager,
       client: TEST_CLIENT,
     });
 
@@ -67,7 +60,6 @@ describe("autoConnect", () => {
         props: {
           client: TEST_CLIENT,
           wallets: [],
-          walletManager: mockWalletManager,
         },
       }),
     );
