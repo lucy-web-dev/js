@@ -3,12 +3,12 @@ import { createWallet } from "../create-wallet.js";
 import { getDefaultWallets } from "../defaultWallets.js";
 import { getInstalledWalletProviders } from "../injected/mipdStore.js";
 import type { Wallet } from "../interfaces/wallet.js";
-import type { ConnectionManager } from "../manager/index.js";
+import { createConnectionManager } from "../manager/index.js";
 import { autoConnectCore } from "./autoConnectCore.js";
 import type { AutoConnectProps } from "./types.js";
 
 /**
- * Attempts to automatically connect to a wallet based on the provided configuration.
+ * Attempts to automatically connect to the last connected wallet.
  * It combines both specified wallets and installed wallet providers that aren't already specified.
  *
  * @example
@@ -16,27 +16,26 @@ import type { AutoConnectProps } from "./types.js";
  * ```tsx
  * import { autoConnect } from "thirdweb/wallets";
  *
- * const walletManager = createConnectionManager();
  * const autoConnected = await autoConnect({
  *  client,
- *  walletManager,
+ *  onConnect: (wallet) => {
+ *    console.log("wallet", wallet);
+ *  },
  * });
  * ```
  *
- *
  * @param props - The auto-connect configuration properties
  * @param props.wallets - Array of wallet instances to consider for auto-connection
- * @param walletManager - The connection manager instance handling wallet connections
  * @returns {boolean} a promise resolving to true or false depending on whether the auto connect function connected to a wallet or not
  */
 export const autoConnect = async (
   props: AutoConnectProps & {
-    wallets: Wallet[];
-    walletManager: ConnectionManager;
+    wallets?: Wallet[];
   },
 ) => {
   const wallets = props.wallets || getDefaultWallets(props);
-  return autoConnectCore({
+  const manager = createConnectionManager(webLocalStorage);
+  const result = await autoConnectCore({
     storage: webLocalStorage,
     props: {
       ...props,
@@ -53,6 +52,7 @@ export const autoConnect = async (
 
       return installedWallets;
     },
-    manager: props.walletManager,
+    manager,
   });
+  return result;
 };

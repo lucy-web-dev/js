@@ -92,7 +92,6 @@ export const autoConnectCore = async ({
   // in that case, we default to the passed chain to connect to
   const lastConnectedChain =
     (await getLastConnectedChain(storage)) || props.chain;
-
   const availableWallets = [...wallets, ...(getInstalledWallets?.() ?? [])];
   const activeWallet =
     lastActiveWalletId &&
@@ -127,15 +126,12 @@ export const autoConnectCore = async ({
             client: props.client,
             accountAbstraction: props.accountAbstraction,
           }));
-
       if (connectedWallet) {
-        if (onConnect) {
-          try {
-            onConnect(connectedWallet);
-            autoConnected = true;
-          } catch {
-            // ignore
-          }
+        autoConnected = true;
+        try {
+          onConnect?.(connectedWallet);
+        } catch {
+          // ignore
         }
       } else {
         manager.activeWalletConnectionStatusStore.setValue("disconnected");
