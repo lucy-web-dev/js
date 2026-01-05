@@ -1,11 +1,13 @@
+/** biome-ignore-all lint/nursery/useUniqueElementIds: "id" is not a html attribute here - TODO: stop using 'id' as a prop on JSX elements */
+
 "use client";
 import { ReloadIcon } from "@radix-ui/react-icons";
 import type { ThirdwebClient } from "../../../../../client/client.js";
 import type { WalletConnectSession } from "../../../../../wallets/wallet-connect/receiver/types.js";
 import { iconSize, spacing } from "../../../../core/design-system/index.js";
-import { Spacer } from "../../components/Spacer.js";
 import { Container, Line, ModalHeader } from "../../components/basic.js";
 import { Button } from "../../components/buttons.js";
+import { Spacer } from "../../components/Spacer.js";
 import { Text } from "../../components/text.js";
 import { WalletLogoSpinner } from "./WalletLogoSpinner.js";
 
@@ -26,7 +28,7 @@ export function WalletConnectDisconnectScreen(props: {
       }}
     >
       <Container p="lg">
-        <ModalHeader title="Connect an App" onBack={props.onBack} />
+        <ModalHeader onBack={props.onBack} title="Connect an App" />
       </Container>
       <Line />
       <Container
@@ -41,8 +43,8 @@ export function WalletConnectDisconnectScreen(props: {
             <WalletLogoSpinner
               client={props.client}
               error={!!props.error}
-              id="walletConnect"
               hideSpinner={true}
+              id="walletConnect"
             />
           </Container>
           <Container
@@ -58,32 +60,32 @@ export function WalletConnectDisconnectScreen(props: {
                 </Text>
                 <Spacer y="xl" />
                 <Button
-                  variant="accent"
                   fullWidth
                   onClick={() => {
                     props.disconnect();
                   }}
+                  variant="accent"
                 >
                   Disconnect
                 </Button>
               </>
             ) : (
               <>
-                <Text center balance multiline size="sm">
+                <Text balance center multiline size="sm">
                   {props.error}
                 </Text>
                 <Spacer y="md" />
-                <Container flex="row" center="x" animate="fadein">
+                <Container animate="fadein" center="x" flex="row">
                   <Button
                     fullWidth
-                    variant="accent"
                     onClick={() => props.disconnect()}
                     style={{
-                      gap: spacing.xs,
                       alignItems: "center",
+                      gap: spacing.xs,
                     }}
+                    variant="accent"
                   >
-                    <ReloadIcon width={iconSize.sm} height={iconSize.sm} />
+                    <ReloadIcon height={iconSize.sm} width={iconSize.sm} />
                     Retry
                   </Button>
                 </Container>

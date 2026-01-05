@@ -1,6 +1,8 @@
+"use client";
+
 import { cn } from "../../lib/utils";
 import { MobileSidebar } from "./MobileSidebar";
-import { Sidebar, type SidebarLink } from "./Sidebar";
+import { CustomSidebar, type SidebarLink } from "./Sidebar";
 
 export function SidebarLayout(props: {
   sidebarLinks: SidebarLink[];
@@ -17,7 +19,10 @@ export function SidebarLayout(props: {
         props.className,
       )}
     >
-      <Sidebar links={sidebarLinks} className={props.desktopSidebarClassName} />
+      <CustomSidebar
+        className={props.desktopSidebarClassName}
+        links={sidebarLinks}
+      />
       <MobileSidebar
         links={sidebarLinks}
         triggerClassName={props.mobileSidebarClassName}

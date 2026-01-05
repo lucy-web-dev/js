@@ -10,7 +10,7 @@ const ContentSecurityPolicy = `
   style-src 'self' 'unsafe-inline';
   font-src 'self';
   frame-src * data:;
-  script-src 'self' 'unsafe-eval' 'unsafe-inline' 'wasm-unsafe-eval' 'inline-speculation-rules' *.thirdweb.com *.thirdweb-dev.com vercel.live js.stripe.com;
+  script-src 'self' 'unsafe-eval' 'unsafe-inline' 'wasm-unsafe-eval' 'inline-speculation-rules' thirdweb.com *.thirdweb.com thirdweb-dev.com *.thirdweb-dev.com vercel.live js.stripe.com;
   connect-src * data: blob:;
   worker-src 'self' blob:;
   block-all-mixed-content;
@@ -47,26 +47,39 @@ const withMDX = createMDX({
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  transpilePackages: ["@workspace/ui"],
   eslint: {
     ignoreDuringBuilds: true,
   },
-  productionBrowserSourceMaps: false,
   experimental: {
+    serverSourceMaps: false,
     webpackBuildWorker: true,
     webpackMemoryOptimizations: true,
-    serverSourceMaps: false,
-  },
-  pageExtensions: ["mdx", "tsx", "ts"],
-  redirects,
-  webpack: (config) => {
-    config.externals.push("pino-pretty", "lokijs", "encoding");
-    return config;
   },
   async headers() {
     return [
       {
-        source: "/(.*)",
         headers: securityHeaders,
+        source: "/(.*)",
+      },
+    ];
+  },
+  pageExtensions: ["mdx", "tsx", "ts"],
+  productionBrowserSourceMaps: false,
+  redirects,
+  async rewrites() {
+    return [
+      {
+        destination: "https://us-assets.i.posthog.com/static/:path*",
+        source: "/_ph/static/:path*",
+      },
+      {
+        destination: "https://us.i.posthog.com/:path*",
+        source: "/_ph/:path*",
+      },
+      {
+        destination: "https://us.i.posthog.com/decide",
+        source: "/_ph/decide",
       },
     ];
   },

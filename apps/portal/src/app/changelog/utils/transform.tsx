@@ -1,4 +1,9 @@
 /* eslint-disable @next/next/no-img-element */
+
+import { Fragment } from "react";
+import type { Transform } from "react-html-parser";
+import { convertNodeToElement } from "react-html-parser";
+import type { BundledLanguage, SpecialLanguage } from "shiki";
 import {
   CodeBlock,
   DocLink,
@@ -8,10 +13,6 @@ import {
   Separator,
   UnorderedList,
 } from "@/components/Document";
-import { Fragment } from "react";
-import { convertNodeToElement } from "react-html-parser";
-import type { Transform } from "react-html-parser";
-import type { BundledLanguage, SpecialLanguage } from "shiki";
 
 const headingTags = new Set(["h1", "h2", "h3", "h4", "h5", "h6"]);
 
@@ -49,7 +50,7 @@ export const transform: Transform = (node, index: number) => {
     const level = Number.parseInt(node.name[1] || "");
 
     return (
-      <Heading level={level} id="#" anchorClassName="mt-10">
+      <Heading anchorClassName="mt-10" anchorId="#" level={level}>
         {getChildren()}
       </Heading>
     );
@@ -60,10 +61,10 @@ export const transform: Transform = (node, index: number) => {
       if (!node.attribs) {
         node.attribs = {};
       }
-      node.attribs.class = "text-center text-sm text-f-300";
+      node.attribs.class = "text-center text-sm text-muted-foreground";
       return;
     }
-    return <Paragraph>{getChildren()}</Paragraph>;
+    return <Paragraph className="leading-7">{getChildren()}</Paragraph>;
   }
 
   if (node.name === "ul") {
@@ -76,7 +77,7 @@ export const transform: Transform = (node, index: number) => {
     }
     node.attribs.class = "rounded-lg";
     return (
-      <div className="my-5 flex justify-center rounded-lg border p-4">
+      <div className="my-6 flex justify-center rounded-lg border border-dashed p-2 bg-card/50">
         {convertNodeToElement(node, index, transform)}
       </div>
     );
@@ -108,7 +109,13 @@ export const transform: Transform = (node, index: number) => {
       // }
     }
     if (code) {
-      return <CodeBlock lang={lang} code={code} />;
+      return (
+        <CodeBlock
+          code={code}
+          lang={lang}
+          className="bg-card/50 border-dashed"
+        />
+      );
     }
   }
 

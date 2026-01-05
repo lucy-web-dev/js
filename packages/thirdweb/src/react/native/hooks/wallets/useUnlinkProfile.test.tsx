@@ -37,6 +37,32 @@ describe("useUnlinkProfile", () => {
     });
 
     expect(unlinkProfile).toHaveBeenCalledWith({
+      allowAccountDeletion: false,
+      client: TEST_CLIENT,
+      ecosystem: undefined,
+      profileToUnlink: mockProfile,
+    });
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["profiles"],
+    });
+  });
+
+  it("should call unlinkProfile with allowAccountDeletion if true", async () => {
+    const { result } = renderHook(() => useUnlinkProfile(), {
+      wrapper,
+    });
+    const mutationFn = result.current.mutateAsync;
+
+    await act(async () => {
+      await mutationFn({
+        allowAccountDeletion: true,
+        client: TEST_CLIENT,
+        profileToUnlink: mockProfile,
+      });
+    });
+
+    expect(unlinkProfile).toHaveBeenCalledWith({
+      allowAccountDeletion: true,
       client: TEST_CLIENT,
       ecosystem: undefined,
       profileToUnlink: mockProfile,
@@ -48,8 +74,8 @@ describe("useUnlinkProfile", () => {
 
   it("should include ecosystem if ecosystem wallet is found", async () => {
     const mockWallet = {
-      id: "ecosystem.wallet-id",
       getConfig: () => ({ partnerId: "partner-id" }),
+      id: "ecosystem.wallet-id",
     } as unknown as Wallet;
     vi.mocked(useConnectedWallets).mockReturnValue([mockWallet]);
 
@@ -63,6 +89,7 @@ describe("useUnlinkProfile", () => {
     });
 
     expect(unlinkProfile).toHaveBeenCalledWith({
+      allowAccountDeletion: false,
       client: TEST_CLIENT,
       ecosystem: {
         id: mockWallet.id,

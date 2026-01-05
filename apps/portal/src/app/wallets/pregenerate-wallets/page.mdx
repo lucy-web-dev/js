@@ -1,0 +1,41 @@
+import { Callout, OpenApiEndpoint } from "@doc";
+import { createMetadata, ArticleIconCard } from "@doc";
+
+export const metadata = createMetadata({
+	image: {
+		title: "Pregenerate Wallets",
+		icon: "wallets",
+	},
+	title: "Pregenerate Wallets | thirdweb",
+	description: "Create wallets before users sign up with thirdweb's wallet pregeneration. Pre-fund with tokens, NFTs, or game assets to enable smooth onboarding and asset claiming.",
+});
+
+# Pregenerate Wallets
+
+Create wallets for users before they authenticate, enabling smoother onboarding and pre-funded asset distribution.
+
+## Use Cases
+
+- **Pre-assign wallets** to users before signup
+- **Reduce onboarding time** by eliminating wallet creation delays  
+- **Pre-fund wallets** with tokens or NFTs before users claim them
+- **Create smooth experiences** for gaming and app onboarding
+- **Distribute assets** like game items, welcome bonuses, or promotional NFTs
+
+## API Reference
+
+<OpenApiEndpoint path="/v1/wallets/user" method="POST" />
+
+<Callout variant='info' title='Ecosystem Requirements'>
+For ecosystem wallets, the secret key must be from the same account as the ecosystem owner.
+</Callout>
+
+<Callout variant='warning' title='Smart Wallet Addresses'>
+The API returns the EOA (admin wallet) address. Use [`predictSmartAccountAddress`](/references/typescript/v5/predictSmartAccountAddress) to get the corresponding smart contract wallet address.
+</Callout>
+
+## Next Steps
+
+Pregeneration doesn't change the user experience. Users can login normally and will automatically receive their pregenerated wallet.
+
+For more information, see the [User Wallets](/wallets/users) documentation.

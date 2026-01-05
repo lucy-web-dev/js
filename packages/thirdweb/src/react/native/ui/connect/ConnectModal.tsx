@@ -14,24 +14,27 @@ import type { ConnectEmbedProps } from "../../../core/hooks/connection/ConnectEm
 import { useActiveAccount } from "../../../core/hooks/wallets/useActiveAccount.js";
 import { useActiveWallet } from "../../../core/hooks/wallets/useActiveWallet.js";
 import { useDisconnect } from "../../../core/hooks/wallets/useDisconnect.js";
+import { useIsAutoConnecting } from "../../../core/hooks/wallets/useIsAutoConnecting.js";
 import { useConnectionManager } from "../../../core/providers/connection-manager.js";
 import { useWalletInfo } from "../../../core/utils/wallet.js";
 import { radius, spacing } from "../../design-system/index.js";
 import { getDefaultWallets } from "../../wallets/defaultWallets.js";
+import { AutoConnect } from "../AutoConnect/AutoConnect.js";
+import { ThemedButton, ThemedButtonWithIcon } from "../components/button.js";
 import { type ContainerType, Header } from "../components/Header.js";
 import { RNImage } from "../components/RNImage.js";
-import {
-  WalletImage,
-  getAuthProviderImage,
-} from "../components/WalletImage.js";
-import { ThemedButton, ThemedButtonWithIcon } from "../components/button.js";
 import { Spacer } from "../components/spacer.js";
 import { ThemedText } from "../components/text.js";
 import { ThemedView } from "../components/view.js";
+import {
+  getAuthProviderImage,
+  WalletImage,
+} from "../components/WalletImage.js";
 import { TW_ICON, WALLET_ICON } from "../icons/svgs.js";
 import { ErrorView } from "./ErrorView.js";
 import { AllWalletsList, ExternalWalletsList } from "./ExternalWalletsList.js";
 import { InAppWalletUI, OtpLogin, PasskeyView } from "./InAppWalletUI.js";
+import { LoadingView } from "./LoadingView.js";
 import WalletLoadingThumbnail from "./WalletLoadingThumbnail.js";
 
 export type ModalState =
@@ -74,13 +77,42 @@ export function ConnectEmbed(props: ConnectEmbedProps) {
     ...props,
     connectModal: { ...props },
   } as ConnectButtonProps;
-  return isConnected ? null : (
-    <ConnectModal
-      {...adaptedProps}
-      theme={theme}
-      containerType="embed"
+  const isAutoConnecting = useIsAutoConnecting();
+  const wallets = props.wallets || getDefaultWallets(props);
+
+  const autoConnectComp = props.autoConnect !== false && (
+    <AutoConnect
+      accountAbstraction={props.accountAbstraction}
+      appMetadata={props.appMetadata}
+      chain={props.chain}
+      client={props.client}
+      onConnect={props.onConnect}
       siweAuth={siweAuth}
+      timeout={
+        typeof props.autoConnect === "boolean"
+          ? undefined
+          : props.autoConnect?.timeout
+      }
+      wallets={wallets}
     />
+  );
+
+  if (isAutoConnecting) {
+    return <LoadingView theme={theme} />;
+  }
+
+  return isConnected ? (
+    autoConnectComp
+  ) : (
+    <>
+      <ConnectModal
+        {...adaptedProps}
+        containerType="embed"
+        siweAuth={siweAuth}
+        theme={theme}
+      />
+      {autoConnectComp}
+    </>
   );
 }
 
@@ -110,7 +142,9 @@ export function ConnectModal(
   const inAppWallet = wallets.find((wallet) => wallet.id === "inApp") as
     | Wallet<"inApp">
     | undefined;
-  const externalWallets = wallets.filter((wallet) => wallet.id !== "inApp");
+  const externalWallets = wallets
+    .filter((wallet) => wallet.id !== "inApp")
+    .filter((wallet) => !props.hiddenWallets?.includes(wallet.id));
   const showBranding = props.connectModal?.showThirdwebBranding !== false;
   const connectionManager = useConnectionManager();
 
@@ -121,15 +155,15 @@ export function ConnectModal(
       authMethod?: InAppWalletAuth;
     }) => {
       setModalState({
+        authMethod: args.authMethod,
         screen: "connecting",
         wallet: args.wallet,
-        authMethod: args.authMethod,
       });
       try {
         const w = await args.connectFn(props.chain);
         await connectionManager.connect(w, {
-          client,
           accountAbstraction,
+          client,
           onConnect,
         });
         if (siweAuth.requiresAuth && !siweAuth.isLoggedIn) {
@@ -148,8 +182,8 @@ export function ConnectModal(
         }
       } catch (error) {
         setModalState({
-          screen: "error",
           error: (error as Error)?.message || "Unknown error",
+          screen: "error",
         });
       }
     },
@@ -171,10 +205,10 @@ export function ConnectModal(
       content = (
         <>
           <Header
-            theme={theme}
-            onClose={props.onClose}
             containerType={containerType}
             onBack={() => setModalState({ screen: "base" })}
+            onClose={props.onClose}
+            theme={theme}
             title={props.connectModal?.title || "Sign in"}
           />
           <Spacer size="xl" />
@@ -187,11 +221,11 @@ export function ConnectModal(
           >
             <OtpLogin
               auth={modalState.auth}
-              wallet={modalState.wallet}
               client={client}
+              connector={connector}
               setScreen={setModalState}
               theme={theme}
-              connector={connector}
+              wallet={modalState.wallet}
             />
           </View>
           {containerType === "modal" ? (
@@ -207,21 +241,21 @@ export function ConnectModal(
       content = (
         <>
           <Header
-            theme={theme}
-            onClose={props.onClose}
             containerType={containerType}
             onBack={() => setModalState({ screen: "base" })}
+            onClose={props.onClose}
+            theme={theme}
             title={props.connectModal?.title || "Sign in"}
           />
           <Spacer size="lg" />
           <ExternalWalletsList
-            theme={theme}
-            externalWallets={externalWallets}
             client={client}
             connector={connector}
             containerType={containerType}
-            showAllWalletsButton={props.showAllWallets !== false}
+            externalWallets={externalWallets}
             onShowAllWallets={() => setModalState({ screen: "all_wallets" })}
+            showAllWalletsButton={props.showAllWallets !== false}
+            theme={theme}
           />
         </>
       );
@@ -231,23 +265,23 @@ export function ConnectModal(
       content = (
         <>
           <Header
-            theme={theme}
-            onClose={props.onClose}
             containerType={containerType}
             onBack={() =>
               inAppWallet
                 ? setModalState({ screen: "external_wallets" })
                 : setModalState({ screen: "base" })
             }
+            onClose={props.onClose}
+            theme={theme}
             title={props.connectModal?.title || "Select Wallet"}
           />
           <Spacer size="lg" />
           <AllWalletsList
-            theme={theme}
-            externalWallets={externalWallets}
             client={client}
             connector={connector}
             containerType={containerType}
+            externalWallets={externalWallets}
+            theme={theme}
           />
         </>
       );
@@ -257,10 +291,10 @@ export function ConnectModal(
       content = (
         <>
           <Header
-            theme={theme}
-            onClose={props.onClose}
             containerType={containerType}
             onBack={() => setModalState({ screen: "base" })}
+            onClose={props.onClose}
+            theme={theme}
             title={props.connectModal?.title || "Sign in"}
           />
           {containerType === "modal" ? (
@@ -269,10 +303,10 @@ export function ConnectModal(
             <Spacer size="lg" />
           )}
           <WalletLoadingView
+            authProvider={modalState.authMethod}
+            client={client}
             theme={theme}
             wallet={modalState.wallet}
-            client={client}
-            authProvider={modalState.authMethod}
           />
           {containerType === "modal" ? (
             <View style={{ flex: 1 }} />
@@ -287,10 +321,10 @@ export function ConnectModal(
       content = (
         <>
           <Header
-            theme={theme}
-            onClose={props.onClose}
             containerType={containerType}
             onBack={() => setModalState({ screen: "base" })}
+            onClose={props.onClose}
+            theme={theme}
             title={props.connectModal?.title || "Sign in"}
           />
           {containerType === "modal" ? (
@@ -299,11 +333,11 @@ export function ConnectModal(
             <Spacer size="lg" />
           )}
           <PasskeyView
-            wallet={modalState.wallet}
             client={client}
+            connector={connector}
             setScreen={setModalState}
             theme={theme}
-            connector={connector}
+            wallet={modalState.wallet}
           />
           {containerType === "modal" ? (
             <View style={{ flex: 1 }} />
@@ -318,10 +352,10 @@ export function ConnectModal(
       content = (
         <>
           <Header
-            theme={theme}
-            onClose={props.onClose}
             containerType={containerType}
             onBack={props.onClose}
+            onClose={props.onClose}
+            theme={theme}
             title={props.connectModal?.title || "Sign in"}
           />
           {containerType === "modal" ? (
@@ -330,12 +364,12 @@ export function ConnectModal(
             <Spacer size="lg" />
           )}
           <SignInView
-            theme={theme}
             client={client}
-            siweAuth={siweAuth}
-            onSignIn={() => props.onClose?.()}
-            onError={(error) => setModalState({ screen: "error", error })}
             onDisconnect={() => setModalState({ screen: "base" })}
+            onError={(error) => setModalState({ error, screen: "error" })}
+            onSignIn={() => props.onClose?.()}
+            siweAuth={siweAuth}
+            theme={theme}
           />
           {containerType === "modal" ? (
             <View style={{ flex: 1 }} />
@@ -350,10 +384,10 @@ export function ConnectModal(
       content = (
         <>
           <Header
-            theme={theme}
-            onClose={props.onClose}
             containerType={containerType}
             onBack={() => setModalState({ screen: "base" })}
+            onClose={props.onClose}
+            theme={theme}
             title={props.connectModal?.title || "Sign in"}
           />
           {containerType === "modal" ? (
@@ -375,9 +409,9 @@ export function ConnectModal(
       content = (
         <>
           <Header
-            theme={theme}
-            onClose={props.onClose}
             containerType={containerType}
+            onClose={props.onClose}
+            theme={theme}
             title={props.connectModal?.title || "Sign in"}
           />
           {inAppWallet ? (
@@ -395,22 +429,22 @@ export function ConnectModal(
                 }}
               >
                 <InAppWalletUI
-                  wallet={inAppWallet}
-                  setScreen={setModalState}
                   client={client}
-                  theme={theme}
                   connector={connector}
+                  setScreen={setModalState}
+                  theme={theme}
+                  wallet={inAppWallet}
                 />
                 {externalWallets.length > 0 ? (
                   <>
                     <OrDivider theme={theme} />
                     <ThemedButtonWithIcon
-                      theme={theme}
                       icon={WALLET_ICON}
-                      title="Connect a wallet"
                       onPress={() =>
                         setModalState({ screen: "external_wallets" })
                       }
+                      theme={theme}
+                      title="Connect a wallet"
                     />
                   </>
                 ) : null}
@@ -430,15 +464,15 @@ export function ConnectModal(
                 }}
               >
                 <ExternalWalletsList
-                  theme={theme}
-                  externalWallets={externalWallets}
                   client={client}
                   connector={connector}
                   containerType={containerType}
-                  showAllWalletsButton={props.showAllWallets !== false}
+                  externalWallets={externalWallets}
                   onShowAllWallets={() =>
                     setModalState({ screen: "all_wallets" })
                   }
+                  showAllWalletsButton={props.showAllWallets !== false}
+                  theme={theme}
                 />
               </View>
             </>
@@ -450,12 +484,12 @@ export function ConnectModal(
 
   return (
     <ThemedView
-      theme={theme}
       style={
         containerType === "modal"
           ? styles.modalContainer
           : styles.embedContainer
       }
+      theme={theme}
     >
       {content}
       {showBranding && <PoweredByThirdweb theme={theme} />}
@@ -478,18 +512,18 @@ function WalletLoadingView({
   return (
     <View
       style={{
-        flexDirection: "column",
-        flex: 1,
         alignItems: "center",
+        flex: 1,
+        flexDirection: "column",
         justifyContent: "center",
         paddingVertical: spacing.xl,
       }}
     >
       <WalletLoadingThumbnail
-        theme={theme}
-        imageSize={100}
         animate={true}
+        imageSize={100}
         roundLoader={authProvider === "passkey"}
+        theme={theme}
       >
         {authProvider ? (
           <View
@@ -499,18 +533,18 @@ function WalletLoadingView({
             }}
           >
             <RNImage
-              theme={theme}
-              size={80}
-              data={getAuthProviderImage(authProvider)}
               color={theme.colors.accentButtonBg}
+              data={getAuthProviderImage(authProvider)}
+              size={80}
+              theme={theme}
             />
           </View>
         ) : (
           <WalletImage
-            theme={theme}
-            size={90}
-            wallet={wallet}
             client={client}
+            size={90}
+            theme={theme}
+            wallet={wallet}
           />
         )}
       </WalletLoadingThumbnail>
@@ -553,23 +587,23 @@ function SignInView({
     wallet && (
       <View
         style={{
-          flexDirection: "column",
-          flex: 1,
           alignItems: "center",
+          flex: 1,
+          flexDirection: "column",
           justifyContent: "center",
           padding: spacing.xl,
         }}
       >
         <WalletLoadingThumbnail
-          theme={theme}
-          imageSize={100}
           animate={isSigningIn}
+          imageSize={100}
+          theme={theme}
         >
           <WalletImage
-            theme={theme}
-            size={90}
-            wallet={wallet}
             client={client}
+            size={90}
+            theme={theme}
+            wallet={wallet}
           />
         </WalletLoadingThumbnail>
         <Spacer size="xl" />
@@ -582,10 +616,7 @@ function SignInView({
         </ThemedText>
         <Spacer size="xl" />
         <ThemedButton
-          theme={theme}
-          variant="accent"
           disabled={isSigningIn}
-          style={{ width: "100%" }}
           onPress={async () => {
             try {
               await siweAuth.doLogin();
@@ -594,35 +625,38 @@ function SignInView({
               onError((e as Error)?.message || "Unknown error");
             }
           }}
+          style={{ width: "100%" }}
+          theme={theme}
+          variant="accent"
         >
           <ThemedText
-            theme={theme}
-            type="defaultSemiBold"
             style={{
               color: theme.colors.accentButtonText,
             }}
+            theme={theme}
+            type="defaultSemiBold"
           >
             Sign login request
           </ThemedText>
         </ThemedButton>
         <Spacer size="md" />
         <ThemedButton
-          theme={theme}
-          variant="secondary"
           disabled={isSigningIn}
-          style={{ width: "100%" }}
           onPress={async () => {
             disconnect(wallet);
             siweAuth.doLogout();
             onDisconnect();
           }}
+          style={{ width: "100%" }}
+          theme={theme}
+          variant="secondary"
         >
           <ThemedText
-            theme={theme}
-            type="defaultSemiBold"
             style={{
               color: theme.colors.secondaryButtonText,
             }}
+            theme={theme}
+            type="defaultSemiBold"
           >
             Disconnect
           </ThemedText>
@@ -636,27 +670,27 @@ function OrDivider({ theme }: { theme: Theme }) {
   return (
     <View
       style={{
-        flexDirection: "row",
         alignItems: "center",
-        justifyContent: "center",
+        flexDirection: "row",
         gap: spacing.lg,
+        justifyContent: "center",
       }}
     >
       <View
         style={{
+          backgroundColor: theme.colors.borderColor,
           flex: 1,
           height: 1,
-          backgroundColor: theme.colors.borderColor,
         }}
       />
-      <ThemedText theme={theme} style={{ color: theme.colors.secondaryText }}>
+      <ThemedText style={{ color: theme.colors.secondaryText }} theme={theme}>
         OR
       </ThemedText>
       <View
         style={{
+          backgroundColor: theme.colors.borderColor,
           flex: 1,
           height: 1,
-          backgroundColor: theme.colors.borderColor,
         }}
       />
     </View>
@@ -667,10 +701,10 @@ function PoweredByThirdweb({ theme }: { theme: Theme }) {
   return (
     <View
       style={{
-        flexDirection: "row",
-        justifyContent: "center",
         alignItems: "center",
+        flexDirection: "row",
         gap: spacing.xs,
+        justifyContent: "center",
         paddingBottom: Platform.OS === "android" ? spacing.md : spacing.lg,
       }}
     >
@@ -678,13 +712,13 @@ function PoweredByThirdweb({ theme }: { theme: Theme }) {
         Powered by
       </ThemedText>
       <SvgXml
-        xml={TW_ICON}
-        width={22}
+        color={theme.colors.secondaryText}
         height={22}
         style={{ marginBottom: -2 }}
-        color={theme.colors.secondaryText}
+        width={22}
+        xml={TW_ICON}
       />
-      <ThemedText theme={theme} type="subtext" style={{ fontWeight: "600" }}>
+      <ThemedText style={{ fontWeight: "600" }} theme={theme} type="subtext">
         thirdweb
       </ThemedText>
     </View>
@@ -697,17 +731,17 @@ function capitalizeFirstLetter(str: string): string {
 }
 
 const styles = StyleSheet.create({
-  modalContainer: {
+  embedContainer: {
+    backgroundColor: "transparent",
     flex: 1,
-    width: "100%",
     flexDirection: "column",
+    width: "100%",
+  },
+  modalContainer: {
     borderTopLeftRadius: radius.lg,
     borderTopRightRadius: radius.lg,
-  },
-  embedContainer: {
     flex: 1,
-    width: "100%",
     flexDirection: "column",
-    backgroundColor: "transparent",
+    width: "100%",
   },
 });

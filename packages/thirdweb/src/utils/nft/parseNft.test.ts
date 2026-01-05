@@ -18,15 +18,19 @@ const client = TEST_CLIENT;
 describe("parseNft", () => {
   it("should parse ERC721 token", () => {
     const option: ParseNFTOptions = {
+      chainId: 1,
+      tokenAddress: "0x1234567890123456789012345678901234567890",
       tokenId: 0n,
       tokenUri: "ipfs://",
       type: "ERC721",
     };
     const result = parseNFT(base, option);
     const expectedResult: NFT = {
+      chainId: option.chainId,
+      id: option.tokenId,
       metadata: base,
       owner: option.owner ?? null,
-      id: option.tokenId,
+      tokenAddress: option.tokenAddress,
       tokenURI: option.tokenUri,
       type: option.type,
     };
@@ -35,18 +39,22 @@ describe("parseNft", () => {
 
   it("should parse ERC1155 token", () => {
     const option: ParseNFTOptions = {
+      chainId: 1,
+      supply: 10n,
+      tokenAddress: "0x1234567890123456789012345678901234567890",
       tokenId: 0n,
       tokenUri: "ipfs://",
       type: "ERC1155",
-      supply: 10n,
     };
     const expectedResult: NFT = {
+      chainId: option.chainId,
+      id: option.tokenId,
       metadata: base,
       owner: option.owner ?? null,
-      id: option.tokenId,
+      supply: option.supply,
+      tokenAddress: option.tokenAddress,
       tokenURI: option.tokenUri,
       type: option.type,
-      supply: option.supply,
     };
     const result = parseNFT(base, option);
     expect(result).toMatchObject(expectedResult);

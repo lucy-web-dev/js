@@ -21,16 +21,19 @@ export async function backendAuthenticate(args: {
     ecosystem: args.ecosystem,
   });
   const res = await clientFetch(`${path}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
     body: stringify({
       walletSecret: args.walletSecret,
     }),
+    headers: {
+      "Content-Type": "application/json",
+    },
+    method: "POST",
   });
 
-  if (!res.ok) throw new Error("Failed to generate backend account");
+  if (!res.ok) {
+    const error = await res.text();
+    throw new Error(`Failed to generate backend account: ${error}`);
+  }
 
   return (await res.json()) satisfies AuthStoredTokenWithCookieReturnType;
 }

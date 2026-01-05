@@ -1,11 +1,8 @@
 "use client";
 
-import { type UseQueryOptions, useQuery } from "@tanstack/react-query";
+import type { UseQueryOptions } from "@tanstack/react-query";
 import type { JSX } from "react";
-import { getFunctionId } from "../../../../../utils/function-id.js";
-import { getWalletInfo } from "../../../../../wallets/__generated__/getWalletInfo.js";
-import type { WalletId } from "../../../../../wallets/wallet-types.js";
-import { useWalletContext } from "./provider.js";
+import { useWalletName } from "../../../../core/utils/walletname.js";
 
 /**
  * Props for the WalletName component
@@ -30,7 +27,7 @@ export interface WalletNameProps
    * If not passed, the component will return `null`.
    *
    * You can/should pass a descriptive text/component to this prop, indicating that the
-   * name was not fetched succesfully
+   * name was not fetched successfully
    * @example
    * ```tsx
    * <WalletName fallbackComponent={<span>Failed to load</span>}
@@ -106,7 +103,7 @@ export function WalletName({
   formatFn,
   ...restProps
 }: WalletNameProps) {
-  const nameQuery = useWalletName({ queryOptions, formatFn });
+  const nameQuery = useWalletName({ formatFn, queryOptions });
   if (nameQuery.isLoading) {
     return loadingComponent || null;
   }
@@ -114,51 +111,4 @@ export function WalletName({
     return fallbackComponent || null;
   }
   return <span {...restProps}>{nameQuery.data}</span>;
-}
-
-/**
- * @internal
- */
-function useWalletName(props: {
-  formatFn?: (str: string) => string;
-  queryOptions?: Omit<UseQueryOptions<string>, "queryFn" | "queryKey">;
-}) {
-  const { id } = useWalletContext();
-  const nameQuery = useQuery({
-    queryKey: getQueryKeys({ id, formatFn: props.formatFn }),
-    queryFn: async () => fetchWalletName({ id, formatFn: props.formatFn }),
-    ...props.queryOptions,
-  });
-  return nameQuery;
-}
-
-/**
- * @internal Exported for tests only
- */
-export function getQueryKeys(props: {
-  id: WalletId;
-  formatFn?: (str: string) => string;
-}) {
-  if (typeof props.formatFn === "function") {
-    return [
-      "walletName",
-      props.id,
-      { resolver: getFunctionId(props.formatFn) },
-    ] as const;
-  }
-  return ["walletName", props.id] as const;
-}
-
-/**
- * @internal Exported for tests only
- */
-export async function fetchWalletName(props: {
-  id: WalletId;
-  formatFn?: (str: string) => string;
-}) {
-  const info = await getWalletInfo(props.id);
-  if (typeof props.formatFn === "function") {
-    return props.formatFn(info.name);
-  }
-  return info.name;
 }

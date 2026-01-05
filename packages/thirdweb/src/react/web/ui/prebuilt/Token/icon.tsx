@@ -6,6 +6,7 @@ import { getChainMetadata } from "../../../../../chains/utils.js";
 import { NATIVE_TOKEN_ADDRESS } from "../../../../../constants/addresses.js";
 import { getContract } from "../../../../../contract/contract.js";
 import { getContractMetadata } from "../../../../../extensions/common/read/getContractMetadata.js";
+import { getToken } from "../../../../../pay/convert/get-token.js";
 import { getFunctionId } from "../../../../../utils/function-id.js";
 import { resolveScheme } from "../../../../../utils/ipfs.js";
 import { useTokenContext } from "./provider.js";
@@ -118,19 +119,6 @@ export function TokenIcon({
 }: TokenIconProps) {
   const { address, client, chain } = useTokenContext();
   const iconQuery = useQuery({
-    queryKey: [
-      "_internal_token_icon_",
-      chain.id,
-      address,
-      {
-        resolver:
-          typeof iconResolver === "string"
-            ? iconResolver
-            : typeof iconResolver === "function"
-              ? getFunctionId(iconResolver)
-              : undefined,
-      },
-    ] as const,
     queryFn: async () => {
       if (typeof iconResolver === "string") {
         return iconResolver;
@@ -145,7 +133,15 @@ export function TokenIcon({
         if (!possibleUrl) {
           throw new Error("Failed to resolve icon for native token");
         }
-        return resolveScheme({ uri: possibleUrl, client });
+        return resolveScheme({ client, uri: possibleUrl });
+      }
+
+      const bridgeToken = await getToken(client, address, chain.id).catch(
+        () => null,
+      );
+
+      if (bridgeToken?.iconUri) {
+        return bridgeToken.iconUri;
       }
 
       // Try to get the icon from the contractURI
@@ -165,10 +161,23 @@ export function TokenIcon({
       }
 
       return resolveScheme({
-        uri: contractMetadata.image,
         client,
+        uri: contractMetadata.image,
       });
     },
+    queryKey: [
+      "_internal_token_icon_",
+      chain.id,
+      address,
+      {
+        resolver:
+          typeof iconResolver === "string"
+            ? iconResolver
+            : typeof iconResolver === "function"
+              ? getFunctionId(iconResolver)
+              : undefined,
+      },
+    ] as const,
     ...queryOptions,
   });
 

@@ -68,7 +68,6 @@ export type MakeOfferParams = {
  */
 export function makeOffer(options: BaseTransactionOptions<MakeOfferParams>) {
   return makeOfferGenerated({
-    contract: options.contract,
     asyncParams: async () => {
       const [normalizedPrice, currency] = await Promise.all([
         (async () => {
@@ -83,8 +82,8 @@ export function makeOffer(options: BaseTransactionOptions<MakeOfferParams>) {
           return await convertErc20Amount({
             amount: options.totalOffer,
             chain: options.contract.chain,
-            erc20Address: options.currencyContractAddress,
             client: options.contract.client,
+            erc20Address: options.currencyContractAddress,
           });
         })(),
         (async () => {
@@ -94,6 +93,7 @@ export function makeOffer(options: BaseTransactionOptions<MakeOfferParams>) {
           }
           // otherwise determine the wrapped native token address for the chain
 
+          // TODO: auto wrap native tokens if the currency is a native token address
           // TODO: add known wrapped native token addresses for each chain on the chain config
 
           const { getDeployedInfraContract } = await import(
@@ -120,6 +120,14 @@ export function makeOffer(options: BaseTransactionOptions<MakeOfferParams>) {
       );
 
       return {
+        overrides: {
+          erc20Value: isNativeTokenAddress(currency)
+            ? undefined
+            : {
+                amountWei: normalizedPrice,
+                tokenAddress: currency,
+              },
+        },
         params: {
           assetContract: options.assetContractAddress,
           currency,
@@ -130,5 +138,6 @@ export function makeOffer(options: BaseTransactionOptions<MakeOfferParams>) {
         },
       };
     },
+    contract: options.contract,
   });
 }

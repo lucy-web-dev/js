@@ -1,11 +1,13 @@
+import { activateStylusContract } from "../../../extensions/stylus/write/activateStylusContract.js";
 import { sendAndConfirmTransaction } from "../../../transaction/actions/send-and-confirm-transaction.js";
+import { sendTransaction } from "../../../transaction/actions/send-transaction.js";
 import {
   type FetchDeployMetadataResult,
   fetchBytecodeFromCompilerMetadata,
 } from "../../../utils/any-evm/deploy-metadata.js";
 import { isZkSyncChain } from "../../../utils/any-evm/zksync/isZkSyncChain.js";
 import type { ClientAndChainAndAccount } from "../../../utils/types.js";
-import { type ThirdwebContract, getContract } from "../../contract.js";
+import { getContract, type ThirdwebContract } from "../../contract.js";
 import { fetchPublishedContractMetadata } from "../publisher.js";
 import {
   ZKSYNC_IMPLEMENTATIONS,
@@ -19,9 +21,9 @@ import {
   getDeployedCreate2Factory,
 } from "./create-2-factory.js";
 import {
-  type InfraContractId,
   getDeployedInfraContract,
   getDeployedInfraContractFromMetadata,
+  type InfraContractId,
   prepareInfraContractDeployTransactionFromMetadata,
 } from "./infra.js";
 
@@ -63,9 +65,9 @@ export async function getOrDeployInfraForPublishedContract(
 
   if (await isZkSyncChain(chain)) {
     const cloneFactoryContract = await zkDeployCreate2Factory({
+      account,
       chain,
       client,
-      account,
     });
     const compilerMetadata = await fetchPublishedContractMetadata({
       client,
@@ -83,15 +85,15 @@ export async function getOrDeployInfraForPublishedContract(
 
     if (!implementationContract) {
       implementationContract = await zkDeployContractDeterministic({
+        abi: compilerMetadata.abi,
+        account,
+        bytecode: await fetchBytecodeFromCompilerMetadata({
+          chain,
+          client,
+          compilerMetadata,
+        }),
         chain,
         client,
-        account,
-        abi: compilerMetadata.abi,
-        bytecode: await fetchBytecodeFromCompilerMetadata({
-          compilerMetadata,
-          client,
-          chain,
-        }),
         params: constructorParams,
       });
     }
@@ -118,8 +120,8 @@ export async function getOrDeployInfraForPublishedContract(
     getDeployedInfraContract({
       chain,
       client,
-      contractId,
       constructorParams,
+      contractId,
       publisher,
       version,
     }),
@@ -128,21 +130,25 @@ export async function getOrDeployInfraForPublishedContract(
   if (!implementationContract || !cloneFactoryContract) {
     // deploy the infra and implementation contracts if not found
     cloneFactoryContract = await deployCloneFactory({
-      client,
-      chain,
       account,
+      chain,
+      client,
     });
     implementationContract = await deployImplementation({
-      client,
-      chain,
       account,
-      contractId,
+      chain,
+      client,
       constructorParams,
+      contractId,
       publisher,
       version,
     });
   }
-  return { cloneFactoryContract, implementationContract };
+
+  return {
+    cloneFactoryContract,
+    implementationContract,
+  };
 }
 
 /**
@@ -165,8 +171,8 @@ export async function deployCloneFactory(options: ClientAndChainAndAccount) {
   // clone factory
   return getOrDeployInfraContract({
     ...options,
-    contractId: "TWCloneFactory",
     constructorParams: { _trustedForwarder: forwarder.address },
+    contractId: "TWCloneFactory",
   });
 }
 
@@ -184,8 +190,8 @@ export async function deployImplementation(
 ) {
   return getOrDeployInfraContract({
     ...options,
-    contractId: options.contractId,
     constructorParams: options.constructorParams,
+    contractId: options.contractId,
     publisher: options.publisher,
     version: options.version,
   });
@@ -208,9 +214,9 @@ export async function getOrDeployInfraContract(
 
     if (weth) {
       return getContract({
-        client: options.client,
-        chain: options.chain,
         address: weth,
+        chain: options.chain,
+        client: options.client,
       });
     }
   }
@@ -230,7 +236,7 @@ export async function getOrDeployInfraContract(
   });
 }
 
-export async function getOrDeployInfraContractFromMetadata(
+async function getOrDeployInfraContractFromMetadata(
   options: ClientAndChainAndAccount & {
     contractMetadata: FetchDeployMetadataResult;
     constructorParams?: Record<string, unknown>;
@@ -243,13 +249,32 @@ export async function getOrDeployInfraContractFromMetadata(
   const transaction =
     prepareInfraContractDeployTransactionFromMetadata(options);
   await sendAndConfirmTransaction({
-    transaction,
     account: options.account,
+    transaction,
   });
   const deployedInfraContract =
     await getDeployedInfraContractFromMetadata(options);
   if (!deployedInfraContract) {
     throw new Error(`Failed to deploy ${options.contractMetadata.name}`);
   }
+
+  const isStylus = options.contractMetadata.metadata.language === "rust";
+  if (isStylus) {
+    try {
+      const activationTransaction = await activateStylusContract({
+        chain: options.chain,
+        client: options.client,
+        contractAddress: deployedInfraContract.address,
+      });
+
+      await sendTransaction({
+        account: options.account,
+        transaction: activationTransaction,
+      });
+    } catch {
+      console.error("Error: Contract could not be activated.");
+    }
+  }
+
   return deployedInfraContract;
 }

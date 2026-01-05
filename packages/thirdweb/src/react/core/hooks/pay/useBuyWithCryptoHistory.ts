@@ -34,6 +34,7 @@ export type BuyWithCryptoHistoryQueryOptions = Omit<
  *  return <div> ... </div>
  * }
  * ```
+ * @deprecated
  * @buyCrypto
  */
 export function useBuyWithCryptoHistory(
@@ -42,13 +43,13 @@ export function useBuyWithCryptoHistory(
 ): UseQueryResult<BuyWithCryptoHistoryData> {
   return useQuery({
     ...queryParams,
-    queryKey: ["getBuyWithCryptoHistory", params],
+    enabled: !!params,
     queryFn: () => {
       if (!params) {
         throw new Error("Swap params are required");
       }
       return getBuyWithCryptoHistory(params);
     },
-    enabled: !!params,
+    queryKey: ["getBuyWithCryptoHistory", params],
   });
 }

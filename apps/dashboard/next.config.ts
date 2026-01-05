@@ -9,13 +9,18 @@ const ContentSecurityPolicy = `
   img-src * data: blob:;
   media-src * data: blob:;
   object-src 'none';
-  style-src 'self' 'unsafe-inline' vercel.live;
+  style-src 'self' 'unsafe-inline' vercel.live us.posthog.com;
   font-src 'self' vercel.live assets.vercel.com framerusercontent.com fonts.gstatic.com;
   frame-src * data:;
-  script-src 'self' 'unsafe-eval' 'unsafe-inline' 'wasm-unsafe-eval' 'inline-speculation-rules' *.thirdweb.com *.thirdweb-dev.com vercel.live js.stripe.com framerusercontent.com events.framer.com challenges.cloudflare.com;
+  script-src 'self' 'unsafe-eval' 'unsafe-inline' 'wasm-unsafe-eval' 'inline-speculation-rules' *.thirdweb.com *.thirdweb-dev.com vercel.live js.stripe.com framerusercontent.com events.framer.com challenges.cloudflare.com googletagmanager.com us-assets.i.posthog.com edit.framer.com framer.com googletagmanager.com;
   connect-src * data: blob:;
   worker-src 'self' blob:;
   block-all-mixed-content;
+`;
+
+const EmbedContentSecurityPolicy = `
+  ${ContentSecurityPolicy}
+  frame-ancestors *;
 `;
 
 const securityHeaders = [
@@ -46,90 +51,88 @@ function determineIpfsGateways() {
   const remotePatterns: RemotePattern[] = [];
   if (process.env.API_ROUTES_CLIENT_ID) {
     remotePatterns.push({
-      protocol: "https",
       hostname: `${process.env.API_ROUTES_CLIENT_ID}.ipfscdn.io`,
+      protocol: "https",
     });
     remotePatterns.push({
-      protocol: "https",
       hostname: `${process.env.API_ROUTES_CLIENT_ID}.thirdwebstorage-staging.com`,
+      protocol: "https",
     });
     remotePatterns.push({
-      protocol: "https",
       hostname: `${process.env.API_ROUTES_CLIENT_ID}.thirdwebstorage-dev.com`,
+      protocol: "https",
     });
   } else {
     // this should only happen in development
     remotePatterns.push({
-      protocol: "https",
       hostname: "ipfs.io",
+      protocol: "https",
     });
   }
   // also add the dashboard clientId ipfs gateway if it is set
   if (process.env.NEXT_PUBLIC_DASHBOARD_CLIENT_ID) {
     remotePatterns.push({
-      protocol: "https",
       hostname: `${process.env.NEXT_PUBLIC_DASHBOARD_CLIENT_ID}.ipfscdn.io`,
+      protocol: "https",
     });
     remotePatterns.push({
-      protocol: "https",
       hostname: `${process.env.NEXT_PUBLIC_DASHBOARD_CLIENT_ID}.thirdwebstorage-staging.com`,
+      protocol: "https",
     });
     remotePatterns.push({
-      protocol: "https",
       hostname: `${process.env.NEXT_PUBLIC_DASHBOARD_CLIENT_ID}.thirdwebstorage-dev.com`,
+      protocol: "https",
     });
   }
   return remotePatterns;
 }
 
 const SENTRY_OPTIONS: SentryBuildOptions = {
-  // For all available options, see:
-  // https://github.com/getsentry/sentry-webpack-plugin#options
-
-  org: "thirdweb-dev",
-  project: "dashboard",
   // An auth token is required for uploading source maps.
   authToken: process.env.SENTRY_AUTH_TOKEN,
-  // Suppresses source map uploading logs during build
-  silent: true,
-  // For all available options, see:
-  // https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/
-
-  // Upload a larger set of source maps for prettier stack traces (increases build time)
-  widenClientFileUpload: true,
-
-  // Routes browser requests to Sentry through a Next.js rewrite to circumvent ad-blockers (increases server load)
-  tunnelRoute: "/err",
-
-  // Hides source maps from generated client bundles
-  hideSourceMaps: true,
-
-  // Automatically tree-shake Sentry logger statements to reduce bundle size
-  disableLogger: true,
 
   // Enables automatic instrumentation of Vercel Cron Monitors.
   // See the following for more information:
   // https://docs.sentry.io/product/crons/
   // https://vercel.com/docs/cron-jobs
   automaticVercelMonitors: false,
+
+  // Automatically tree-shake Sentry logger statements to reduce bundle size
+  disableLogger: true,
+  // For all available options, see:
+  // https://github.com/getsentry/sentry-webpack-plugin#options
+
+  org: "thirdweb-dev",
+  project: "dashboard",
+  // Suppresses source map uploading logs during build
+  silent: true,
+
+  // Routes browser requests to Sentry through a Next.js rewrite to circumvent ad-blockers (increases server load)
+  tunnelRoute: "/err",
+  // For all available options, see:
+  // https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/
+
+  // Upload a larger set of source maps for prettier stack traces (increases build time)
+  widenClientFileUpload: true,
 };
 
+// add additional languages to the framer rewrite paths here (english is already included by default)
+const FRAMER_ADDITIONAL_LANGUAGES = ["es"];
+
 const baseNextConfig: NextConfig = {
+  transpilePackages: ["@workspace/ui"],
   eslint: {
     ignoreDuringBuilds: true,
   },
-  productionBrowserSourceMaps: false,
   experimental: {
+    serverSourceMaps: false,
+    taint: true,
     webpackBuildWorker: true,
     webpackMemoryOptimizations: true,
-    serverSourceMaps: false,
   },
-  serverExternalPackages: ["pino-pretty"],
   async headers() {
     return [
       {
-        // Apply these headers to all routes in your application.
-        source: "/(.*)",
         headers: [
           ...securityHeaders,
           {
@@ -137,48 +140,104 @@ const baseNextConfig: NextConfig = {
             value: "sec-ch-viewport-width",
           },
         ],
+        // Apply these headers to all routes in your application.
+        source: "/(.*)",
+      },
+      {
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value: EmbedContentSecurityPolicy.replace(/\s{2,}/g, " ").trim(),
+          },
+        ],
+        source: "/bridge/widget",
+      },
+      {
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value: EmbedContentSecurityPolicy.replace(/\s{2,}/g, " ").trim(),
+          },
+        ],
+        source: "/bridge/widget/:path*",
+      },
+      {
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value: EmbedContentSecurityPolicy.replace(/\s{2,}/g, " ").trim(),
+          },
+        ],
+        source: "/bridge/checkout-widget",
+      },
+      {
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value: EmbedContentSecurityPolicy.replace(/\s{2,}/g, " ").trim(),
+          },
+        ],
+        source: "/bridge/checkout-widget/:path*",
       },
     ];
   },
+  images: {
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
+    dangerouslyAllowSVG: true,
+    remotePatterns: [
+      {
+        hostname: "**.thirdweb.com",
+        protocol: "https",
+      },
+      ...determineIpfsGateways(),
+    ],
+  },
+  productionBrowserSourceMaps: false,
+  reactStrictMode: true,
   async redirects() {
     return getRedirects();
   },
   async rewrites() {
     return [
       {
-        source: "/thirdweb.eth",
-        destination: "/deployer.thirdweb.eth",
+        destination: "https://us-assets.i.posthog.com/static/:path*",
+        source: "/_ph/static/:path*",
       },
       {
-        source: "/thirdweb.eth/:path*",
+        destination: "https://us.i.posthog.com/:path*",
+        source: "/_ph/:path*",
+      },
+      {
+        destination: "https://us.i.posthog.com/decide",
+        source: "/_ph/decide",
+      },
+      {
+        destination: "/deployer.thirdweb.eth",
+        source: "/thirdweb.eth",
+      },
+      {
         destination: "/deployer.thirdweb.eth/:path*",
+        source: "/thirdweb.eth/:path*",
       },
       // re-write /home to / (this is so that logged in users will be able to go to /home and NOT be redirected to the logged in app)
       {
+        destination: "https://landing.thirdweb.com",
         source: "/home",
-        destination: "/",
       },
-      ...FRAMER_PATHS.map((path) => ({
-        source: path,
-        destination: `https://landing.thirdweb.com${path}`,
-      })),
+      // flatmap the framer paths for the default language and the additional languages
+      ...FRAMER_PATHS.flatMap((path) => [
+        {
+          destination: `https://landing.thirdweb.com${path}`,
+          source: path,
+        },
+        // this is for additional languages
+        ...FRAMER_ADDITIONAL_LANGUAGES.map((lang) => ({
+          destination: `https://landing.thirdweb.com/${lang}${path}`,
+          source: `/${lang}${path}`,
+        })),
+      ]),
     ];
   },
-  images: {
-    dangerouslyAllowSVG: true,
-    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "**.thirdweb.com",
-      },
-      ...determineIpfsGateways(),
-    ],
-  },
-  compiler: {
-    emotion: true,
-  },
-  reactStrictMode: true,
 };
 
 function getConfig(): NextConfig {
@@ -187,36 +246,29 @@ function getConfig(): NextConfig {
     const withBundleAnalyzer = require("@next/bundle-analyzer")({
       enabled: process.env.ANALYZE === "true",
     });
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { withPlausibleProxy } = require("next-plausible");
+
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { withSentryConfig } = require("@sentry/nextjs");
     return withBundleAnalyzer(
-      withPlausibleProxy({
-        customDomain: "https://pl.thirdweb.com",
-        scriptName: "pl",
-      })(
-        withSentryConfig(
-          {
-            ...baseNextConfig,
-            // @ts-expect-error - this is a valid option
-            webpack: (config) => {
-              if (config.cache) {
-                config.cache = Object.freeze({
-                  type: "memory",
-                });
-              }
-              config.externals.push("pino-pretty");
-              config.module = {
-                ...config.module,
-                exprContextCritical: false,
-              };
-              // Important: return the modified config
-              return config;
-            },
+      withSentryConfig(
+        {
+          ...baseNextConfig,
+          // @ts-expect-error - this is a valid option
+          webpack: (config) => {
+            if (config.cache) {
+              config.cache = Object.freeze({
+                type: "memory",
+              });
+            }
+            config.module = {
+              ...config.module,
+              exprContextCritical: false,
+            };
+            // Important: return the modified config
+            return config;
           },
-          SENTRY_OPTIONS,
-        ),
+        },
+        SENTRY_OPTIONS,
       ),
     );
   }

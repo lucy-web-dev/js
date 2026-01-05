@@ -1,6 +1,6 @@
-import { sluggerContext } from "@/contexts/slugger";
 import invariant from "tiny-invariant";
 import type { FunctionSignature } from "typedoc-better-json";
+import { sluggerContext } from "@/contexts/slugger";
 import { CodeBlock } from "../../../../components/Document/Code";
 import { DocLink } from "../../../../components/Document/DocLink";
 import { Heading } from "../../../../components/Document/Heading";
@@ -23,12 +23,14 @@ export function TypedocSummary(props: {
       {props.summary.map((s) => {
         switch (s.type) {
           case "code": {
-            return <CodeBlock lang={s.lang} code={s.value} />;
+            return (
+              <CodeBlock code={s.value} key={Math.random()} lang={s.lang} />
+            );
           }
 
           case "html":
           case "inlineCode": {
-            return <InlineCode code={s.value} />;
+            return <InlineCode code={s.value} key={Math.random()} />;
           }
 
           case "link": {
@@ -36,7 +38,7 @@ export function TypedocSummary(props: {
 
             // TODO - link to doc
             return (
-              <DocLink href={isUrlNum ? "" : s.url}>
+              <DocLink href={isUrlNum ? "" : s.url} key={s.url}>
                 <TypedocSummary summary={s.children} />
               </DocLink>
             );
@@ -44,27 +46,27 @@ export function TypedocSummary(props: {
 
           case "paragraph": {
             return (
-              <Paragraph className={props.className}>
+              <Paragraph className={props.className} key={Math.random()}>
                 <TypedocSummary summary={s.children} />
               </Paragraph>
             );
           }
 
           case "text": {
-            return <span> {s.value}</span>;
+            return <span key={Math.random()}>{s.value}</span>;
           }
 
           case "list": {
             if (s.ordered) {
               return (
-                <OrderedList>
+                <OrderedList key={Math.random()}>
                   <TypedocSummary summary={s.children} />
                 </OrderedList>
               );
             }
 
             return (
-              <UnorderedList>
+              <UnorderedList key={Math.random()}>
                 <TypedocSummary summary={s.children} />
               </UnorderedList>
             );
@@ -72,8 +74,8 @@ export function TypedocSummary(props: {
 
           case "listItem": {
             return (
-              <li>
-                <TypedocSummary summary={s.children} className="mb-0" />
+              <li key={Math.random()}>
+                <TypedocSummary className="mb-0" summary={s.children} />
               </li>
             );
           }
@@ -81,8 +83,13 @@ export function TypedocSummary(props: {
           case "heading": {
             return (
               <Heading
+                anchorId={slugger.slug(
+                  // biome-ignore lint/suspicious/noExplicitAny: complex type
+                  (s.children[0] as any)?.value ?? "",
+                  false,
+                )}
+                key={Math.random()}
                 level={s.depth}
-                id={slugger.slug(s.children[0]?.value, false)}
               >
                 <TypedocSummary summary={s.children} />
               </Heading>
@@ -92,7 +99,7 @@ export function TypedocSummary(props: {
           case "strong":
           case "emphasis": {
             return (
-              <em>
+              <em key={Math.random()}>
                 <TypedocSummary summary={s.children} />
               </em>
             );

@@ -8,10 +8,10 @@ import {
 } from "../../../../test/src/test-wallets.js";
 import { NATIVE_TOKEN_ADDRESS } from "../../../constants/addresses.js";
 import {
-  type ThirdwebContract,
   getContract,
+  type ThirdwebContract,
 } from "../../../contract/contract.js";
-import { sendTransaction } from "../../../transaction/actions/send-transaction.js";
+import { sendAndConfirmTransaction } from "../../../transaction/actions/send-and-confirm-transaction.js";
 import { toHex } from "../../../utils/encoding/hex.js";
 import { deployERC20Contract } from "../../prebuilts/deploy-erc20.js";
 import { deployERC1155Contract } from "../../prebuilts/deploy-erc1155.js";
@@ -58,27 +58,27 @@ describe.runIf(process.env.TW_SECRET_KEY)("generateMintSignature1155", () => {
 
   it("should generate a mint signature and mint an NFT", async () => {
     const { payload, signature } = await generateMintSignature({
-      mintRequest: {
-        to: TEST_ACCOUNT_B.address,
-        quantity: 10n,
-        pricePerToken: "0.1",
-        metadata: {
-          name: "My NFT",
-          description: "This is my NFT",
-          image: "https://example.com/image.png",
-        },
-      },
       account: TEST_ACCOUNT_A,
       contract: erc1155Contract,
+      mintRequest: {
+        metadata: {
+          description: "This is my NFT",
+          image: "https://example.com/image.png",
+          name: "My NFT",
+        },
+        pricePerToken: "0.1",
+        quantity: 10n,
+        to: TEST_ACCOUNT_B.address,
+      },
     });
     const transaction = mintWithSignature({
       contract: erc1155Contract,
       payload,
       signature,
     });
-    const { transactionHash } = await sendTransaction({
-      transaction,
+    const { transactionHash } = await sendAndConfirmTransaction({
       account: TEST_ACCOUNT_A,
+      transaction,
     });
     expect(transactionHash.length).toBe(66);
     const nft = await getNFT({
@@ -94,22 +94,22 @@ describe.runIf(process.env.TW_SECRET_KEY)("generateMintSignature1155", () => {
 
   it("should mint additional supply", async () => {
     const { payload, signature } = await generateMintSignature({
-      mintRequest: {
-        to: TEST_ACCOUNT_B.address,
-        quantity: 5n,
-        tokenId: 0n,
-      },
       account: TEST_ACCOUNT_A,
       contract: erc1155Contract,
+      mintRequest: {
+        quantity: 5n,
+        to: TEST_ACCOUNT_B.address,
+        tokenId: 0n,
+      },
     });
     const transaction = mintWithSignature({
       contract: erc1155Contract,
       payload,
       signature,
     });
-    const { transactionHash } = await sendTransaction({
-      transaction,
+    const { transactionHash } = await sendAndConfirmTransaction({
       account: TEST_ACCOUNT_A,
+      transaction,
     });
     expect(transactionHash.length).toBe(66);
     const nft = await getNFT({
@@ -125,13 +125,13 @@ describe.runIf(process.env.TW_SECRET_KEY)("generateMintSignature1155", () => {
 
   it("should generate a mint signature with default values", async () => {
     const { payload, signature } = await generateMintSignature({
-      mintRequest: {
-        to: TEST_ACCOUNT_B.address,
-        quantity: 10n,
-        metadata: "https://example.com/token",
-      },
       account: TEST_ACCOUNT_A,
       contract: erc1155Contract,
+      mintRequest: {
+        metadata: "https://example.com/token",
+        quantity: 10n,
+        to: TEST_ACCOUNT_B.address,
+      },
     });
 
     expect(payload.to).toBe(TEST_ACCOUNT_B.address);
@@ -153,9 +153,9 @@ describe.runIf(process.env.TW_SECRET_KEY)("generateMintSignature1155", () => {
       payload,
       signature,
     });
-    const { transactionHash } = await sendTransaction({
-      transaction,
+    const { transactionHash } = await sendAndConfirmTransaction({
       account: TEST_ACCOUNT_A,
+      transaction,
     });
     expect(transactionHash.length).toBe(66);
   });
@@ -163,21 +163,21 @@ describe.runIf(process.env.TW_SECRET_KEY)("generateMintSignature1155", () => {
   it("should generate a mint signature with custom values", async () => {
     const uid = toHex("abcdef1234567890", { size: 32 });
     const { payload, signature } = await generateMintSignature({
-      mintRequest: {
-        to: TEST_ACCOUNT_B.address,
-        quantity: 10n,
-        royaltyRecipient: TEST_ACCOUNT_B.address,
-        royaltyBps: 500,
-        primarySaleRecipient: TEST_ACCOUNT_A.address,
-        tokenId: 0n,
-        pricePerToken: "0.2",
-        currency: erc20TokenContract.address,
-        validityStartTimestamp: new Date(1635724800),
-        validityEndTimestamp: new Date(1867260800),
-        uid,
-      },
       account: TEST_ACCOUNT_A,
       contract: erc1155Contract,
+      mintRequest: {
+        currency: erc20TokenContract.address,
+        pricePerToken: "0.2",
+        primarySaleRecipient: TEST_ACCOUNT_A.address,
+        quantity: 10n,
+        royaltyBps: 500,
+        royaltyRecipient: TEST_ACCOUNT_B.address,
+        to: TEST_ACCOUNT_B.address,
+        tokenId: 0n,
+        uid,
+        validityEndTimestamp: new Date(1867260800),
+        validityStartTimestamp: new Date(1635724800),
+      },
     });
 
     expect(payload.to).toBe(TEST_ACCOUNT_B.address);
@@ -197,21 +197,21 @@ describe.runIf(process.env.TW_SECRET_KEY)("generateMintSignature1155", () => {
 
   it("should generate a mint signature with custom values", async () => {
     const { payload, signature } = await generateMintSignature({
-      mintRequest: {
-        to: TEST_ACCOUNT_B.address,
-        quantity: 10n,
-        royaltyRecipient: TEST_ACCOUNT_B.address,
-        royaltyBps: 500,
-        primarySaleRecipient: TEST_ACCOUNT_A.address,
-        tokenId: 0n,
-        pricePerToken: "0.2",
-        currency: erc20TokenContract.address,
-        validityStartTimestamp: new Date(1635724800),
-        validityEndTimestamp: new Date(1867260800),
-        uid: "abcdef1234567890",
-      },
       account: TEST_ACCOUNT_A,
       contract: erc1155Contract,
+      mintRequest: {
+        currency: erc20TokenContract.address,
+        pricePerToken: "0.2",
+        primarySaleRecipient: TEST_ACCOUNT_A.address,
+        quantity: 10n,
+        royaltyBps: 500,
+        royaltyRecipient: TEST_ACCOUNT_B.address,
+        to: TEST_ACCOUNT_B.address,
+        tokenId: 0n,
+        uid: "abcdef1234567890",
+        validityEndTimestamp: new Date(1867260800),
+        validityStartTimestamp: new Date(1635724800),
+      },
     });
 
     expect(payload.to).toBe(TEST_ACCOUNT_B.address);

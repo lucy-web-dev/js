@@ -94,13 +94,14 @@ export function NFTName({
   const { contract, tokenId } = useNFTContext();
 
   const nameQuery = useQuery({
+    queryFn: async (): Promise<string> =>
+      fetchNftName({ contract, nameResolver, tokenId }),
     queryKey: getQueryKey({
       chainId: contract.chain.id,
-      tokenId,
+      contractAddress: contract.address,
       nameResolver,
+      tokenId,
     }),
-    queryFn: async (): Promise<string> =>
-      fetchNftName({ nameResolver, contract, tokenId }),
     ...queryOptions,
   });
 
@@ -118,14 +119,16 @@ export function NFTName({
  * @internal
  */
 export function getQueryKey(props: {
+  contractAddress: string;
   chainId: number;
   tokenId: bigint;
   nameResolver?: string | (() => string) | (() => Promise<string>);
 }) {
-  const { chainId, tokenId, nameResolver } = props;
+  const { chainId, tokenId, nameResolver, contractAddress } = props;
   return [
     "_internal_nft_name_",
     chainId,
+    contractAddress,
     tokenId.toString(),
     {
       resolver:

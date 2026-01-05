@@ -16,17 +16,18 @@ env:
   TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
   TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
   TW_SECRET_KEY: ${{ secrets.TW_SECRET_KEY }}
+  TW_CLIENT_ID: ${{ secrets.TW_CLIENT_ID }}
   CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
 jobs:
   optimize_ci:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-8
     outputs:
       skip: ${{ steps.check_skip.outputs.skip }}
     steps:
       - name: Optimize CI
         id: check_skip
-        uses: withgraphite/graphite-ci-action@main
+        uses: withgraphite/graphite-ci-action@9cb601a55e114099561b6d755505de377d45db40 # v0.0.9 ("main")
         with:
           graphite_token: ${{ secrets.GRAPHITE_OMTIMIZE_TOKEN }}
   
@@ -34,11 +35,11 @@ jobs:
   build:
     needs: optimize_ci
     if: needs.optimize_ci.outputs.skip == 'false'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-8
     name: Build Packages
     steps:
       - name: Check out the code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup & Install
         uses: ./.github/composite-actions/install
@@ -51,18 +52,18 @@ jobs:
     if: needs.optimize_ci.outputs.skip == 'false'
     timeout-minutes: 15
     name: Lint Packages
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-8
     steps:
       - name: Check out the code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup & Install
         uses: ./.github/composite-actions/install
 
       - name: Setup Biome
-        uses: biomejs/setup-biome@v2
+        uses: biomejs/setup-biome@a9763ed3d2388f5746f9dc3e1a55df7f4609bc89 # v2.5.1
         with:
-          version: latest  
+          version: 2.0.6
 
       - run: pnpm lint
 
@@ -71,16 +72,16 @@ jobs:
     if: needs.optimize_ci.outputs.skip == 'false'
     timeout-minutes: 15
     name: Unit Tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-8
     steps:
       - name: Check out the code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup & Install
         uses: ./.github/composite-actions/install
 
       - name: Set up foundry
-        uses: foundry-rs/foundry-toolchain@v1
+        uses: foundry-rs/foundry-toolchain@82dee4ba654bd2146511f85f0d013af94670c4de # v1.4.0
         with:
           cache: false
           version: nightly-c4a984fbf2c48b793c8cd53af84f56009dd1070c
@@ -88,7 +89,7 @@ jobs:
       - run: pnpm test
 
       - name: Code Coverage
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@18283e04ce6e62d37312384ff67231eb8fd56d24 # v5.4.3
         with:
           directory: packages/
           flags: packages
@@ -99,14 +100,14 @@ jobs:
     if: needs.optimize_ci.outputs.skip == 'false'
     timeout-minutes: 15
     name: E2E Tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-8
     strategy:
       matrix:
-        package_manager: [npm, yarn, pnpm, bun]
+        package_manager: [pnpm] # TODO, reenable [npm, yarn, pnpm, bun]
         bundler: [vite, webpack, esbuild]
     steps:
       - name: Check out the code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup & Install
         uses: ./.github/composite-actions/install
@@ -123,7 +124,14 @@ jobs:
           mkdir test-project
           cd test-project
           npm init -y
-          ${{ matrix.package_manager }} add react react-dom ../packages/thirdweb
+          
+          # Handle different package managers
+          if [ "${{ matrix.package_manager }}" = "pnpm" ]; then
+            # Create pnpm workspace
+            echo '{"name": "test-project", "private": true, "workspaces": ["."]}' > package.json
+            echo '{"packages": ["../packages/*"]}' > pnpm-workspace.yaml
+            pnpm add react react-dom ../packages/thirdweb -w
+          fi
       - name: Create test file
         run: |
           cd test-project
@@ -133,7 +141,7 @@ jobs:
         if: matrix.bundler == 'vite'
         run: |
           cd test-project
-          ${{matrix.package_manager}} add vite
+          ${{matrix.package_manager}} add vite -w
           echo 'import { defineConfig } from "vite"; import {resolve} from "path"; export default defineConfig({ build: { lib: { entry: resolve(__dirname, "index.js"), name: "e2e_test" }, outDir: "dist" }});' > vite.config.js
           npx vite build
     
@@ -141,7 +149,7 @@ jobs:
         if: matrix.bundler == 'webpack'
         run: |
           cd test-project
-          ${{matrix.package_manager}} add webpack webpack-cli
+          ${{matrix.package_manager}} add webpack webpack-cli -w
           echo 'const path = require("path"); module.exports = { mode: "production", entry: "./index.js", output: { path: path.resolve(__dirname, "dist"), filename: "bundle.js" }};' > webpack.config.js
           npx webpack
     
@@ -149,7 +157,7 @@ jobs:
         if: matrix.bundler == 'esbuild'
         run: |
           cd test-project
-          ${{matrix.package_manager}} add esbuild
+          ${{matrix.package_manager}} add esbuild -w
           npx esbuild index.js --bundle --outdir=dist
     
       - name: Verify bundle
@@ -169,17 +177,27 @@ jobs:
     if:  github.event_name == 'pull_request' && needs.optimize_ci.outputs.skip == 'false'
     timeout-minutes: 15
     name: "Size"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-8
     steps:
       - name: Check out the code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup & Install
         uses: ./.github/composite-actions/install
 
-      - name: Report bundle size
-        uses: andresz1/size-limit-action@master
+      - name: Build Packages
+        run: pnpm build
+
+      - name: Report bundle size (thirdweb)
+        uses: andresz1/size-limit-action@94bc357df29c36c8f8d50ea497c3e225c3c95d1d # v1.8.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           package_manager: pnpm
           directory: packages/thirdweb
+
+      - name: Report bundle size (nexus)
+        uses: andresz1/size-limit-action@94bc357df29c36c8f8d50ea497c3e225c3c95d1d # v1.8.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          package_manager: pnpm
+          directory: packages/nexus

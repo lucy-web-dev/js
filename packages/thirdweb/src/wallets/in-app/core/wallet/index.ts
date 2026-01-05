@@ -5,14 +5,25 @@ import {
   type SocialAuthOption,
   socialAuthOptions,
 } from "../../../../wallets/types.js";
+import type {
+  EcosystemWalletConnectionOptions,
+  EcosystemWalletCreationOptions,
+} from "../../../ecosystem/types.js";
 import type { Account, Wallet } from "../../../interfaces/wallet.js";
-import type { EcosystemWalletId, WalletId } from "../../../wallet-types.js";
+import type { SmartWalletOptions } from "../../../smart/types.js";
 import type {
   CreateWalletArgs,
+  EcosystemWalletId,
   WalletAutoConnectionOption,
-  WalletConnectionOption,
+  WalletId,
 } from "../../../wallet-types.js";
+import { create7702MinimalAccount } from "../eip7702/minimal-account.js";
 import type { InAppConnector } from "../interfaces/connector.js";
+import type {
+  ExecutionModeOptions,
+  InAppWalletConnectionOptions,
+  InAppWalletCreationOptions,
+} from "./types.js";
 
 /**
  * Checks if the provided wallet is an in-app wallet.
@@ -30,12 +41,8 @@ export function isInAppWallet(
  * @internal
  */
 export async function connectInAppWallet(
-  options:
-    | WalletConnectionOption<"inApp">
-    | WalletConnectionOption<EcosystemWalletId>,
-  createOptions:
-    | CreateWalletArgs<"inApp">[1]
-    | CreateWalletArgs<EcosystemWalletId>[1],
+  options: InAppWalletConnectionOptions | EcosystemWalletConnectionOptions,
+  createOptions: InAppWalletCreationOptions | EcosystemWalletCreationOptions,
   connector: InAppConnector,
 ): Promise<{ account: Account; chain: Chain; adminAccount?: Account }> {
   if (
@@ -46,7 +53,7 @@ export async function connectInAppWallet(
   ) {
     const strategy = options.strategy;
     if (socialAuthOptions.includes(strategy as SocialAuthOption)) {
-      connector.authenticateWithRedirect(
+      await connector.authenticateWithRedirect(
         strategy as SocialAuthOption,
         createOptions?.auth?.mode,
         createOptions?.auth?.redirectUrl,
@@ -60,21 +67,12 @@ export async function connectInAppWallet(
   const authResult = await connector.connect(options);
   const authAccount = authResult.user.account;
 
-  if (
-    createOptions &&
-    "smartAccount" in createOptions &&
-    createOptions?.smartAccount
-  ) {
-    const [account, chain] = await convertToSmartAccount({
-      client: options.client,
-      authAccount,
-      smartAccountOptions: createOptions.smartAccount,
-      chain: options.chain,
-    });
-    return { account, chain, adminAccount: authAccount };
-  }
-
-  return { account: authAccount, chain: options.chain || ethereum } as const;
+  return createInAppAccount({
+    authAccount,
+    client: options.client,
+    createOptions,
+    desiredChain: options.chain,
+  });
 }
 
 /**
@@ -100,21 +98,12 @@ export async function autoConnectInAppWallet(
 
   const authAccount = user.account;
 
-  if (
-    createOptions &&
-    "smartAccount" in createOptions &&
-    createOptions?.smartAccount
-  ) {
-    const [account, chain] = await convertToSmartAccount({
-      client: options.client,
-      authAccount,
-      smartAccountOptions: createOptions.smartAccount,
-      chain: options.chain,
-    });
-    return { account, chain, adminAccount: authAccount };
-  }
-
-  return { account: authAccount, chain: options.chain || ethereum } as const;
+  return createInAppAccount({
+    authAccount,
+    client: options.client,
+    createOptions,
+    desiredChain: options.chain,
+  });
 }
 
 async function convertToSmartAccount(options: {
@@ -127,9 +116,9 @@ async function convertToSmartAccount(options: {
 
   return connectSmartAccount(
     {
+      chain: options.chain,
       client: options.client,
       personalAccount: options.authAccount,
-      chain: options.chain,
     },
     options.smartAccountOptions,
   );
@@ -143,4 +132,67 @@ async function getAuthenticatedUser(connector: InAppConnector) {
     }
   }
   return undefined;
+}
+
+async function createInAppAccount(options: {
+  client: ThirdwebClient;
+  authAccount: Account;
+  createOptions: InAppWalletCreationOptions | EcosystemWalletCreationOptions;
+  desiredChain?: Chain;
+}) {
+  const { createOptions, authAccount, desiredChain, client } = options;
+  let smartAccountOptions: SmartWalletOptions | undefined;
+  let eip7702: Extract<ExecutionModeOptions, { mode: "EIP7702" }> | undefined;
+  const executionMode =
+    createOptions && "executionMode" in createOptions
+      ? createOptions.executionMode
+      : undefined;
+
+  if (executionMode) {
+    if (executionMode.mode === "EIP4337") {
+      smartAccountOptions = executionMode.smartAccount;
+    } else if (executionMode.mode === "EIP7702") {
+      eip7702 = executionMode;
+    }
+  }
+
+  // backwards compatibility
+  if (
+    createOptions &&
+    "smartAccount" in createOptions &&
+    createOptions?.smartAccount
+  ) {
+    smartAccountOptions = createOptions.smartAccount;
+  }
+
+  if (smartAccountOptions) {
+    const [account, chain] = await convertToSmartAccount({
+      authAccount,
+      chain: desiredChain,
+      client,
+      smartAccountOptions,
+    });
+    return { account, adminAccount: authAccount, chain };
+  }
+
+  if (eip7702) {
+    const chain = desiredChain;
+    if (!chain) {
+      throw new Error(
+        "Chain is required for EIP-7702 execution, pass a chain when connecting the inAppWallet.",
+      );
+    }
+    const account = create7702MinimalAccount({
+      adminAccount: authAccount,
+      client,
+      sponsorGas: eip7702.sponsorGas,
+    });
+    return {
+      account,
+      adminAccount: authAccount,
+      chain,
+    };
+  }
+
+  return { account: authAccount, chain: desiredChain || ethereum } as const;
 }

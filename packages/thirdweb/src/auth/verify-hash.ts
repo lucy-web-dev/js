@@ -1,26 +1,24 @@
-import {
-  type Signature,
-  encodeDeployData,
-  encodeFunctionData,
-  isErc6492Signature,
-  serializeSignature,
-  universalSignatureValidatorAbi,
-  universalSignatureValidatorByteCode,
-} from "viem";
+import * as ox__Abi from "ox/Abi";
+import * as ox__AbiConstructor from "ox/AbiConstructor";
+import * as ox__AbiFunction from "ox/AbiFunction";
+import { WrappedSignature as ox__WrappedSignature } from "ox/erc6492";
+import * as ox__Signature from "ox/Signature";
 import type { Chain } from "../chains/types.js";
 import type { ThirdwebClient } from "../client/client.js";
-import { type ThirdwebContract, getContract } from "../contract/contract.js";
+import { getContract, type ThirdwebContract } from "../contract/contract.js";
 import { isValidSignature } from "../extensions/erc1271/__generated__/isValidSignature/read/isValidSignature.js";
 import { eth_call } from "../rpc/actions/eth_call.js";
 import { getRpcClient } from "../rpc/rpc.js";
+import type { Address } from "../utils/address.js";
 import { isZkSyncChain } from "../utils/any-evm/zksync/isZkSyncChain.js";
+import { isContractDeployed } from "../utils/bytecode/is-contract-deployed.js";
 import { fromBytes } from "../utils/encoding/from-bytes.js";
 import { type Hex, hexToBool, isHex } from "../utils/encoding/hex.js";
 import { serializeErc6492Signature } from "./serialize-erc6492-signature.js";
 
 export type VerifyHashParams = {
   hash: Hex;
-  signature: string | Uint8Array | Signature;
+  signature: string | Uint8Array | ox__Signature.Signature;
   address: string;
   client: ThirdwebClient;
   chain: Chain;
@@ -30,10 +28,11 @@ export type VerifyHashParams = {
   };
 };
 
-const ZKSYNC_VALIDATOR_ADDRESS = "0xfB688330379976DA81eB64Fe4BF50d7401763B9C";
+const ZKSYNC_VALIDATOR_ADDRESS: Address =
+  "0xfB688330379976DA81eB64Fe4BF50d7401763B9C";
 
 /**
- * @description Verify that an address created the provided signature for a given hash using [ERC-6492](https://eips.ethereum.org/EIPS/eip-6492). This function is interoperable with all wallet types, including EOAs.
+ * Verify that an address created the provided signature for a given hash using [ERC-6492](https://eips.ethereum.org/EIPS/eip-6492). This function is interoperable with all wallet types, including EOAs.
  * This function should rarely be used directly, instead use @see {import("./verify-signature.js")} and @see {import("./verify-typed-data.js")}}
  *
  * @param {Hex} options.hash The hash that was signed
@@ -71,7 +70,7 @@ export async function verifyHash({
   const signatureHex = (() => {
     if (isHex(signature)) return signature;
     if (typeof signature === "object" && "r" in signature && "s" in signature)
-      return serializeSignature(signature);
+      return ox__Signature.toHex(signature);
     if (signature instanceof Uint8Array) return fromBytes(signature, "hex");
     // We should never hit this but TS doesn't know that
     throw new Error(
@@ -79,13 +78,40 @@ export async function verifyHash({
     );
   })();
 
+  const isDeployed = await isContractDeployed(
+    getContract({
+      address,
+      chain,
+      client,
+    }),
+  );
+
+  if (isDeployed) {
+    const validEip1271 = await verifyEip1271Signature({
+      contract: getContract({
+        address,
+        chain,
+        client,
+      }),
+      hash,
+      signature: signatureHex,
+    }).catch((err) => {
+      console.error("Error verifying EIP-1271 signature", err);
+      return false;
+    });
+    if (validEip1271) {
+      return true;
+    }
+  }
+
+  // contract not deployed, use erc6492 validator to verify signature
   const wrappedSignature: Hex = await (async () => {
     // If no factory is provided, we have to assume its already deployed or is an EOA
     // TODO: Figure out how to automatically tell if our default factory was used
     if (!accountFactory) return signatureHex;
 
     // If this sigature was already wrapped for ERC-6492, carry on
-    if (isErc6492Signature(signatureHex)) return signatureHex;
+    if (ox__WrappedSignature.validate(signatureHex)) return signatureHex;
 
     // Otherwise, serialize the signature for ERC-6492 validation
     return serializeErc6492Signature({
@@ -96,27 +122,28 @@ export async function verifyHash({
   })();
 
   let verificationData: {
-    to?: string;
+    to?: Address;
     data: Hex;
   };
+
   const zkSyncChain = await isZkSyncChain(chain);
+  const abi = ox__Abi.from(ox__WrappedSignature.universalSignatureValidatorAbi);
   if (zkSyncChain) {
     // zksync chains dont support deploying code with eth_call
     // need to call a deployed contract instead
     verificationData = {
+      data: ox__AbiFunction.encodeData(
+        ox__AbiFunction.fromAbi(abi, "isValidSig"),
+        [address, hash, wrappedSignature],
+      ),
       to: ZKSYNC_VALIDATOR_ADDRESS,
-      data: encodeFunctionData({
-        abi: universalSignatureValidatorAbi,
-        functionName: "isValidSig",
-        args: [address, hash, wrappedSignature],
-      }),
     };
   } else {
+    const validatorConstructor = ox__AbiConstructor.fromAbi(abi);
     verificationData = {
-      data: encodeDeployData({
-        abi: universalSignatureValidatorAbi,
+      data: ox__AbiConstructor.encode(validatorConstructor, {
         args: [address, hash, wrappedSignature],
-        bytecode: universalSignatureValidatorByteCode,
+        bytecode: ox__WrappedSignature.universalSignatureValidatorBytecode,
       }),
     };
   }
@@ -132,13 +159,13 @@ export async function verifyHash({
   } catch {
     // Some chains do not support the eth_call simulation and will fail, so we fall back to regular EIP1271 validation
     const validEip1271 = await verifyEip1271Signature({
-      hash,
-      signature: signatureHex,
       contract: getContract({
-        chain,
         address,
+        chain,
         client,
       }),
+      hash,
+      signature: signatureHex,
     }).catch((err) => {
       console.error("Error verifying EIP-1271 signature", err);
       return false;
@@ -164,12 +191,13 @@ export async function verifyEip1271Signature({
 }): Promise<boolean> {
   try {
     const result = await isValidSignature({
+      contract,
       hash,
       signature,
-      contract,
     });
     return result === EIP_1271_MAGIC_VALUE;
-  } catch {
+  } catch (err) {
+    console.error("Error verifying EIP-1271 signature", err);
     return false;
   }
 }

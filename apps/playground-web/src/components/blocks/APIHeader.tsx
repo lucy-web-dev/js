@@ -1,53 +1,70 @@
-import Image from "next/image";
+import { ArrowUpRightIcon } from "lucide-react";
 import Link from "next/link";
+import { cn } from "../../lib/utils";
 import { Button } from "../ui/button";
 
-export function APIHeader(props: {
+export function PageHeader(props: {
   title: string;
   description: React.ReactNode;
   docsLink: string;
-  heroLink: string;
+  icon: React.FC<{ className?: string }>;
+  containerClassName?: string;
 }) {
   return (
-    <div
-      className="mb-12 flex flex-col-reverse items-center justify-between gap-6 rounded-3xl px-6 py-8 lg:flex-row lg:px-14 lg:py-14"
-      style={{
-        background:
-          "linear-gradient(to top, hsl(var(--secondary)/80%), transparent)",
-      }}
-    >
-      {/* Left */}
-      <div>
-        <h1 className="mb-2 font-bold text-4xl tracking-tighter md:text-5xl">
-          {props.title}
-        </h1>
-        <p className="mb-5 max-w-[700px] text-balance text-muted-foreground">
-          {props.description}
-        </p>
+    <div className="mb-8 border-b py-8 relative">
+      <div
+        className={cn(
+          "container max-w-7xl flex-col lg:flex-row flex items-start justify-between gap-4",
+          props.containerClassName,
+        )}
+      >
+        {/* Left */}
+        <div>
+          <div className="flex mb-4">
+            <div className="rounded-full border bg-card p-2.5">
+              <props.icon className="size-6 text-muted-foreground" />
+            </div>
+          </div>
 
-        <div className="flex flex-col gap-3 md:flex-row">
-          <Button asChild size="lg">
-            <Link target="_blank" href={props.docsLink}>
-              View docs
-            </Link>
-          </Button>
-          <Button asChild variant="outline" size="lg">
-            <Link target="_blank" href="https://thirdweb.com/contact-us">
-              Book a Demo
-            </Link>
-          </Button>
+          <h1 className="mb-1 font-bold text-3xl tracking-tight">
+            {props.title}
+          </h1>
+          <p className="text-sm md:text-base text-balance text-muted-foreground max-w-5xl">
+            {props.description}
+          </p>
         </div>
-      </div>
 
-      {/* Right */}
-      <Image
-        src={props.heroLink}
-        width={600}
-        height={400}
-        className="max-h-[300px] rounded-2xl object-contain lg:max-w-[500px]"
-        alt=""
-        priority={true}
-      />
+        {/* right */}
+        <Button asChild className="rounded-full gap-2 px-4" size="sm">
+          <Link href={props.docsLink} target="_blank">
+            Documentation
+            <ArrowUpRightIcon className="size-4" />
+          </Link>
+        </Button>
+      </div>
     </div>
+  );
+}
+
+export function PageLayout(props: {
+  title: string;
+  description: React.ReactNode;
+  docsLink: string;
+  children: React.ReactNode;
+  containerClassName?: string;
+  icon: React.FC<{ className?: string }>;
+}) {
+  return (
+    <main>
+      <PageHeader
+        description={props.description}
+        docsLink={props.docsLink}
+        icon={props.icon}
+        title={props.title}
+      />
+      <div className={cn("container max-w-7xl pb-8", props.containerClassName)}>
+        {props.children}
+      </div>
+    </main>
   );
 }

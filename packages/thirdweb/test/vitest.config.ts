@@ -37,8 +37,10 @@ export default defineConfig({
     setupFiles: [join(__dirname, "./reactSetup.ts")],
     globalSetup: [join(__dirname, "./globalSetup.ts")],
     testTimeout: 90_000,
-    retry: process.env.CI ? 3 : 0,
-    maxConcurrency: 3,
+    retry: 3,
+    maxConcurrency: 1,
+    maxWorkers: 4,
+    minWorkers: 2,
     bail: 1,
     // clear any mocks between any tests
     clearMocks: true,

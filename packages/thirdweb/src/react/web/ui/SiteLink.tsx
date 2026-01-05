@@ -48,29 +48,30 @@ export function SiteLink({
   const activeWallet = useActiveWallet();
   const walletId = activeWallet?.id;
 
-  const {
-    data: { authProvider, authCookie } = {},
-  } = useQuery({
-    queryKey: ["site-link", walletId, href, client.clientId, ecosystem],
+  const { data: { authProvider, authCookie } = {} } = useQuery({
     enabled:
-      activeWallet && (isEcosystemWallet(activeWallet) || walletId === "inApp"),
+      activeWallet &&
+      (isEcosystemWallet(activeWallet) ||
+        walletId === "inApp" ||
+        walletId === "smart"),
     queryFn: async () => {
       const storage = new ClientScopedStorage({
-        storage: webLocalStorage,
         clientId: client.clientId,
         ecosystem,
+        storage: webLocalStorage,
       });
 
       const authProvider = await getLastAuthProvider(webLocalStorage);
       const authCookie = await storage.getAuthCookie();
 
-      return { authProvider, authCookie };
+      return { authCookie, authProvider };
     },
+    queryKey: ["site-link", walletId, href, client.clientId, ecosystem],
   });
 
   const url = new URL(href);
   if (walletId) {
-    url.searchParams.set("walletId", walletId);
+    url.searchParams.set("walletId", walletId === "smart" ? "inApp" : walletId);
   }
   if (authProvider) {
     url.searchParams.set("authProvider", authProvider);

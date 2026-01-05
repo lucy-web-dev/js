@@ -21,10 +21,10 @@ describe("normalizeFunctionParams", () => {
         { name: "_param1", type: "uint256" },
         { name: "_param2", type: "string" },
       ],
-      type: "function",
-      stateMutability: "pure",
       name: "test",
       outputs: [],
+      stateMutability: "pure",
+      type: "function",
     };
     const params = {
       param1: 123,
@@ -41,10 +41,10 @@ describe("normalizeFunctionParams", () => {
         { name: "_param1", type: "uint256" },
         { name: "_param2", type: "string" },
       ],
-      type: "function",
-      stateMutability: "pure",
       name: "test",
       outputs: [],
+      stateMutability: "pure",
+      type: "function",
     };
     const params = {
       _param1: 123,
@@ -56,26 +56,51 @@ describe("normalizeFunctionParams", () => {
   });
 
   it("should throw an error if a parameter name is missing", () => {
-    const abiFunction: AbiFunction = {
+    let abiFunction: AbiFunction = {
       inputs: [{ name: undefined, type: "uint256" }],
-      type: "function",
-      stateMutability: "pure",
       name: "test",
       outputs: [],
+      stateMutability: "pure",
+      type: "function",
     };
 
     expect(() => normalizeFunctionParams(abiFunction, {})).toThrow(
       "Missing named parameter for test at index 0",
     );
+
+    abiFunction = {
+      inputs: [{ name: "", type: "uint256" }],
+      name: "test",
+      outputs: [],
+      stateMutability: "pure",
+      type: "function",
+    };
+
+    expect(() => normalizeFunctionParams(abiFunction, {})).toThrow(
+      "Missing named parameter for test at index 0",
+    );
+
+    abiFunction = {
+      inputs: [{ name: undefined, type: "uint256" }],
+      name: "test",
+      outputs: [],
+      stateMutability: "pure",
+      type: "function",
+    };
+
+    const normalized = normalizeFunctionParams(abiFunction, { "*": 123 });
+
+    expect(normalized.length).to.eq(1);
+    expect(normalized[0]).to.eq(123);
   });
 
   it("should throw an error if a parameter value is missing", () => {
     const abiFunction: AbiFunction = {
       inputs: [{ name: "_param1", type: "uint256" }],
       name: "testFunction",
-      type: "function",
-      stateMutability: "pure",
       outputs: [],
+      stateMutability: "pure",
+      type: "function",
     };
 
     expect(() => normalizeFunctionParams(abiFunction, {})).toThrow(
@@ -89,10 +114,10 @@ describe("normalizeFunctionParams", () => {
         { name: "_param1", type: "uint256" },
         { name: "_param2", type: "string" },
       ],
-      type: "function",
-      stateMutability: "pure",
       name: "test",
       outputs: [],
+      stateMutability: "pure",
+      type: "function",
     };
     const params = {
       param1: 123,

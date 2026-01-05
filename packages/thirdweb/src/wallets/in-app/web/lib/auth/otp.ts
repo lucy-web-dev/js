@@ -16,7 +16,7 @@ import type { Ecosystem } from "../../../core/wallet/types.js";
  */
 export const sendOtp = async (args: PreAuthArgsType): Promise<void> => {
   const { client, ecosystem } = args;
-  const url = getLoginUrl({ client, ecosystem, authOption: args.strategy });
+  const url = getLoginUrl({ authOption: args.strategy, client, ecosystem });
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -45,13 +45,23 @@ export const sendOtp = async (args: PreAuthArgsType): Promise<void> => {
   })();
 
   const response = await fetch(url, {
-    method: "POST",
-    headers,
     body: stringify(body),
+    headers,
+    method: "POST",
   });
 
   if (!response.ok) {
-    throw new Error("Failed to send verification code");
+    const raw = await response.text();
+    let message: string | undefined;
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed.message === "string") {
+        message = parsed.message;
+      }
+    } catch {
+      // ignore parse errors
+    }
+    throw new Error(message || "Failed to send verification code");
   }
 
   return await response.json();
@@ -90,21 +100,21 @@ export const verifyOtp = async (
     switch (args.strategy) {
       case "email":
         return {
-          email: args.email,
           code: args.verificationCode,
+          email: args.email,
         };
       case "phone":
         return {
-          phone: args.phoneNumber,
           code: args.verificationCode,
+          phone: args.phoneNumber,
         };
     }
   })();
 
   const response = await fetch(url, {
-    method: "POST",
-    headers,
     body: stringify(body),
+    headers,
+    method: "POST",
   });
 
   if (!response.ok) {

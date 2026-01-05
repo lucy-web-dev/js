@@ -16,6 +16,7 @@ export type MintAdditionalSupplyToBatchParams = WithOverrides<{
 
 /**
  * This extension batches multiple `mintAdditionalSupplyToBatch` extensions into one single multicall.
+ * This method is only available on the `TokenERC1155` contract.
  * Keep in mind that there is a limit of how many NFTs you can mint per transaction.
  * This limit varies depends on the network that you are transacting on.
  *
@@ -39,7 +40,6 @@ export function mintAdditionalSupplyToBatch(
   options: BaseTransactionOptions<MintAdditionalSupplyToBatchParams>,
 ) {
   return multicall({
-    contract: options.contract,
     asyncParams: async () => {
       const nfts = optimizeMintBatchContent(options.nfts);
       const data = await Promise.all(
@@ -49,15 +49,16 @@ export function mintAdditionalSupplyToBatch(
             tokenId: nft.tokenId,
           });
           return encodeMintTo({
+            amount: nft.supply,
             to: nft.to,
             tokenId: nft.tokenId,
-            amount: nft.supply,
             uri: tokenUri,
           });
         }),
       );
       return { data };
     },
+    contract: options.contract,
     overrides: options.overrides,
   });
 }
@@ -93,9 +94,9 @@ export function optimizeMintBatchContent(
     );
     if (matchingIndex !== -1) {
       results[matchingIndex] = {
+        supply: item.supply + (results[matchingIndex]?.supply || 0n),
         to: item.to,
         tokenId: item.tokenId,
-        supply: item.supply + (results[matchingIndex]?.supply || 0n),
       };
     } else {
       results.push(item);

@@ -1,0 +1,513 @@
+import {
+	Callout,
+	OpenSourceCard,
+	createMetadata,
+	InstallTabs,
+	SDKCard,
+	Grid,
+	ArticleIconCard,
+	Tabs,
+	TabsList,
+	TabsTrigger,
+	TabsContent,
+	OpenApiEndpoint,
+	Stack,
+} from "@doc";
+import {
+	ReactIcon,
+	TypeScriptIcon,
+	UnityIcon,
+	DotNetIcon,
+	UnrealEngineIcon,
+	EngineIcon,
+} from "@/icons";
+import { ExternalLink } from "lucide-react";
+
+export const metadata = createMetadata({
+	image: {
+		title: "Wallets",
+		icon: "wallets",
+	},
+	title: "Get started with wallets",
+	description: "Create or connect wallets to your app or your backend",
+});
+
+# Get Started
+
+Create wallets for your users with flexible authentication options. Choose from email/phone verification, social OAuth, passkeys, or external wallet connections.
+
+<Tabs defaultValue="http">
+  <TabsList>
+    <TabsTrigger value="http" className="flex items-center gap-2 [&>p]:mb-0">
+      HTTP
+    </TabsTrigger>
+    <TabsTrigger value="typescript" className="flex items-center gap-2 [&>p]:mb-0">
+      TypeScript
+    </TabsTrigger>
+    <TabsTrigger value="react" className="flex items-center gap-2 [&>p]:mb-0">
+      React
+    </TabsTrigger>
+    <TabsTrigger value="reactnative" className="flex items-center gap-2 [&>p]:mb-0">
+      React Native
+    </TabsTrigger>
+    <TabsTrigger value="unity" className="flex items-center gap-2 [&>p]:mb-0">
+      Unity
+    </TabsTrigger>
+    <TabsTrigger value="dotnet" className="flex items-center gap-2 [&>p]:mb-0">
+      .NET
+    </TabsTrigger>
+    <TabsTrigger value="unreal" className="flex items-center gap-2 [&>p]:mb-0">
+      Unreal Engine
+    </TabsTrigger>
+  </TabsList>
+
+  <TabsContent value="http">
+
+## API Authentication
+
+For email, phone, passkey, or SIWE authentication, a two-step process is used:
+- Initiate authentication to get a challenge
+- Complete authentication with the challenge response
+
+For guest or custom (jwt/auth-payload) authentication, you can skip the first step and directly use the `/v1/auth/complete` endpoint with the required parameters.
+
+### Initiate Authentication
+Start authentication with email, phone, passkey, or SIWE
+
+<OpenApiEndpoint path="/v1/auth/initiate" method="POST" />
+
+### Complete Authentication
+Verify and complete the authentication process:
+
+<OpenApiEndpoint path="/v1/auth/complete" method="POST" />
+
+## Social Authentication
+
+### Single Step Flow
+OAuth is done in a single step using a dedicated endpoint.
+
+Visit the API reference for more details on the available social providers and code snippets.
+
+<OpenApiEndpoint path="/v1/auth/social" method="GET" />
+
+### Get Wallet Information
+Retrieve authenticated user's wallet details:
+
+<OpenApiEndpoint path="/v1/wallets/me" method="GET" />
+
+</TabsContent>
+
+  <TabsContent value="typescript">
+    ### Installation
+
+    Install the thirdweb SDK in your TypeScript project
+
+    <InstallTabs
+      npm="npm i thirdweb"
+      yarn="yarn add thirdweb"
+      pnpm="pnpm i thirdweb"
+      bun="bun i thirdweb"
+    />
+
+    ### Set up the Client
+
+    First, create a client instance to connect with thirdweb services:
+
+    ```typescript
+    import { createThirdwebClient } from "thirdweb";
+
+    // - clientId for client-side applications
+    // - secretKey for server-side applications
+    const client = createThirdwebClient({
+      clientId: "YOUR_CLIENT_ID", // Get from your thirdweb dashboard
+    });
+    ```
+
+    ### Create a wallet for your users
+
+    Create wallets with email or social login:
+
+    ```typescript
+    import { inAppWallet } from "thirdweb/wallets";
+
+    // Initialize a wallet
+    const wallet = inAppWallet();
+
+    // Connect with social login
+    const account = await wallet.connect({
+      client, // your thirdweb client
+      strategy: "google", // or any other auth strategy
+    });
+
+    console.log("connected to", account.address);
+    ```
+
+  </TabsContent>
+
+  <TabsContent value="react">
+    ### Installation
+
+    Install the thirdweb SDK in your React project:
+
+    <InstallTabs
+      npm="npm i thirdweb"
+      yarn="yarn add thirdweb"
+      pnpm="pnpm i thirdweb"
+      bun="bun i thirdweb"
+    />
+
+
+    ### Create a Client
+
+    First, create a client file (e.g., `thirdwebClient.ts`) for reuse throughout your app:
+
+    ```typescript
+    // thirdwebClient.ts
+    import { createThirdwebClient } from "thirdweb";
+
+    export const client = createThirdwebClient({
+      clientId: "YOUR_CLIENT_ID", // Get from your thirdweb dashboard
+    });
+    ```
+
+    ### Setup the Provider
+
+    Wrap your application with the ThirdwebProvider:
+
+    ```tsx
+    // app.tsx / _app.tsx
+    import { ThirdwebProvider } from "thirdweb/react";
+
+    function App() {
+      return (
+        <ThirdwebProvider>
+          <YourApp />
+        </ThirdwebProvider>
+      );
+    }
+    ```
+
+    ### Connect Button Component
+
+    Use the pre-built ConnectButton for a complete wallet connection UI:
+
+    ```tsx
+    import { ConnectButton, useActiveAccount } from "thirdweb/react";
+
+    function YourApp() {
+      const account = useActiveAccount();
+      console.log("connected to", account?.address);
+
+      return (
+        <div>
+          <ConnectButton client={client} />
+        </div>
+      );
+    }
+    ```
+
+    The ConnectButton automatically handles creating wallets for your users, as well as connecting to 500+ external wallets, including MetaMask, WalletConnect, Coinbase Wallet, and more.
+
+    ### Connection Hooks
+
+    For more customized implementations, use the connection hooks:
+
+    ```tsx
+    import { useConnect, useActiveAccount } from "thirdweb/react";
+    import { inAppWallet } from "thirdweb/wallets";
+
+    // initialize a wallet
+    const wallet = inAppWallet();
+
+    function CustomWalletUI() {
+      const { connect } = useConnect();
+      const account = useActiveAccount();
+      console.log("connected to", account?.address);
+
+      const onClick = () => {
+        connect(async () => {
+          await wallet.connect({
+            client, // your thirdweb client
+            strategy: "google", // or any other auth strategy
+          });
+          return wallet;
+        });
+      };
+
+      return (
+        <div>
+            <button
+              onClick={onClick}
+            >
+              Connect With Google
+            </button>
+        </div>
+      );
+    }
+    ```
+
+  </TabsContent>
+
+  <TabsContent value="reactnative">
+    ### Installation
+
+    Install the thirdweb SDK in your React Native project:
+
+    <InstallTabs
+      npm="npm i thirdweb"
+      yarn="yarn add thirdweb"
+      pnpm="pnpm i thirdweb"
+      bun="bun i thirdweb"
+    />
+
+
+    <Callout variant="info" title="Expo Go Support">
+      You cannot use Expo Go with thirdweb because native modules are required.
+      Use an Expo development build (`npx expo prebuild`) or React Native CLI app.
+    </Callout>
+
+    ### Create a Client
+
+    Create a client once and reuse it throughout your app:
+
+    ```typescript
+    import { createThirdwebClient } from "thirdweb";
+
+    export const client = createThirdwebClient({
+      clientId: "YOUR_CLIENT_ID", // Get from your thirdweb dashboard
+    });
+    ```
+
+    <Callout variant="info" title="Allowlist your Bundle ID">
+      When creating your client ID on the thirdweb dashboard, allowlist your mobile app's bundle ID (e.g., com.yourcompany.app) for security.
+    </Callout>
+
+    ### Setup the Provider
+
+    Wrap your application with the ThirdwebProvider:
+
+    ```tsx
+    import { ThirdwebProvider } from "thirdweb/react";
+
+    function App() {
+      return (
+        <ThirdwebProvider>
+          <YourApp />
+        </ThirdwebProvider>
+      );
+    }
+    ```
+
+    ### Connect Button Component
+
+    Use the pre-built ConnectButton for a complete wallet connection UI:
+
+    ```tsx
+    import { ConnectButton, useActiveAccount } from "thirdweb/react";
+
+    function YourApp() {
+      const account = useActiveAccount();
+      console.log("connected to", account?.address);
+
+      return (
+        <View>
+          <ConnectButton client={client} />
+        </View>
+      );
+    }
+    ```
+
+    The ConnectButton automatically handles creating wallets for your users, as well as connecting to 500+ external wallets, including MetaMask, WalletConnect, Coinbase Wallet, and more.
+
+    ### Connection Hooks
+
+    For more customized implementations, use the connection hooks:
+
+    ```tsx
+    import { useConnect, useActiveAccount } from "thirdweb/react";
+    import { inAppWallet } from "thirdweb/wallets";
+
+    // initialize a wallet
+    const wallet = inAppWallet();
+
+    function CustomWalletUI() {
+      const { connect } = useConnect();
+      const account = useActiveAccount();
+      console.log("connected to", account?.address);
+
+      const onClick = () => {
+        connect(async () => {
+          await wallet.connect({
+            client, // your thirdweb client
+            strategy: "google", // or any other auth strategy
+          });
+          return wallet;
+        });
+      };
+
+      return (
+        <View>
+            <Button
+              onPress={onClick}
+            >
+              Connect With Google
+            </Button>
+        </View>
+      );
+    }
+    ```
+
+  </TabsContent>
+
+  <TabsContent value="unity">
+    ### Installation
+
+    1. Download the latest [thirdweb Unity SDK](https://github.com/thirdweb-dev/unity/releases) (.unitypackage file)
+    2. Import the package into your Unity project via Assets > Import Package > Custom Package
+
+    ### Configure Client ID
+
+    After importing the SDK:
+
+    1. Drag the ThirdwebManager prefab into your scene.
+    2. Enter your Client ID and Bundle ID from the thirdweb dashboard
+    3. Allowlist your game's Bundle ID on the thirdweb dashboard for security
+
+    ### Implementing User Wallets
+
+    Enable email login in Unity:
+
+    ```csharp
+    public async void ConnectWithEmail(string email)
+    {
+        try {
+            var inAppWalletOptions = new InAppWalletOptions(email: "myepicemail@domain.id");
+            var options = new WalletOptions(
+                provider: WalletProvider.InAppWallet,
+                chainId: 1,
+                inAppWalletOptions: inAppWalletOptions
+            );
+            var wallet = await ThirdwebManager.Instance.ConnectWallet(options);
+        }
+        catch (System.Exception e) {
+            Debug.LogError("Error connecting wallet: " + e.Message);
+        }
+    }
+    ```
+
+  </TabsContent>
+
+  <TabsContent value="dotnet">
+    ### Installation
+
+    Install the thirdweb .NET SDK using NuGet:
+
+    ```bash
+    dotnet add package Thirdweb
+    ```
+
+    ### Initialize the SDK
+
+    Create a client instance to connect with thirdweb services:
+
+    ```csharp
+    using Thirdweb;
+
+    // For native applications
+    var client = ThirdwebClient.Create(clientId: "yourClientId", bundleId: "yourBundleId");
+
+    // For frontend applications
+    var client = ThirdwebClient.Create(clientId: "yourClientId");
+
+    // For backend applications
+    var client = ThirdwebClient.Create(secretKey: "yourSecretKey");
+    ```
+
+    ### Connect External Wallets
+
+    For .NET applications that need to interact with external wallets:
+
+    ```csharp
+    var privateKeyHex = "yourPrivateKeyHex"; // Should be securely stored and accessed
+    var wallet = await PrivateKeyWallet.Create(client, privateKeyHex);
+
+    var address = await wallet.GetAddress();
+    Console.WriteLine($"Connected wallet address: {address}");
+
+    // Read wallet balance
+    var balance = await wallet.GetBalance(chainId);
+    Console.WriteLine($"Balance: {balance.ToString().ToEth()}");
+    ```
+
+    ### Using In-App Wallets
+
+    Create wallets with email authentication:
+
+    ```csharp
+    var wallet = await InAppWallet.Create(client: client, email: "userEmail");
+    await wallet.SendOTP(); // and fetch the otp
+    var address = await wallet.LoginWithOtp("userEnteredOTP"); // try catch and retry if needed
+    ```
+
+    ### Reading Contract Data
+
+    Interact with smart contracts:
+
+    ```csharp
+    // Get a contract instance
+    var contract = await ThirdwebContract.Create(
+      client,
+      "contractAddress",
+      chainId,
+    );
+
+    // Read a value from the contract
+    var name = await contract.Read<string>("name");
+    Console.WriteLine($"Contract name: {name}");
+    ```
+
+  </TabsContent>
+
+  <TabsContent value="unreal">
+    <ArticleIconCard
+      href="/unreal-engine"
+      icon={UnrealEngineIcon}
+      title="Unreal Engine SDK"
+      description="Learn more about the Unreal Engine SDK"
+    />
+  </TabsContent>
+</Tabs>
+
+## Going further
+
+To connect with other auth strategies, use external wallets, or sponsor gas for users, check out the following guides:
+
+- [Authentication Methods](/wallets/users)
+- [Server wallets](/wallets/server)
+- [Implement Sign In with Ethereum](/wallets/auth)
+- [External Wallets](/wallets/external-wallets) (e.g. MetaMask, WalletConnect, Coinbase Wallet, etc.)
+
+## Explore Full API References
+
+For comprehensive guides on implementing the full thirdweb SDK, explore our language-specific documentation:
+
+<Grid>
+	<SDKCard
+		title="TypeScript"
+		href="/references/typescript/v5"
+		icon={TypeScriptIcon}
+	/>
+	<SDKCard title="React" href="/references/typescript/v5" icon={ReactIcon} />
+	<SDKCard
+		title="React Native"
+		href="/references/typescript/v5"
+		icon={ReactIcon}
+	/>
+	<SDKCard title="DotNet" href="/dotnet/getting-started" icon={DotNetIcon} />
+	<SDKCard title="Unity" href="/unity/v5/getting-started" icon={UnityIcon} />
+	<SDKCard
+		title="Unreal Engine"
+		href="/unreal-engine/getting-started"
+		icon={UnrealEngineIcon}
+	/>
+</Grid>

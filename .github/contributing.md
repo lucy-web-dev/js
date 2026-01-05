@@ -6,8 +6,6 @@ To get started, read the [How this repo works](#how-this-repo-works) section bel
 
 From there, you can take a look at our [Good First Issues](https://github.com/thirdweb-dev/js/labels/good%20first%20issue) board and find an issue that interests you!
 
-If you have any questions about the issue, feel free to ask on our [Discord server](https://discord.gg/thirdweb) in the `#contributors` channel; where you'll be able to get help from our team and other contributors.
-
 <br />
 
 ## How this repo works
@@ -16,7 +14,7 @@ We use [Turborepo](https://turbo.build/repo/docs) to manage the repository, and 
 
 We use [pnpm](https://pnpm.io) for package management across the repo. `pnpm` is similar to `npm` or `yarn` but with more efficient disk space usage.
 
-**With the v5 SDK, we've consolidated everything into a single project at [/packages/thirdweb](./packages/thirdweb). You can still find the legacy packages at [/legacy_packages](./legacy_packages).**
+**With the v5 SDK, we've consolidated everything into a single project at [/packages/thirdweb](../packages/thirdweb). You can still find the legacy packages at [/legacy_packages](../legacy_packages).**
 
 This single package provides a performant & lightweight SDK to interact with any EVM chain across Node, React, and React Native. Learn more about how to use the thirdweb SDK in our [documentation](https://portal.thirdweb.com/typescript/v5).
 
@@ -85,7 +83,10 @@ If your test depends on a downstream network call, you must mock the call using 
 import { setupServer } from "msw/node";
 import { downloadMock, uploadMock } from "../../../test/src/mocks/storage.js";
 
-const server = setupServer(uploadMock("HASH"), downloadMock({ name: "Test NFT" }));
+const server = setupServer(
+  uploadMock("HASH"),
+  downloadMock({ name: "Test NFT" })
+);
 
 beforeAll(() => server.listen());
 afterEach(() => server.resetHandlers());

@@ -1,84 +1,116 @@
+import { ExternalLinkIcon, ZapIcon } from "lucide-react";
 import type { SideBar } from "@/components/Layouts/DocLayout";
-import { PaymentsNFTCheckoutIcon } from "@/icons";
+import { EngineIcon, ReactIcon, TypeScriptIcon, UnityIcon } from "@/icons";
+import { UnrealEngineIcon } from "../../icons/sdks/UnrealEngineIcon";
 
-const checkoutSlug = "/payments/nft-checkout";
+const paymentsSlug = "/payments";
 
 export const sidebar: SideBar = {
-  name: "Payments",
   links: [
     {
-      name: "Overview",
-      href: "/payments",
+      href: paymentsSlug,
+      name: "Get Started",
+      icon: <ZapIcon />,
+    },
+    {
+      href: "https://playground.thirdweb.com/bridge",
+      icon: <ExternalLinkIcon />,
+      name: "Playground",
     },
     { separator: true },
     {
-      name: "NFT Checkout",
-      icon: <PaymentsNFTCheckoutIcon />,
       isCollapsible: false,
       links: [
         {
-          name: "Get Started",
-          href: `${checkoutSlug}/getting-started`,
-          links: [
-            {
-              name: "Enable Contract for Payments",
-              href: `${checkoutSlug}/enable-contract`,
-            },
-            {
-              name: "Create Checkout Link",
-              href: `${checkoutSlug}/checkout-link`,
-            },
-            {
-              name: "Go Live Checklist",
-              href: `${checkoutSlug}/go-live-checklist`,
-            },
-          ],
-        },
-
-        {
-          name: "Embedded Elements",
-
-          links: [
-            {
-              name: "Overview",
-              href: `${checkoutSlug}/elements`,
-            },
-            {
-              name: "CheckoutWithCard",
-              href: `${checkoutSlug}/checkout-with-card`,
-            },
-            {
-              name: "CheckoutWithEth",
-              href: `${checkoutSlug}/checkout-with-eth`,
-            },
-          ],
+          href: `${paymentsSlug}/fund`,
+          name: "Fund Wallets",
         },
         {
+          href: `${paymentsSlug}/products`,
+          name: "Sell a Product",
+        },
+        {
+          href: `${paymentsSlug}/transactions`,
+          name: "Pay for Transactions",
+        },
+        {
+          href: `${paymentsSlug}/send`,
+          name: "Send a Payment",
+        },
+        {
+          href: `/bridge/sell`,
+          name: "Sell Tokens",
+        },
+        {
+          href: `/bridge/swap`,
+          name: "Swap Tokens",
+        },
+        {
+          href: `/bridge/tokens`,
+          name: "Get Token Prices",
+        },
+        {
+          href: `${paymentsSlug}/webhooks`,
           name: "Webhooks",
-          href: `${checkoutSlug}/webhooks`,
-        },
-        { name: "Translations", href: `${checkoutSlug}/translations` },
-        { name: "Marketplaces", href: `${checkoutSlug}/marketplaces` },
-        {
-          name: "One-Time Checkout Link",
-          href: `${checkoutSlug}/one-time-checkout-link`,
         },
         {
-          name: "Pre-built Contracts",
-          href: `${checkoutSlug}/pre-built-contracts`,
+          href: `${paymentsSlug}/custom-data`,
+          name: "Custom Data",
+        },
+      ],
+      name: "Guides",
+    },
+    { separator: true },
+    {
+      isCollapsible: false,
+      links: [
+        {
+          href: `/reference`,
+          icon: <EngineIcon />,
+          name: "HTTP API",
         },
         {
-          name: "Custom Contracts",
-          href: `${checkoutSlug}/custom-contracts`,
+          href: "/references/typescript/v5",
+          icon: <TypeScriptIcon />,
+          name: "TypeScript",
         },
         {
-          name: "ERC-20 Pricing",
-          href: `${checkoutSlug}/erc20-pricing`,
+          href: "/references/typescript/v5",
+          icon: <ReactIcon />,
+          name: "React",
+        },
+        {
+          href: "/unity",
+          icon: <UnityIcon />,
+          name: "Unity",
+        },
+        {
+          href: "/unreal-engine",
+          icon: <UnrealEngineIcon />,
+          name: "Unreal Engine",
+        },
+      ],
+      name: "API References",
+    },
+    { separator: true },
+    {
+      isCollapsible: false,
+      name: "Resources",
+      links: [
+        {
+          href: `${paymentsSlug}/fees`,
+          name: "Understanding Fees",
+        },
+        {
+          href: `${paymentsSlug}/onramp-providers`,
+          name: "Onramp Providers",
+        },
+        {
+          href: `${paymentsSlug}/faq`,
+          name: "FAQ",
         },
       ],
     },
-    { separator: true },
-    { name: "API Reference", href: `${checkoutSlug}/api-reference` },
-    { name: "FAQ", href: `${checkoutSlug}/faq` },
   ],
+  name: "Payments",
 };

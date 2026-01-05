@@ -1,18 +1,21 @@
 import { useCallback, useContext, useMemo, useState } from "react";
 import type { Chain } from "../../../../chains/types.js";
 import type { ThirdwebClient } from "../../../../client/client.js";
+import { getDefaultWallets } from "../../../../wallets/defaultWallets.js";
 import type { Wallet } from "../../../../wallets/interfaces/wallet.js";
 import type { SmartWalletOptions } from "../../../../wallets/smart/types.js";
 import type { AppMetadata } from "../../../../wallets/types.js";
+import type { WalletId } from "../../../../wallets/wallet-types.js";
 import type { Theme } from "../../../core/design-system/index.js";
+import type { SiweAuthOptions } from "../../../core/hooks/auth/useSiweAuth.js";
+import type { OnConnectCallback } from "../../../core/hooks/connection/types.js";
 import { SetRootElementContext } from "../../../core/providers/RootElementContext.js";
 import { WalletUIStatesProvider } from "../../providers/wallet-ui-states-provider.js";
 import { canFitWideModal } from "../../utils/canFitWideModal.js";
-import { getDefaultWallets } from "../../wallets/defaultWallets.js";
 import type { LocaleId } from "../types.js";
-import ConnectModal from "./Modal/ConnectModal.js";
 import { getConnectLocale } from "./locale/getConnectLocale.js";
 import type { ConnectLocale } from "./locale/types.js";
+import ConnectModal from "./Modal/ConnectModal.js";
 import type { WelcomeScreen } from "./screens/types.js";
 
 /**
@@ -61,15 +64,16 @@ export function useConnectModal() {
             setRootEl(
               <Modal
                 {...props}
-                onConnect={(w) => {
-                  resolve(w);
-                  cleanup();
-                }}
+                connectLocale={locale}
                 onClose={() => {
                   reject();
                   cleanup();
                 }}
-                connectLocale={locale}
+                onConnect={(w) => {
+                  if (props.auth) return;
+                  resolve(w);
+                  cleanup();
+                }}
               />,
             );
           })
@@ -87,7 +91,7 @@ export function useConnectModal() {
 
 function Modal(
   props: UseConnectModalOptions & {
-    onConnect: (wallet: Wallet) => void;
+    onConnect: OnConnectCallback;
     onClose: () => void;
     connectLocale: ConnectLocale;
   },
@@ -124,26 +128,26 @@ function Modal(
   ]);
 
   return (
-    <WalletUIStatesProvider theme={props.theme} isOpen={true}>
+    <WalletUIStatesProvider isOpen={true} theme={props.theme}>
       <ConnectModal
-        onClose={props.onClose}
-        shouldSetActive={props.setActive === undefined ? true : props.setActive}
         accountAbstraction={props.accountAbstraction}
-        // TODO: not set up in `useConnectModal` for some reason?
-        auth={undefined}
+        auth={props.auth}
         chain={props.chain}
+        chains={props.chains}
         client={props.client}
         connectLocale={props.connectLocale}
-        meta={meta}
-        size={size}
-        welcomeScreen={props.welcomeScreen}
+        hiddenWallets={props.hiddenWallets}
         localeId={props.locale || "en_US"}
+        meta={meta}
+        onClose={props.onClose}
         onConnect={props.onConnect}
         recommendedWallets={props.recommendedWallets}
+        shouldSetActive={props.setActive === undefined ? true : props.setActive}
         showAllWallets={props.showAllWallets}
-        wallets={wallets}
-        chains={props.chains}
+        size={size}
         walletConnect={props.walletConnect}
+        wallets={wallets}
+        welcomeScreen={props.welcomeScreen}
       />
     </WalletUIStatesProvider>
   );
@@ -364,6 +368,11 @@ export type UseConnectModalOptions = {
   showAllWallets?: boolean;
 
   /**
+   * All wallet IDs included in this array will be hidden from the wallet selection list.
+   */
+  hiddenWallets?: WalletId[];
+
+  /**
    * Title to show in Connect Modal
    *
    * The default is `"Connect"`
@@ -432,6 +441,14 @@ export type UseConnectModalOptions = {
    * If you want to hide the branding, set this prop to `false`
    */
   showThirdwebBranding?: boolean;
+
+  /**
+   * Enable SIWE (Sign in with Ethererum) by passing an object of type `SiweAuthOptions` to
+   * enforce the users to sign a message after connecting their wallet to authenticate themselves.
+   *
+   * Refer to the [`SiweAuthOptions`](https://portal.thirdweb.com/references/typescript/v5/SiweAuthOptions) for more details
+   */
+  auth?: SiweAuthOptions;
 };
 
 // TODO: consilidate Button/Embed/Modal props into one type with extras

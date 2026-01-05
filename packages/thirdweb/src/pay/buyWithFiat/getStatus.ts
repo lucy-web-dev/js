@@ -1,13 +1,14 @@
+import { status as onrampStatus } from "../../bridge/OnrampStatus.js";
 import type { ThirdwebClient } from "../../client/client.js";
-import { getClientFetch } from "../../utils/fetch.js";
+import type { PurchaseData } from "../types.js";
 import type {
   PayOnChainTransactionDetails,
   PayTokenInfo,
 } from "../utils/commonTypes.js";
-import { getPayBuyWithFiatStatusEndpoint } from "../utils/definitions.js";
 
 /**
  * Parameters for the [`getBuyWithFiatStatus`](https://portal.thirdweb.com/references/typescript/v5/getBuyWithFiatStatus) function
+ * @deprecated
  * @buyCrypto
  */
 export type GetBuyWithFiatStatusParams = {
@@ -23,11 +24,6 @@ export type GetBuyWithFiatStatusParams = {
    */
   intentId: string;
 };
-
-export type ValidBuyWithFiatStatus = Exclude<
-  BuyWithFiatStatus,
-  { status: "NOT_FOUND" }
->;
 
 /**
  * The returned object from [`getBuyWithFiatStatus`](https://portal.thirdweb.com/references/typescript/v5/getBuyWithFiatStatus) function
@@ -49,28 +45,13 @@ export type BuyWithFiatStatus =
        * - `NONE` - No status
        * - `PENDING_PAYMENT` - Payment is not done yet in the on-ramp provider
        * - `PAYMENT_FAILED` - Payment failed in the on-ramp provider
-       * - `PENDING_ON_RAMP_TRANSFER` - Payment is done but the on-ramp provider is yet to transfer the tokens to the user's wallet
-       * - `ON_RAMP_TRANSFER_IN_PROGRESS` - On-ramp provider is transferring the tokens to the user's wallet
        * - `ON_RAMP_TRANSFER_COMPLETED` - On-ramp provider has transferred the tokens to the user's wallet
-       * - `ON_RAMP_TRANSFER_FAILED` - On-ramp provider failed to transfer the tokens to the user's wallet
-       * - `CRYPTO_SWAP_REQUIRED` - On-ramp provider has sent the tokens to the user's wallet but a swap is required to convert it to the desired token
-       * - `CRYPTO_SWAP_IN_PROGRESS` - Swap is in progress
-       * - `CRYPTO_SWAP_COMPLETED` - Swap is completed and the user has received the desired token
-       * - `CRYPTO_SWAP_FALLBACK` - Swap failed and the user has received a fallback token which is not the desired token
        */
       status:
         | "NONE"
         | "PENDING_PAYMENT"
         | "PAYMENT_FAILED"
-        | "PENDING_ON_RAMP_TRANSFER"
-        | "ON_RAMP_TRANSFER_IN_PROGRESS"
-        | "ON_RAMP_TRANSFER_COMPLETED"
-        | "ON_RAMP_TRANSFER_FAILED"
-        | "CRYPTO_SWAP_REQUIRED"
-        | "CRYPTO_SWAP_COMPLETED"
-        | "CRYPTO_SWAP_FALLBACK"
-        | "CRYPTO_SWAP_IN_PROGRESS"
-        | "CRYPTO_SWAP_FAILED";
+        | "ON_RAMP_TRANSFER_COMPLETED";
       /**
        * The wallet address to which the desired tokens are sent to
        */
@@ -129,7 +110,7 @@ export type BuyWithFiatStatus =
       /**
        * Arbitrary data sent at the time of fetching the quote
        */
-      purchaseData?: object;
+      purchaseData?: PurchaseData;
     };
 
 /**
@@ -170,31 +151,114 @@ export type BuyWithFiatStatus =
  * })
  *
  * // when the fiatStatus.status is "ON_RAMP_TRANSFER_COMPLETED" - the process is complete
- * // when the fiatStatus.status is "CRYPTO_SWAP_REQUIRED" - start the swap process
  * ```
+ * @deprecated
  * @buyCrypto
  */
 export async function getBuyWithFiatStatus(
   params: GetBuyWithFiatStatusParams,
 ): Promise<BuyWithFiatStatus> {
-  try {
-    const queryParams = new URLSearchParams({
-      intentId: params.intentId,
-    });
+  const result = await onrampStatus({
+    client: params.client,
+    id: params.intentId,
+  });
 
-    const queryString = queryParams.toString();
-    const url = `${getPayBuyWithFiatStatusEndpoint()}?${queryString}`;
+  return toBuyWithFiatStatus({ intentId: params.intentId, result });
+}
 
-    const response = await getClientFetch(params.client)(url);
+////////////////////////////////////////////////////////////////////////////////
+// Helpers
+////////////////////////////////////////////////////////////////////////////////
 
-    if (!response.ok) {
-      response.body?.cancel();
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
+function toBuyWithFiatStatus(args: {
+  intentId: string;
+  result: Awaited<ReturnType<typeof onrampStatus>>;
+}): BuyWithFiatStatus {
+  const { intentId, result } = args;
 
-    return (await response.json()).result;
-  } catch (error) {
-    console.error("Fetch error:", error);
-    throw new Error(`Fetch failed: ${error}`);
-  }
+  // Map status constants from the Bridge.Onramp.status response to BuyWithFiatStatus equivalents.
+  const STATUS_MAP: Record<
+    typeof result.status,
+    "NONE" | "PENDING_PAYMENT" | "PAYMENT_FAILED" | "ON_RAMP_TRANSFER_COMPLETED"
+  > = {
+    COMPLETED: "ON_RAMP_TRANSFER_COMPLETED",
+    CREATED: "PENDING_PAYMENT",
+    FAILED: "PAYMENT_FAILED",
+    PENDING: "PENDING_PAYMENT",
+  } as const;
+
+  const mappedStatus = STATUS_MAP[result.status];
+
+  return buildPlaceholderStatus({
+    intentId,
+    purchaseData: result.purchaseData,
+    status: mappedStatus,
+  });
+}
+
+function buildPlaceholderStatus(args: {
+  intentId: string;
+  status:
+    | "NONE"
+    | "PENDING_PAYMENT"
+    | "PAYMENT_FAILED"
+    | "ON_RAMP_TRANSFER_COMPLETED";
+  purchaseData?: PurchaseData;
+}): BuyWithFiatStatus {
+  const { intentId, status, purchaseData } = args;
+
+  // Build a minimal—but type-complete—object that satisfies BuyWithFiatStatus.
+  const emptyToken: PayTokenInfo = {
+    chainId: 0,
+    decimals: 18,
+    name: "",
+    priceUSDCents: 0,
+    symbol: "",
+    tokenAddress: "",
+  };
+
+  type BuyWithFiatStatusWithData = Exclude<
+    BuyWithFiatStatus,
+    { status: "NOT_FOUND" }
+  >;
+
+  const quote: BuyWithFiatStatusWithData["quote"] = {
+    createdAt: new Date().toISOString(),
+    estimatedDurationSeconds: 0,
+    estimatedOnRampAmount: "0",
+    estimatedOnRampAmountWei: "0",
+
+    estimatedToTokenAmount: "0",
+    estimatedToTokenAmountWei: "0",
+
+    fromCurrency: {
+      amount: "0",
+      amountUnits: "USD",
+      currencySymbol: "USD",
+      decimals: 2,
+    },
+    fromCurrencyWithFees: {
+      amount: "0",
+      amountUnits: "USD",
+      currencySymbol: "USD",
+      decimals: 2,
+    },
+    onRampToken: emptyToken,
+    toToken: emptyToken,
+  } as BuyWithFiatStatusWithData["quote"];
+
+  // The source/destination fields can only be filled accurately when extra context is returned
+  // by the API. Since Bridge.Onramp.status doesn't yet provide these details, we omit them for
+  // now (they are optional).
+
+  const base: Exclude<BuyWithFiatStatus, { status: "NOT_FOUND" }> = {
+    fromAddress: "",
+    intentId,
+    purchaseData,
+    quote,
+    status,
+    toAddress: "",
+  };
+
+  return base;
 }

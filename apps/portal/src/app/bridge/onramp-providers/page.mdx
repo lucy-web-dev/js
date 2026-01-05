@@ -1,0 +1,33 @@
+import { createMetadata } from "@doc";
+
+export const metadata = createMetadata({
+	image: {
+		title: "thirdweb Bridge - Onramp Providers",
+		icon: "thirdweb",
+	},
+	title: "thirdweb Bridge - Onramp Providers | thirdweb",
+	description:
+		"Integrate onramp providers for any onchain transaction and set preferred providers",
+});
+
+# Onramp Providers
+
+**Onramp Providers** are services that allow users to buy crypto with fiat.
+
+Bridge integrates the following onramp providers:
+
+- [**Coinbase**](https://docs.cdp.coinbase.com/onramp-&-offramp/introduction/welcome)
+- [**Transak**](https://transak.com/)
+- [**Stripe**](https://docs.stripe.com/crypto/onramp)
+
+## Provider Fees & Regions
+
+Each provider sets its own fees, which may vary based on several factors. These fees are determined solely by the onramp provider and are not controlled or influenced by thirdweb.
+
+Each provider also has different regions and currencies they support.
+
+|          | Fees                                                                                                                 | Regions                                                                                                                                   |
+| -------- | -------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Coinbase | [View Fees](https://docs.cdp.coinbase.com/onramp-&-offramp/developer-guidance/faq#what-fees-do-you-charge%3F)        | [View Regions](https://docs.cdp.coinbase.com/onramp-&-offramp/developer-guidance/faq#which-countries-are-supported-by-coinbase-onramp%3F) |
+| Stripe   | N/A                                                                                                                  | [View Regions](https://support.stripe.com/questions/crypto-supportability-and-availability-by-region)                                     |
+| Transak  | [View Fees](https://transak.notion.site/On-Ramp-Payment-Methods-Fees-Other-Details-b0761634feed4b338a69f4f186d906a5) | [View Regions](https://transak.com/global-coverage)                                                                                       |

@@ -10,6 +10,7 @@ import { getRpcClient } from "../rpc/rpc.js";
 import type { AuthorizationRequest } from "../transaction/actions/eip7702/authorization.js";
 import { signTransaction } from "../transaction/actions/sign-transaction.js";
 import type { SerializableTransaction } from "../transaction/serialize-transaction.js";
+import { getAddress } from "../utils/address.js";
 import { type Hex, toHex } from "../utils/encoding/hex.js";
 import { signMessage } from "../utils/signatures/sign-message.js";
 import { signTypedData } from "../utils/signatures/sign-typed-data.js";
@@ -79,17 +80,17 @@ export function privateKeyToAccount(
   const address = publicKeyToAddress(publicKey);
 
   const account = {
-    address,
+    address: getAddress(address),
     sendTransaction: async (
       tx: SerializableTransaction & { chainId: number },
     ) => {
       const rpcRequest = getRpcClient({
-        client: client,
         chain: getCachedChain(tx.chainId),
+        client: client,
       });
       const signedTx = signTransaction({
-        transaction: tx,
         privateKey,
+        transaction: tx,
       });
       const transactionHash = await eth_sendRawTransaction(
         rpcRequest,
@@ -99,10 +100,23 @@ export function privateKeyToAccount(
         transactionHash,
       };
     },
+    signAuthorization: async (authorization: AuthorizationRequest) => {
+      const signature = ox__Secp256k1.sign({
+        payload: ox__Authorization.getSignPayload(authorization),
+        privateKey: privateKey,
+      });
+      return ox__Authorization.from(authorization, { signature });
+    },
     signMessage: async ({ message }: { message: Message }) => {
       return signMessage({
         message,
         privateKey,
+      });
+    },
+    signTransaction: async (tx: SerializableTransaction) => {
+      return signTransaction({
+        privateKey,
+        transaction: tx,
       });
     },
     signTypedData: async <
@@ -115,19 +129,6 @@ export function privateKeyToAccount(
         ..._typedData,
         privateKey,
       });
-    },
-    signTransaction: async (tx: SerializableTransaction) => {
-      return signTransaction({
-        transaction: tx,
-        privateKey,
-      });
-    },
-    signAuthorization: async (authorization: AuthorizationRequest) => {
-      const signature = ox__Secp256k1.sign({
-        payload: ox__Authorization.getSignPayload(authorization),
-        privateKey: privateKey,
-      });
-      return ox__Authorization.from(authorization, { signature });
     },
   };
 

@@ -1,10 +1,9 @@
 "use client";
-import * as React from "react";
-
-import { cn } from "@/lib/utils";
 import { UploadIcon } from "lucide-react";
 import Image from "next/image";
+import * as React from "react";
 import { useDropzone } from "react-dropzone";
+import { cn } from "@/lib/utils";
 
 export interface ImageUploadProps
   extends React.InputHTMLAttributes<HTMLInputElement> {
@@ -33,7 +32,7 @@ const ImageUpload = React.forwardRef<HTMLInputElement, ImageUploadProps>(
         <div
           {...getRootProps()}
           className={cn(
-            "group relative flex cursor-pointer flex-col items-center justify-center gap-1.5 overflow-hidden rounded-md border bg-card p-4 py-6 text-muted-foreground transition-all hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+            "group relative flex cursor-pointer flex-col items-center justify-center gap-1.5 overflow-hidden rounded-md border bg-background p-4 py-6 text-muted-foreground transition-all hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
             isDragActive ? "border-primary" : "border-input",
             !activeFile ? "w-full" : "min-h-32 min-w-32",
             className,
@@ -42,10 +41,10 @@ const ImageUpload = React.forwardRef<HTMLInputElement, ImageUploadProps>(
           <input ref={ref} {...getInputProps()} {...props} />
           {activeFile ? (
             <Image
-              className="object-contain object-center "
-              src={URL.createObjectURL(activeFile)}
-              fill
               alt=""
+              className="object-contain object-center "
+              fill
+              src={URL.createObjectURL(activeFile)}
             />
           ) : (
             <>

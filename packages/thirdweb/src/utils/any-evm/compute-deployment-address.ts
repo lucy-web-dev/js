@@ -1,5 +1,7 @@
-import { type Hex, encodePacked } from "viem";
+import { encodePacked, type Hex } from "viem";
+import { getAddress } from "../address.js";
 import { ensureBytecodePrefix } from "../bytecode/prefix.js";
+import { isHex } from "../encoding/hex.js";
 import { keccak256 } from "../hashing/keccak256.js";
 import { getSaltHash } from "./get-salt-hash.js";
 import { keccakId } from "./keccak-id.js";
@@ -9,6 +11,7 @@ type ComputeDeploymentAddressOptions = {
   encodedArgs: Hex;
   create2FactoryAddress: string;
   salt?: string;
+  extraDataWithUri?: Hex;
 };
 
 /**
@@ -32,21 +35,25 @@ export function computeDeploymentAddress(
 ) {
   const bytecode = ensureBytecodePrefix(options.bytecode);
   const saltHash = options.salt
-    ? keccakId(options.salt)
+    ? isHex(options.salt) && options.salt.length === 66
+      ? options.salt
+      : keccakId(options.salt)
     : getSaltHash(bytecode);
 
   // 1. create init bytecode hash with contract's bytecode and encoded args
-  const initBytecode = encodePacked(
-    ["bytes", "bytes"],
-    [bytecode, options.encodedArgs],
-  );
+  const initBytecode = options.extraDataWithUri
+    ? encodePacked(
+        ["bytes", "bytes", "bytes"],
+        [bytecode, options.encodedArgs, options.extraDataWithUri],
+      )
+    : encodePacked(["bytes", "bytes"], [bytecode, options.encodedArgs]);
 
   // 2. abi-encode pack the deployer address, salt, and bytecode hash
   const deployInfoPacked = encodePacked(
     ["bytes1", "address", "bytes32", "bytes32"],
     [
       "0xff",
-      options.create2FactoryAddress,
+      getAddress(options.create2FactoryAddress),
       saltHash,
       keccak256(encodePacked(["bytes"], [initBytecode])),
     ],

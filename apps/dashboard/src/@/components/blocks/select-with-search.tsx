@@ -1,18 +1,18 @@
-/* eslint-disable no-restricted-syntax */
+/** biome-ignore-all lint/a11y/useSemanticElements: FIXME */
 "use client";
 
+import { CheckIcon, ChevronDownIcon, SearchIcon } from "lucide-react";
+import React, { useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { ScrollShadow } from "@/components/ui/ScrollShadow";
+import { useShowMore } from "@/hooks/useShowMore";
 import { cn } from "@/lib/utils";
-import { CheckIcon, ChevronDown, SearchIcon } from "lucide-react";
-import React, { useRef, useMemo, useEffect } from "react";
-import { useShowMore } from "../../lib/useShowMore";
-import { ScrollShadow } from "../ui/ScrollShadow/ScrollShadow";
-import { Input } from "../ui/input";
 
 interface SelectWithSearchProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -22,7 +22,7 @@ interface SelectWithSearchProps
   }[];
   value: string | undefined;
   onValueChange: (value: string) => void;
-  placeholder: string;
+  placeholder: string | React.ReactNode;
   searchPlaceholder?: string;
   className?: string;
   overrideSearchFn?: (
@@ -31,6 +31,10 @@ interface SelectWithSearchProps
   ) => boolean;
   renderOption?: (option: { value: string; label: string }) => React.ReactNode;
   popoverContentClassName?: string;
+  side?: "left" | "right" | "top" | "bottom";
+  align?: "center" | "start" | "end";
+  closeOnSelect?: boolean;
+  showCheck?: boolean;
 }
 
 export const SelectWithSearch = React.forwardRef<
@@ -48,6 +52,8 @@ export const SelectWithSearch = React.forwardRef<
       overrideSearchFn,
       popoverContentClassName,
       searchPlaceholder,
+      closeOnSelect,
+      showCheck = true,
       ...props
     },
     ref,
@@ -95,69 +101,71 @@ export const SelectWithSearch = React.forwardRef<
 
     // scroll to top when options change
     const popoverElRef = useRef<HTMLDivElement>(null);
-    // biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
-    useEffect(() => {
-      const scrollContainer =
-        popoverElRef.current?.querySelector("[data-scrollable]");
-      if (scrollContainer) {
-        scrollContainer.scrollTo({
-          top: 0,
-        });
-      }
-    }, [searchValue]);
 
     return (
-      <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+      <Popover modal onOpenChange={setIsPopoverOpen} open={isPopoverOpen}>
         <PopoverTrigger asChild>
           <Button
             ref={ref}
             {...props}
-            onClick={() => setIsPopoverOpen(true)}
             className={cn(
               "flex w-full items-center justify-between rounded-md border border-border bg-inherit p-3 hover:bg-inherit",
               className,
             )}
+            onClick={() => setIsPopoverOpen(true)}
           >
-            <div className="flex w-full items-center justify-between">
+            <div className="flex w-full items-center justify-between gap-2">
               <span
                 className={cn(
-                  "text-muted-foreground text-sm",
-                  selectedOption && "text-foreground",
+                  "truncate text-muted-foreground text-sm",
+                  selectedOption && "w-full text-foreground",
                 )}
               >
-                {selectedOption?.label || placeholder}
+                {renderOption && selectedOption
+                  ? renderOption(selectedOption)
+                  : selectedOption?.label || placeholder}
               </span>
-              <ChevronDown className="h-4 cursor-pointer text-muted-foreground" />
+              <ChevronDownIcon className="size-3.5 cursor-pointer text-muted-foreground shrink-0" />
             </div>
           </Button>
         </PopoverTrigger>
 
         <PopoverContent
-          className={cn("z-[10001] p-0", popoverContentClassName)}
-          align="center"
-          sideOffset={10}
+          align={props.align || "center"}
+          className={cn("p-0", popoverContentClassName)}
           onEscapeKeyDown={() => setIsPopoverOpen(false)}
-          style={{
-            width: "var(--radix-popover-trigger-width)",
-            maxHeight: "var(--radix-popover-content-available-height)",
-          }}
           ref={popoverElRef}
+          side={props.side}
+          sideOffset={10}
+          style={{
+            maxHeight: "var(--radix-popover-content-available-height)",
+            width: "var(--radix-popover-trigger-width)",
+          }}
         >
           <div>
             {/* Search */}
             <div className="relative">
               <Input
+                className="!h-auto rounded-b-none border-0 border-border border-b py-3 pl-10 focus-visible:ring-0 focus-visible:ring-offset-0"
+                onChange={(e) => {
+                  setSearchValue(e.target.value);
+                  const scrollContainer =
+                    popoverElRef.current?.querySelector("[data-scrollable]");
+                  if (scrollContainer) {
+                    scrollContainer.scrollTo({
+                      top: 0,
+                    });
+                  }
+                }}
                 placeholder={searchPlaceholder || "Search"}
                 value={searchValue}
-                onChange={(e) => setSearchValue(e.target.value)}
-                className="!h-auto rounded-b-none border-0 border-border border-b py-3 pl-10 focus-visible:ring-0 focus-visible:ring-offset-0"
               />
               <SearchIcon className="-translate-y-1/2 absolute top-1/2 left-4 size-4 text-muted-foreground" />
             </div>
 
             <ScrollShadow
-              scrollableClassName="max-h-[min(calc(var(--radix-popover-content-available-height)-60px),350px)] p-1"
               className="rounded"
+              scrollableClassName="max-h-[min(calc(var(--radix-popover-content-available-height)-60px),350px)] p-1"
             >
               {/* List */}
               <div>
@@ -171,19 +179,26 @@ export const SelectWithSearch = React.forwardRef<
                   const isSelected = value === option.value;
                   return (
                     <Button
-                      key={option.value}
-                      role="option"
                       aria-selected={isSelected}
-                      onClick={() => onValueChange(option.value)}
-                      variant="ghost"
                       className="flex w-full cursor-pointer justify-start gap-3 rounded-sm px-3 py-2 text-left"
+                      key={option.value}
+                      onClick={() => {
+                        onValueChange(option.value);
+                        if (closeOnSelect) {
+                          setIsPopoverOpen(false);
+                        }
+                      }}
                       ref={
                         i === optionsToShow.length - 1 ? lastItemRef : undefined
                       }
+                      role="option"
+                      variant="ghost"
                     >
-                      <div className="flex size-4 items-center justify-center">
-                        {isSelected && <CheckIcon className="size-4" />}
-                      </div>
+                      {showCheck && (
+                        <div className="flex size-4 items-center justify-center">
+                          {isSelected && <CheckIcon className="size-4" />}
+                        </div>
+                      )}
 
                       <div className="min-w-0 grow">
                         {renderOption ? renderOption(option) : option.label}

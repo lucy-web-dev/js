@@ -1,8 +1,7 @@
 import type { Chain } from "../../../../chains/types.js";
 import type { ThirdwebClient } from "../../../../client/client.js";
 import type { Address } from "../../../../utils/address.js";
-import type { Account } from "../../../interfaces/wallet.js";
-import type { Wallet } from "../../../interfaces/wallet.js";
+import type { Account, Wallet } from "../../../interfaces/wallet.js";
 import type { AuthOption, OAuthOption } from "../../../types.js";
 import type { Ecosystem } from "../wallet/types.js";
 
@@ -70,7 +69,7 @@ export type SingleStepAuthArgsType =
   | {
       strategy: "wallet";
       wallet: Wallet;
-      chain: Chain;
+      chain?: Chain;
     }
   | {
       strategy: "guest";
@@ -103,6 +102,8 @@ export type AuthProvider =
   | "Discord"
   | "Coinbase"
   | "X"
+  | "TikTok"
+  | "Epic"
   | "Line"
   | "Twitch"
   | "Steam"
@@ -259,4 +260,5 @@ export type UnlinkParams = {
   client: ThirdwebClient;
   ecosystem?: Ecosystem;
   profileToUnlink: Profile;
+  allowAccountDeletion?: boolean;
 };

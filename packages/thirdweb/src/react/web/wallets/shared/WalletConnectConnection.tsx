@@ -3,7 +3,7 @@ import type { Chain } from "../../../../chains/types.js";
 import type { ThirdwebClient } from "../../../../client/client.js";
 import { wait } from "../../../../utils/promise/wait.js";
 import { formatWalletConnectUrl } from "../../../../utils/url.js";
-import { isAndroid, isIOS, isMobile } from "../../../../utils/web/isMobile.js";
+import { isMobile } from "../../../../utils/web/isMobile.js";
 import { openWindow } from "../../../../utils/web/openWindow.js";
 import type { WCSupportedWalletIds } from "../../../../wallets/__generated__/wallet-ids.js";
 import type { Wallet } from "../../../../wallets/interfaces/wallet.js";
@@ -46,42 +46,30 @@ export const WalletConnectConnection: React.FC<{
         chain: props.chain,
         client: props.client,
         walletConnect: {
-          projectId: props.walletConnect?.projectId,
-          showQrModal: false,
           onDisplayUri(uri) {
-            const preferNative =
-              walletInfo.mobile.native || walletInfo.mobile.universal;
             try {
               if (isMobile()) {
-                if (isAndroid()) {
-                  if (preferNative) {
-                    openWindow(
-                      formatWalletConnectUrl(preferNative, uri).redirect,
-                    );
-                  }
-                } else if (isIOS()) {
-                  if (preferNative) {
-                    openWindow(
-                      formatWalletConnectUrl(preferNative, uri).redirect,
-                    );
-                  }
+                const mobileAppLink =
+                  walletInfo.mobile.native || walletInfo.mobile.universal;
+                if (mobileAppLink) {
+                  openWindow(
+                    formatWalletConnectUrl(mobileAppLink, uri).redirect,
+                  );
                 } else {
-                  const preferUniversal =
-                    walletInfo.mobile.universal || walletInfo.mobile.native;
-                  if (preferUniversal) {
-                    openWindow(
-                      formatWalletConnectUrl(preferUniversal, uri).redirect,
-                    );
-                  }
+                  // on android, wc:// links show the app picker
+                  openWindow(uri);
                 }
               } else {
                 setQrCodeUri(uri);
               }
-            } catch {
+            } catch (e) {
+              console.error(e);
               setErrorConnecting(true);
             }
           },
           optionalChains: props.chains,
+          projectId: props.walletConnect?.projectId,
+          showQrModal: false,
         },
       })
       .then(() => {
@@ -114,38 +102,38 @@ export const WalletConnectConnection: React.FC<{
   if (isMobile()) {
     return (
       <ConnectingScreen
+        client={props.client}
+        errorConnecting={errorConnecting}
         locale={{
+          failed: locale.connectionScreen.failed,
           getStartedLink: locale.getStartedLink,
+          inProgress: locale.connectionScreen.inProgress,
           instruction: locale.connectionScreen.instruction,
           tryAgain: locale.connectionScreen.retry,
-          inProgress: locale.connectionScreen.inProgress,
-          failed: locale.connectionScreen.failed,
         }}
         onBack={onBack}
-        walletName={walletInfo.name}
-        walletId={wallet.id}
-        errorConnecting={errorConnecting}
-        onRetry={connect}
         onGetStarted={onGetStarted}
-        client={props.client}
+        onRetry={connect}
         size={props.size}
+        walletId={wallet.id}
+        walletName={walletInfo.name}
       />
     );
   }
 
   return (
     <ScanScreen
-      qrScanInstruction={locale.scanScreen.instruction}
-      onBack={onBack}
-      onGetStarted={onGetStarted}
-      qrCodeUri={qrCodeUri}
-      walletName={walletInfo.name}
-      walletId={wallet.id}
-      getStartedLink={locale.getStartedLink}
-      error={errorConnecting}
-      onRetry={connect}
       client={props.client}
       connectModalSize={props.size}
+      error={errorConnecting}
+      getStartedLink={locale.getStartedLink}
+      onBack={onBack}
+      onGetStarted={onGetStarted}
+      onRetry={connect}
+      qrCodeUri={qrCodeUri}
+      qrScanInstruction={locale.scanScreen.instruction}
+      walletId={wallet.id}
+      walletName={walletInfo.name}
     />
   );
 };
@@ -195,9 +183,9 @@ export const WalletConnectStandaloneConnection: React.FC<{
         .connect({
           chain: props.chain,
           client: props.client,
+          optionalChains: props.chains,
           projectId: props.walletConnect?.projectId,
           showQrModal: true,
-          optionalChains: props.chains,
         })
         .then(() => {
           wcModalClosed = true;
@@ -215,33 +203,12 @@ export const WalletConnectStandaloneConnection: React.FC<{
         .connect({
           chain: props.chain,
           client: props.client,
-          projectId: props.walletConnect?.projectId,
-          showQrModal: false,
           onDisplayUri(uri) {
-            const platformUris = {
-              ios: walletInfo.mobile.native || "",
-              android: walletInfo.mobile.universal || "",
-              other: walletInfo.mobile.universal || "",
-            };
-
             setQrCodeUri(uri);
-            if (isMobile()) {
-              if (isAndroid()) {
-                openWindow(
-                  `${platformUris.android}wc?uri=${encodeURIComponent(uri)}`,
-                );
-              } else if (isIOS()) {
-                openWindow(
-                  `${platformUris.ios}wc?uri=${encodeURIComponent(uri)}`,
-                );
-              } else {
-                openWindow(
-                  `${platformUris.other}wc?uri=${encodeURIComponent(uri)}`,
-                );
-              }
-            }
           },
           optionalChains: props.chains,
+          projectId: props.walletConnect?.projectId,
+          showQrModal: false,
         })
         .then(() => {
           done();
@@ -253,8 +220,6 @@ export const WalletConnectStandaloneConnection: React.FC<{
     }
   }, [
     props.walletConnect,
-    walletInfo.mobile.native,
-    walletInfo.mobile.universal,
     wallet,
     props.chain,
     props.client,
@@ -275,36 +240,36 @@ export const WalletConnectStandaloneConnection: React.FC<{
   if (isMobile()) {
     return (
       <ConnectingScreen
+        client={props.client}
+        errorConnecting={errorConnecting}
         locale={{
+          failed: locale.connectionScreen.failed,
           getStartedLink: locale.getStartedLink,
+          inProgress: locale.connectionScreen.inProgress,
           instruction: locale.connectionScreen.instruction,
           tryAgain: locale.connectionScreen.retry,
-          inProgress: locale.connectionScreen.inProgress,
-          failed: locale.connectionScreen.failed,
         }}
         onBack={onBack}
-        walletName={walletInfo.name}
-        walletId={wallet.id}
-        errorConnecting={errorConnecting}
         onRetry={connect}
-        client={props.client}
         size={props.size}
+        walletId={wallet.id}
+        walletName={walletInfo.name}
       />
     );
   }
 
   return (
     <ScanScreen
-      qrScanInstruction={locale.scanScreen.instruction}
-      onBack={onBack}
-      qrCodeUri={qrCodeUri}
-      walletName={walletInfo.name}
-      walletId={wallet.id}
-      getStartedLink={locale.getStartedLink}
-      error={errorConnecting}
-      onRetry={connect}
       client={props.client}
       connectModalSize={props.size}
+      error={errorConnecting}
+      getStartedLink={locale.getStartedLink}
+      onBack={onBack}
+      onRetry={connect}
+      qrCodeUri={qrCodeUri}
+      qrScanInstruction={locale.scanScreen.instruction}
+      walletId={wallet.id}
+      walletName={walletInfo.name}
     />
   );
 };

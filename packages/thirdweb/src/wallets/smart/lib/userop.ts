@@ -1,10 +1,10 @@
 import { maxUint96 } from "ox/Solidity";
-import { concat, keccak256, toHex } from "viem";
+import { concat } from "viem";
 import type { Chain } from "../../../chains/types.js";
 import type { ThirdwebClient } from "../../../client/client.js";
 import {
-  type ThirdwebContract,
   getContract,
+  type ThirdwebContract,
 } from "../../../contract/contract.js";
 import { getNonce } from "../../../extensions/erc4337/__generated__/IEntryPoint/read/getNonce.js";
 import { getUserOpHash as getUserOpHashV06 } from "../../../extensions/erc4337/__generated__/IEntryPoint/read/getUserOpHash.js";
@@ -16,11 +16,14 @@ import type { PreparedTransaction } from "../../../transaction/prepare-transacti
 import type { TransactionReceipt } from "../../../transaction/types.js";
 import { encodeAbiParameters } from "../../../utils/abi/encodeAbiParameters.js";
 import { isContractDeployed } from "../../../utils/bytecode/is-contract-deployed.js";
-import type { Hex } from "../../../utils/encoding/hex.js";
+import { type Hex, toHex } from "../../../utils/encoding/hex.js";
 import { hexToBytes } from "../../../utils/encoding/to-bytes.js";
 import { isThirdwebUrl } from "../../../utils/fetch.js";
+import { keccak256 } from "../../../utils/hashing/keccak256.js";
+import { stringify } from "../../../utils/json.js";
 import { resolvePromisedValue } from "../../../utils/promise/resolve-promised-value.js";
 import type { Account } from "../../interfaces/wallet.js";
+import { getEntrypointFromFactory } from "../index.js";
 import type {
   BundlerOptions,
   PaymasterResult,
@@ -136,6 +139,7 @@ export async function createUnsignedUserOp(args: {
   adminAddress: string;
   sponsorGas: boolean;
   waitForDeployment?: boolean;
+  isDeployedOverride?: boolean;
   overrides?: SmartWalletOptions["overrides"];
 }): Promise<UserOperationV06 | UserOperationV07> {
   const {
@@ -146,14 +150,15 @@ export async function createUnsignedUserOp(args: {
     overrides,
     sponsorGas,
     waitForDeployment = true,
+    isDeployedOverride,
   } = args;
   const chain = executeTx.chain;
   const client = executeTx.client;
 
   const bundlerOptions = {
-    client,
-    chain,
     bundlerUrl: overrides?.bundlerUrl,
+    chain,
+    client,
     entrypointAddress: overrides?.entrypointAddress,
   };
 
@@ -163,14 +168,18 @@ export async function createUnsignedUserOp(args: {
 
   const [isDeployed, callData, callGasLimit, gasFees, nonce] =
     await Promise.all([
-      isContractDeployed(accountContract),
+      typeof isDeployedOverride === "boolean"
+        ? isDeployedOverride
+        : isContractDeployed(accountContract).then(
+            (isDeployed) => isDeployed || isAccountDeploying(accountContract),
+          ),
       encode(executeTx),
       resolvePromisedValue(executeTx.gas),
       getGasFees({
-        executeTx,
         bundlerOptions,
         chain,
         client,
+        executeTx,
       }),
       getAccountNonce({
         accountContract,
@@ -185,36 +194,36 @@ export async function createUnsignedUserOp(args: {
 
   if (entrypointVersion === "v0.7") {
     return populateUserOp_v0_7({
-      bundlerOptions,
-      factoryContract,
       accountContract,
       adminAddress,
-      sponsorGas,
-      overrides,
-      isDeployed,
-      nonce,
+      bundlerOptions,
       callData,
       callGasLimit,
+      factoryContract,
+      isDeployed,
       maxFeePerGas,
       maxPriorityFeePerGas,
+      nonce,
+      overrides,
+      sponsorGas,
       waitForDeployment,
     });
   }
 
   // default to v0.6
   return populateUserOp_v0_6({
-    bundlerOptions,
-    factoryContract,
     accountContract,
     adminAddress,
-    sponsorGas,
-    overrides,
-    isDeployed,
-    nonce,
+    bundlerOptions,
     callData,
     callGasLimit,
+    factoryContract,
+    isDeployed,
     maxFeePerGas,
     maxPriorityFeePerGas,
+    nonce,
+    overrides,
+    sponsorGas,
     waitForDeployment,
   });
 }
@@ -299,7 +308,7 @@ async function populateUserOp_v0_7(args: {
 
   let factory: string | undefined;
   let factoryData: Hex;
-  if (isDeployed || isAccountDeploying(accountContract)) {
+  if (isDeployed) {
     factoryData = "0x";
     if (waitForDeployment) {
       // lock until account is deployed if needed to avoid 'sender already created' errors when sending multiple transactions in parallel
@@ -309,40 +318,42 @@ async function populateUserOp_v0_7(args: {
     factory = factoryContract.address;
     factoryData = await encode(
       prepareCreateAccount({
-        factoryContract: factoryContract,
-        adminAddress,
         accountSalt: overrides?.accountSalt,
+        adminAddress,
         createAccountOverride: overrides?.createAccount,
+        factoryContract: factoryContract,
       }),
     );
-    markAccountDeploying(accountContract);
+    if (waitForDeployment) {
+      markAccountDeploying(accountContract);
+    }
   }
 
   const partialOp: UserOperationV07 = {
-    sender: accountContract.address,
-    nonce,
     callData,
-    maxFeePerGas,
-    maxPriorityFeePerGas,
     callGasLimit: callGasLimit ?? 0n,
-    verificationGasLimit: 0n,
-    preVerificationGas: 0n,
     factory,
     factoryData,
+    maxFeePerGas,
+    maxPriorityFeePerGas,
+    nonce,
     paymaster: undefined,
     paymasterData: "0x",
-    paymasterVerificationGasLimit: 0n,
     paymasterPostOpGasLimit: 0n,
+    paymasterVerificationGasLimit: 0n,
+    preVerificationGas: 0n,
+    sender: accountContract.address,
     signature: DUMMY_SIGNATURE,
+    verificationGasLimit: 0n,
   };
 
   if (sponsorGas) {
     const paymasterResult = (await getPaymasterAndData({
-      userOp: partialOp,
       chain,
       client,
       entrypointAddress: overrides?.entrypointAddress,
       paymasterOverride: overrides?.paymaster,
+      userOp: partialOp,
     })) as Extract<PaymasterResult, { paymaster: string }>;
     if (paymasterResult.paymaster && paymasterResult.paymasterData) {
       partialOp.paymaster = paymasterResult.paymaster;
@@ -384,8 +395,8 @@ async function populateUserOp_v0_7(args: {
         : undefined;
       const estimates = await estimateUserOpGas(
         {
-          userOp: partialOp,
           options: bundlerOptions,
+          userOp: partialOp,
         },
         stateOverrides,
       );
@@ -399,11 +410,11 @@ async function populateUserOp_v0_7(args: {
         estimates.paymasterVerificationGasLimit || 0n;
       // need paymaster to re-sign after estimates
       const paymasterResult2 = (await getPaymasterAndData({
-        userOp: partialOp,
         chain,
         client,
         entrypointAddress: overrides?.entrypointAddress,
         paymasterOverride: overrides?.paymaster,
+        userOp: partialOp,
       })) as Extract<PaymasterResult, { paymaster: string }>;
       if (paymasterResult2.paymaster && paymasterResult2.paymasterData) {
         partialOp.paymaster = paymasterResult2.paymaster;
@@ -413,8 +424,8 @@ async function populateUserOp_v0_7(args: {
   } else {
     // not gasless, so we just need to estimate gas limits
     const estimates = await estimateUserOpGas({
-      userOp: partialOp,
       options: bundlerOptions,
+      userOp: partialOp,
     });
     partialOp.callGasLimit = estimates.callGasLimit;
     partialOp.verificationGasLimit = estimates.verificationGasLimit;
@@ -462,7 +473,7 @@ async function populateUserOp_v0_6(args: {
   const { chain, client } = bundlerOptions;
   let initCode: Hex;
 
-  if (isDeployed || isAccountDeploying(accountContract)) {
+  if (isDeployed) {
     initCode = "0x";
     if (waitForDeployment) {
       // lock until account is deployed if needed to avoid 'sender already created' errors when sending multiple transactions in parallel
@@ -470,35 +481,37 @@ async function populateUserOp_v0_6(args: {
     }
   } else {
     initCode = await getAccountInitCode({
-      factoryContract: factoryContract,
-      adminAddress,
       accountSalt: overrides?.accountSalt,
+      adminAddress,
       createAccountOverride: overrides?.createAccount,
+      factoryContract: factoryContract,
     });
-    markAccountDeploying(accountContract);
+    if (waitForDeployment) {
+      markAccountDeploying(accountContract);
+    }
   }
 
   const partialOp: UserOperationV06 = {
-    sender: accountContract.address,
-    nonce,
-    initCode,
     callData,
+    callGasLimit: callGasLimit ?? 0n,
+    initCode,
     maxFeePerGas,
     maxPriorityFeePerGas,
-    callGasLimit: callGasLimit ?? 0n,
-    verificationGasLimit: 0n,
-    preVerificationGas: 0n,
+    nonce,
     paymasterAndData: "0x",
+    preVerificationGas: 0n,
+    sender: accountContract.address,
     signature: DUMMY_SIGNATURE,
+    verificationGasLimit: 0n,
   };
 
   if (sponsorGas) {
     const paymasterResult = await getPaymasterAndData({
-      userOp: partialOp,
       chain,
       client,
       entrypointAddress: overrides?.entrypointAddress,
       paymasterOverride: overrides?.paymaster,
+      userOp: partialOp,
     });
     const paymasterAndData =
       "paymasterAndData" in paymasterResult
@@ -519,8 +532,8 @@ async function populateUserOp_v0_6(args: {
     } else {
       // otherwise fallback to bundler for gas limits
       const estimates = await estimateUserOpGas({
-        userOp: partialOp,
         options: bundlerOptions,
+        userOp: partialOp,
       });
       partialOp.callGasLimit = estimates.callGasLimit;
       partialOp.verificationGasLimit = estimates.verificationGasLimit;
@@ -528,11 +541,11 @@ async function populateUserOp_v0_6(args: {
       // need paymaster to re-sign after estimates
       if (paymasterAndData && paymasterAndData !== "0x") {
         const paymasterResult2 = await getPaymasterAndData({
-          userOp: partialOp,
           chain,
           client,
           entrypointAddress: overrides?.entrypointAddress,
           paymasterOverride: overrides?.paymaster,
+          userOp: partialOp,
         });
         const paymasterAndData2 =
           "paymasterAndData" in paymasterResult2
@@ -546,8 +559,8 @@ async function populateUserOp_v0_6(args: {
   } else {
     // not gasless, so we just need to estimate gas limits
     const estimates = await estimateUserOpGas({
-      userOp: partialOp,
       options: bundlerOptions,
+      userOp: partialOp,
     });
     partialOp.callGasLimit = estimates.callGasLimit;
     partialOp.verificationGasLimit = estimates.verificationGasLimit;
@@ -587,6 +600,54 @@ export async function signUserOp(args: {
 }): Promise<UserOperationV06 | UserOperationV07> {
   const { userOp, chain, entrypointAddress, adminAccount } = args;
 
+  const userOpHash = await getUserOpHash({
+    chain,
+    client: args.client,
+    entrypointAddress,
+    userOp,
+  });
+
+  if (adminAccount.signMessage) {
+    const signature = await adminAccount.signMessage({
+      chainId: chain.id,
+      message: {
+        raw: hexToBytes(userOpHash),
+      },
+      originalMessage: stringify(userOp),
+    });
+    return {
+      ...userOp,
+      signature,
+    };
+  }
+  throw new Error("signMessage not implemented in signingAccount");
+}
+
+/**
+ * Get the hash of a user operation.
+ * @param args - The options for getting the user operation hash
+ * @returns - The user operation hash
+ * @example
+ * ```ts
+ * import { getUserOpHash } from "thirdweb/wallets/smart";
+ *
+ * const userOp = await createUnsignedUserOp(...);
+ * const userOpHash = await getUserOpHash({
+ *  client,
+ *  userOp,
+ *  chain,
+ * });
+ * ```
+ * @walletUtils
+ */
+export async function getUserOpHash(args: {
+  client: ThirdwebClient;
+  userOp: UserOperationV06 | UserOperationV07;
+  chain: Chain;
+  entrypointAddress?: string;
+}): Promise<Hex> {
+  const { userOp, chain, entrypointAddress } = args;
+
   const entrypointVersion = getEntryPointVersion(
     entrypointAddress || ENTRYPOINT_ADDRESS_v0_6,
   );
@@ -613,19 +674,7 @@ export async function signUserOp(args: {
       userOp: userOp as UserOperationV06,
     });
   }
-
-  if (adminAccount.signMessage) {
-    const signature = await adminAccount.signMessage({
-      message: {
-        raw: hexToBytes(userOpHash),
-      },
-    });
-    return {
-      ...userOp,
-      signature,
-    };
-  }
-  throw new Error("signMessage not implemented in signingAccount");
+  return userOpHash;
 }
 
 async function getAccountInitCode(options: {
@@ -640,10 +689,10 @@ async function getAccountInitCode(options: {
   const { factoryContract, adminAddress, accountSalt, createAccountOverride } =
     options;
   const deployTx = prepareCreateAccount({
-    factoryContract,
-    adminAddress,
     accountSalt,
+    adminAddress,
     createAccountOverride,
+    factoryContract,
   });
   return concat([factoryContract.address as Hex, await encode(deployTx)]);
 }
@@ -699,6 +748,69 @@ export async function createAndSignUserOp(options: {
   client: ThirdwebClient;
   smartWalletOptions: SmartWalletOptions;
   waitForDeployment?: boolean;
+  isDeployedOverride?: boolean;
+}) {
+  // if factory is passed, but no entrypoint, try to resolve entrypoint from factory
+  if (
+    options.smartWalletOptions.factoryAddress &&
+    !options.smartWalletOptions.overrides?.entrypointAddress
+  ) {
+    const entrypointAddress = await getEntrypointFromFactory(
+      options.smartWalletOptions.factoryAddress,
+      options.client,
+      options.smartWalletOptions.chain,
+    );
+    if (entrypointAddress) {
+      options.smartWalletOptions.overrides = {
+        ...options.smartWalletOptions.overrides,
+        entrypointAddress,
+      };
+    }
+  }
+  const unsignedUserOp = await prepareUserOp({
+    adminAccount: options.adminAccount,
+    client: options.client,
+    isDeployedOverride: options.isDeployedOverride,
+    smartWalletOptions: options.smartWalletOptions,
+    transactions: options.transactions,
+    waitForDeployment: options.waitForDeployment,
+  });
+  const signedUserOp = await signUserOp({
+    adminAccount: options.adminAccount,
+    chain: options.smartWalletOptions.chain,
+    client: options.client,
+    entrypointAddress: options.smartWalletOptions.overrides?.entrypointAddress,
+    userOp: unsignedUserOp,
+  });
+  return signedUserOp;
+}
+
+/**
+ * Prepare a user operation for signing.
+ * @param options - The options for preparing the user operation
+ * @returns - The prepared user operation
+ * @example
+ * ```ts
+ * import { prepareUserOp } from "thirdweb/wallets/smart";
+ *
+ * const userOp = await prepareUserOp({
+ *  transactions,
+ *  adminAccount,
+ *  client,
+ *  smartWalletOptions,
+ * });
+ * ```
+ *
+ * You can then sign the user operation with signUserOp(). and send it to the bundler with bundlerUserOp().
+ * @walletUtils
+ */
+export async function prepareUserOp(options: {
+  transactions: PreparedTransaction[];
+  adminAccount: Account;
+  client: ThirdwebClient;
+  smartWalletOptions: SmartWalletOptions;
+  waitForDeployment?: boolean;
+  isDeployedOverride?: boolean;
 }) {
   const config = options.smartWalletOptions;
   const factoryContract = getContract({
@@ -709,11 +821,11 @@ export async function createAndSignUserOp(options: {
     client: options.client,
   });
   const accountAddress = await predictAddress({
-    factoryContract,
-    adminAddress: options.adminAccount.address,
-    predictAddressOverride: config.overrides?.predictAddress,
-    accountSalt: config.overrides?.accountSalt,
     accountAddress: config.overrides?.accountAddress,
+    accountSalt: config.overrides?.accountSalt,
+    adminAddress: options.adminAccount.address,
+    factoryContract,
+    predictAddressOverride: config.overrides?.predictAddress,
   });
   const accountContract = getContract({
     address: accountAddress,
@@ -724,48 +836,50 @@ export async function createAndSignUserOp(options: {
   let executeTx: PreparedTransaction;
   if (options.transactions.length === 1) {
     const tx = options.transactions[0] as PreparedTransaction;
+    // for single tx, simulate fully
     const serializedTx = await toSerializableTransaction({
-      transaction: tx,
       from: accountAddress,
+      transaction: tx,
     });
     executeTx = prepareExecute({
       accountContract,
-      transaction: serializedTx,
       executeOverride: config.overrides?.execute,
+      transaction: serializedTx,
     });
   } else {
+    // for multiple txs, we can't simulate, just encode
     const serializedTxs = await Promise.all(
-      options.transactions.map((tx) =>
-        toSerializableTransaction({
-          transaction: tx,
-          from: accountAddress,
-        }),
-      ),
+      options.transactions.map(async (tx) => {
+        const [data, to, value] = await Promise.all([
+          encode(tx),
+          resolvePromisedValue(tx.to),
+          resolvePromisedValue(tx.value),
+        ]);
+        return {
+          chainId: tx.chain.id,
+          data,
+          to,
+          value,
+        };
+      }),
     );
     executeTx = prepareBatchExecute({
       accountContract,
-      transactions: serializedTxs,
       executeBatchOverride: config.overrides?.executeBatch,
+      transactions: serializedTxs,
     });
   }
 
-  const unsignedUserOp = await createUnsignedUserOp({
-    transaction: executeTx,
-    factoryContract,
+  return createUnsignedUserOp({
     accountContract,
     adminAddress: options.adminAccount.address,
-    sponsorGas: "sponsorGas" in config ? config.sponsorGas : config.gasless,
+    factoryContract,
+    isDeployedOverride: options.isDeployedOverride,
     overrides: config.overrides,
+    sponsorGas: "sponsorGas" in config ? config.sponsorGas : config.gasless,
+    transaction: executeTx,
     waitForDeployment: options.waitForDeployment,
   });
-  const signedUserOp = await signUserOp({
-    client: options.client,
-    chain: config.chain,
-    adminAccount: options.adminAccount,
-    entrypointAddress: config.overrides?.entrypointAddress,
-    userOp: unsignedUserOp,
-  });
-  return signedUserOp;
 }
 
 async function waitForAccountDeployed(accountContract: ThirdwebContract) {

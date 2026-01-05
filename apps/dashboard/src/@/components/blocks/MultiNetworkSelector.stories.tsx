@@ -1,35 +1,28 @@
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/nextjs";
 import { useState } from "react";
-import { BadgeContainer, mobileViewport } from "../../../stories/utils";
+import { BadgeContainer, storybookThirdwebClient } from "@/storybook/utils";
 import { MultiNetworkSelector } from "./NetworkSelectors";
 
 const meta = {
-  title: "blocks/Cards/MultiNetworkSelector",
   component: Story,
   parameters: {
     nextjs: {
       appDirectory: true,
     },
   },
+  title: "blocks/Cards/MultiNetworkSelector",
 } satisfies Meta<typeof Story>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Desktop: Story = {
+export const Variants: Story = {
   args: {},
-};
-
-export const Mobile: Story = {
-  args: {},
-  parameters: {
-    viewport: mobileViewport("iphone14"),
-  },
 };
 
 function Story() {
   return (
-    <div className="container flex max-w-[1000px] flex-col gap-8 lg:p-10">
+    <div className="container flex max-w-6xl flex-col gap-8 py-10">
       <Variant label="No Chains selected by default" selectedChainIds={[]} />
       <Variant
         label="Polygon, Ethereum selected by default"
@@ -39,16 +32,14 @@ function Story() {
   );
 }
 
-function Variant(props: {
-  label: string;
-  selectedChainIds: number[];
-}) {
+function Variant(props: { label: string; selectedChainIds: number[] }) {
   const [chainIds, setChainIds] = useState<number[]>(props.selectedChainIds);
   return (
     <BadgeContainer label={props.label}>
       <MultiNetworkSelector
-        selectedChainIds={chainIds}
+        client={storybookThirdwebClient}
         onChange={setChainIds}
+        selectedChainIds={chainIds}
       />
     </BadgeContainer>
   );

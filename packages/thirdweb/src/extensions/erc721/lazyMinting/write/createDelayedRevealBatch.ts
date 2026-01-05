@@ -32,6 +32,7 @@ export type CreateDelayedRevealBatchParams = {
 
 /**
  * Creates a batch of encrypted NFTs that can be revealed at a later time.
+ * This method is only available on the `DropERC721` contract.
  *
  * @param options {CreateDelayedRevealBatchParams} - The delayed reveal options.
  * @param options.placeholderMetadata {@link NFTInput} - The placeholder metadata for the batch.
@@ -79,7 +80,6 @@ export function createDelayedRevealBatch(
   }
 
   return generatedLazyMint({
-    contract: options.contract,
     asyncParams: async () => {
       const [placeholderUris, startFileNumber] = await Promise.all([
         upload({
@@ -144,6 +144,7 @@ export function createDelayedRevealBatch(
         extraData: data,
       } as const;
     },
+    contract: options.contract,
   });
 }
 

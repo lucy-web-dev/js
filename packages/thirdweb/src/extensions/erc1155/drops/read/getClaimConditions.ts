@@ -2,12 +2,14 @@ import type { BaseTransactionOptions } from "../../../../transaction/types.js";
 import type { ClaimCondition } from "../../../../utils/extensions/drops/types.js";
 import * as MultiPhase from "../../__generated__/IDrop1155/read/claimCondition.js";
 import * as MultiById from "../../__generated__/IDrop1155/read/getClaimConditionById.js";
+import * as SinglePhase from "../../__generated__/IDropSinglePhase1155/read/claimCondition.js";
 
 export type GetClaimConditionsParams = {
   tokenId: bigint;
 };
 /**
  * Retrieves all claim conditions.
+ * This method is only available on the `DropERC1155` contract.
  * @param options - The transaction options.
  * @returns A promise that resolves to all claim conditions.
  * @throws An error if the claim conditions are unsupported by the contract.
@@ -19,23 +21,51 @@ export type GetClaimConditionsParams = {
  * ```
  */
 export async function getClaimConditions(
-  options: BaseTransactionOptions<GetClaimConditionsParams>,
+  options: BaseTransactionOptions<GetClaimConditionsParams> & {
+    singlePhaseDrop?: boolean;
+  },
 ): Promise<ClaimCondition[]> {
   try {
-    const [startId, count] = await MultiPhase.claimCondition(options);
-
-    const conditionPromises: Array<
-      ReturnType<typeof MultiById.getClaimConditionById>
-    > = [];
-    for (let i = startId; i < startId + count; i++) {
-      conditionPromises.push(
-        MultiById.getClaimConditionById({
-          ...options,
-          conditionId: i,
-        }),
+    if (options.singlePhaseDrop) {
+      return SinglePhase.claimCondition(options).then(
+        ([
+          startTimestamp,
+          maxClaimableSupply,
+          supplyClaimed,
+          quantityLimitPerWallet,
+          merkleRoot,
+          pricePerToken,
+          currency,
+          metadata,
+        ]) => [
+          {
+            currency,
+            maxClaimableSupply,
+            merkleRoot,
+            metadata,
+            pricePerToken,
+            quantityLimitPerWallet,
+            startTimestamp,
+            supplyClaimed,
+          },
+        ],
       );
+    } else {
+      const [startId, count] = await MultiPhase.claimCondition(options);
+
+      const conditionPromises: Array<
+        ReturnType<typeof MultiById.getClaimConditionById>
+      > = [];
+      for (let i = startId; i < startId + count; i++) {
+        conditionPromises.push(
+          MultiById.getClaimConditionById({
+            ...options,
+            conditionId: i,
+          }),
+        );
+      }
+      return Promise.all(conditionPromises);
     }
-    return Promise.all(conditionPromises);
   } catch {
     throw new Error("Claim condition not found");
   }
@@ -56,7 +86,8 @@ export async function getClaimConditions(
 export function isGetClaimConditionsSupported(availableSelectors: string[]) {
   // if multi phase is supported, return true
   return (
-    MultiPhase.isClaimConditionSupported(availableSelectors) &&
-    MultiById.isGetClaimConditionByIdSupported(availableSelectors)
+    (MultiPhase.isClaimConditionSupported(availableSelectors) &&
+      MultiById.isGetClaimConditionByIdSupported(availableSelectors)) ||
+    SinglePhase.isClaimConditionSupported(availableSelectors)
   );
 }

@@ -49,6 +49,12 @@ type ClientOptions = Prettify<{
       gatewayUrl?: string;
     };
   };
+
+  /**
+   * The team ID for thirdweb dashboard usage.
+   * @hidden
+   */
+  teamId?: string;
 }>;
 
 export type CreateThirdwebClientOptions = Prettify<
@@ -114,7 +120,8 @@ export function createThirdwebClient(
         throw new Error("clientId must be provided when using a JWT secretKey");
       }
     } else {
-      realClientId = computeClientIdFromSecretKey(secretKey);
+      // always PREFER the clientId if provided, only compute it from the secretKey if we don't have a clientId passed explicitly
+      realClientId = clientId ?? computeClientIdFromSecretKey(secretKey);
     }
   }
 

@@ -3,13 +3,14 @@ import {
   validProjectResponse,
   validTeamAndProjectResponse,
 } from "../../mocks.js";
-import { type ClientAuthorizationPayload, authorizeClient } from "./client.js";
+import { authorizeClient, type ClientAuthorizationPayload } from "./client.js";
 
 describe("authorizeClient", () => {
   const validAuthOptions: ClientAuthorizationPayload = {
-    secretKeyHash: "secret-hash",
     bundleId: null,
+    incomingServiceApiKey: null,
     origin: "example.com",
+    secretKeyHash: "secret-hash",
   };
 
   it("should authorize client with valid secret key", () => {
@@ -24,9 +25,10 @@ describe("authorizeClient", () => {
 
   it("should authorize client with matching wildcard domain", () => {
     const authOptionsWithWildcardDomain: ClientAuthorizationPayload = {
-      secretKeyHash: null,
       bundleId: null,
+      incomingServiceApiKey: null,
       origin: "sub.example.com",
+      secretKeyHash: null,
     };
 
     const result = authorizeClient(
@@ -40,9 +42,10 @@ describe("authorizeClient", () => {
 
   it("should authorize client with any domain w/o origin check", () => {
     const authOptionsWithAnyDomain: ClientAuthorizationPayload = {
-      secretKeyHash: null,
       bundleId: null,
+      incomingServiceApiKey: null,
       origin: null,
+      secretKeyHash: null,
     };
 
     const validProjectResponseAnyDomain = {
@@ -64,9 +67,10 @@ describe("authorizeClient", () => {
 
   it("should not authorize client with non-matching bundle id", () => {
     const authOptionsWithBundleId: ClientAuthorizationPayload = {
-      secretKeyHash: null,
       bundleId: "com.foo.bar",
+      incomingServiceApiKey: null,
       origin: null,
+      secretKeyHash: null,
     };
 
     const result = authorizeClient(
@@ -76,7 +80,7 @@ describe("authorizeClient", () => {
     ) as any;
     expect(result.authorized).toBe(false);
     expect(result.errorMessage).toBe(
-      "Invalid request: Unauthorized Bundle ID: com.foo.bar. You can view the restrictions on this API key at https://thirdweb.com/create-api-key",
+      "Invalid request: Unauthorized Bundle ID: com.foo.bar. You can view the restrictions for this project at https://thirdweb.com/test-team/test-project/settings",
     );
     expect(result.errorCode).toBe("BUNDLE_UNAUTHORIZED");
     expect(result.status).toBe(401);
@@ -84,9 +88,10 @@ describe("authorizeClient", () => {
 
   it("should not authorize client with unauthorized origin", () => {
     const authOptionsWithUnauthorizedOrigin: ClientAuthorizationPayload = {
-      secretKeyHash: null,
       bundleId: null,
+      incomingServiceApiKey: null,
       origin: "unauthorized.com",
+      secretKeyHash: null,
     };
 
     const result = authorizeClient(
@@ -96,9 +101,26 @@ describe("authorizeClient", () => {
     ) as any;
     expect(result.authorized).toBe(false);
     expect(result.errorMessage).toBe(
-      "Invalid request: Unauthorized domain: unauthorized.com. You can view the restrictions on this API key at https://thirdweb.com/create-api-key",
+      "Invalid request: Unauthorized domain: unauthorized.com. You can view the restrictions for this project at https://thirdweb.com/test-team/test-project/settings",
     );
     expect(result.errorCode).toBe("ORIGIN_UNAUTHORIZED");
     expect(result.status).toBe(401);
+  });
+
+  it("should authorize client with incoming service api key", () => {
+    const authOptionsWithServiceKey: ClientAuthorizationPayload = {
+      bundleId: null,
+      incomingServiceApiKey: "test-service-key",
+      origin: "unauthorized.com", // Even unauthorized origin should work with service key
+      secretKeyHash: null,
+    };
+
+    const result = authorizeClient(
+      authOptionsWithServiceKey,
+      validTeamAndProjectResponse,
+      // biome-ignore lint/suspicious/noExplicitAny: test only
+    ) as any;
+    expect(result.authorized).toBe(true);
+    expect(result.project).toEqual(validTeamAndProjectResponse.project);
   });
 });

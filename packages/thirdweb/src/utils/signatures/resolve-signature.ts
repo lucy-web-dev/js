@@ -17,7 +17,6 @@ async function resolveFunctionSignature(
     `${SIGNATURE_API}/signatures/?format=json&hex_signature=${hexSig}`,
   );
   if (!res.ok) {
-    res.body?.cancel();
     return null;
   }
   const data = await res.json();
@@ -39,7 +38,6 @@ async function resolveEventSignature(
     `${SIGNATURE_API}/event-signatures/?format=json&hex_signature=${hexSig}`,
   );
   if (!res.ok) {
-    res.body?.cancel();
     return null;
   }
   const data = await res.json();
@@ -75,7 +73,6 @@ export async function resolveSignature(hexSig: string): Promise<{
   event: EventString | null;
 }> {
   if (hexSig.startsWith("0x")) {
-    // biome-ignore lint/style/noParameterAssign: modifying in-place for performance
     hexSig = hexSig.slice(2);
   }
   const all = await Promise.all([
@@ -83,8 +80,8 @@ export async function resolveSignature(hexSig: string): Promise<{
     resolveEventSignature(hexSig),
   ]);
   return {
-    function: all[0],
     event: all[1],
+    function: all[0],
   };
 }
 
@@ -105,20 +102,20 @@ export async function resolveSignatures(hexSigs: string[]): Promise<{
   events: EventString[];
 }> {
   // dedupe hexSigs
-  // biome-ignore lint/style/noParameterAssign: modifying in-place for performance
+
   hexSigs = Array.from(new Set(hexSigs));
   const all = await Promise.all(
     hexSigs.map((hexSig) => resolveSignature(hexSig)),
   );
   return {
-    functions: all
-      .map((x) => x.function)
-      .filter((x) => x !== null)
-      .sort() as FunctionString[],
     events: all
       .map((x) => x.event)
       .filter((x) => x !== null)
       .sort() as EventString[],
+    functions: all
+      .map((x) => x.function)
+      .filter((x) => x !== null)
+      .sort() as FunctionString[],
   };
 }
 

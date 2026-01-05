@@ -50,7 +50,7 @@ export interface TokenSymbolProps
    * If not passed, the component will return `null`.
    *
    * You can/should pass a descriptive text/component to this prop, indicating that the
-   * symbol was not fetched succesfully
+   * symbol was not fetched successfully
    * @example
    * ```tsx
    * <TokenSymbol fallbackComponent={"Failed to load"}
@@ -157,9 +157,9 @@ export function TokenSymbol({
 }: TokenSymbolProps) {
   const { address, client, chain } = useTokenContext();
   const symbolQuery = useQuery({
-    queryKey: getQueryKeys({ chainId: chain.id, address, symbolResolver }),
     queryFn: async () =>
-      fetchTokenSymbol({ symbolResolver, address, chain, client }),
+      fetchTokenSymbol({ address, chain, client, symbolResolver }),
+    queryKey: getQueryKeys({ address, chainId: chain.id, symbolResolver }),
     ...queryOptions,
   });
 
@@ -201,7 +201,7 @@ export async function fetchTokenSymbol(props: {
 
   // Try to fetch the symbol from both the `symbol` function and the contract metadata
   // then prioritize its result
-  const contract = getContract({ address, client, chain });
+  const contract = getContract({ address, chain, client });
   const [_symbol, contractMetadata] = await Promise.all([
     symbol({ contract }).catch(() => undefined),
     getContractMetadata({ contract }).catch(() => undefined),

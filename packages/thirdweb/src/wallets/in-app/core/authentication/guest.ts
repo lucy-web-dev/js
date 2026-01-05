@@ -2,9 +2,8 @@ import type { ThirdwebClient } from "../../../../client/client.js";
 import { getClientFetch } from "../../../../utils/fetch.js";
 import { stringify } from "../../../../utils/json.js";
 import { randomBytesHex } from "../../../../utils/random.js";
-import type { AsyncStorage } from "../../../../utils/storage/AsyncStorage.js";
 import type { Ecosystem } from "../wallet/types.js";
-import { ClientScopedStorage } from "./client-scoped-storage.js";
+import type { ClientScopedStorage } from "./client-scoped-storage.js";
 import { getLoginCallbackUrl } from "./getLoginPath.js";
 import type { AuthStoredTokenWithCookieReturnType } from "./types.js";
 
@@ -14,19 +13,13 @@ import type { AuthStoredTokenWithCookieReturnType } from "./types.js";
  */
 export async function guestAuthenticate(args: {
   client: ThirdwebClient;
-  storage: AsyncStorage;
+  storage: ClientScopedStorage;
   ecosystem?: Ecosystem;
 }): Promise<AuthStoredTokenWithCookieReturnType> {
-  const storage = new ClientScopedStorage({
-    storage: args.storage,
-    clientId: args.client.clientId,
-    ecosystem: args.ecosystem,
-  });
-
-  let sessionId = await storage.getGuestSessionId();
+  let sessionId = await args.storage.getGuestSessionId();
   if (!sessionId) {
     sessionId = randomBytesHex(32);
-    storage.saveGuestSessionId(sessionId);
+    args.storage.saveGuestSessionId(sessionId);
   }
 
   const clientFetch = getClientFetch(args.client, args.ecosystem);
@@ -36,16 +29,21 @@ export async function guestAuthenticate(args: {
     ecosystem: args.ecosystem,
   });
   const res = await clientFetch(`${path}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
     body: stringify({
       sessionId,
     }),
+    headers: {
+      "Content-Type": "application/json",
+    },
+    method: "POST",
   });
 
-  if (!res.ok) throw new Error("Failed to generate guest account");
+  if (!res.ok) {
+    const error = await res.text();
+    throw new Error(
+      `Failed to generate guest account: ${res.status} ${res.statusText} ${error}`,
+    );
+  }
 
   return (await res.json()) satisfies AuthStoredTokenWithCookieReturnType;
 }

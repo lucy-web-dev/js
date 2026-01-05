@@ -26,13 +26,13 @@ const closeWindow = ({
   }
 };
 
-export const loginWithOauthRedirect = (options: {
+export async function loginWithOauthRedirect(options: {
   authOption: OAuthOption;
   client: ThirdwebClient;
   ecosystem?: Ecosystem;
   redirectUrl?: string;
   mode?: "redirect" | "popup" | "window";
-}): void => {
+}): Promise<void> {
   const loginUrl = getLoginUrl({
     ...options,
     mode: options.mode || "redirect",
@@ -42,7 +42,10 @@ export const loginWithOauthRedirect = (options: {
   } else {
     window.open(loginUrl);
   }
-};
+  // wait for 5 secs for the redirect to happen
+  // that way it interrupts the rest of the execution that would normally keep connecting
+  await new Promise((resolve) => setTimeout(resolve, 5000));
+}
 
 export const loginWithOauth = async (options: {
   authOption: OAuthOption;
@@ -96,9 +99,9 @@ export const loginWithOauth = async (options: {
             window.removeEventListener("message", messageListener);
             clearInterval(pollTimer);
             closeWindow({
+              closeOpenedWindow: options.closeOpenedWindow,
               isWindowOpenedByFn,
               win,
-              closeOpenedWindow: options.closeOpenedWindow,
             });
             if (event.data.authResult) {
               resolve(event.data.authResult);
@@ -109,9 +112,9 @@ export const loginWithOauth = async (options: {
             window.removeEventListener("message", messageListener);
             clearInterval(pollTimer);
             closeWindow({
+              closeOpenedWindow: options.closeOpenedWindow,
               isWindowOpenedByFn,
               win,
-              closeOpenedWindow: options.closeOpenedWindow,
             });
             reject(new Error(event.data.errorString));
             break;

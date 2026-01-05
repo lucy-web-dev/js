@@ -1,0 +1,190 @@
+import { SaveIcon } from "lucide-react";
+import { useId } from "react";
+import { useForm } from "react-hook-form";
+import { FormFieldSetup } from "@/components/blocks/FormFieldSetup";
+import { Button } from "@/components/ui/button";
+import { Form, FormDescription } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/Spinner";
+import { UnderlineLink } from "@/components/ui/UnderlineLink";
+import {
+  type EngineInstance,
+  type SetWalletConfigInput,
+  useEngineSetWalletConfig,
+  useEngineWalletConfig,
+  useHasEngineFeature,
+} from "@/hooks/useEngine";
+import { useTxNotifications } from "@/hooks/useTxNotifications";
+
+interface KmsAwsConfigProps {
+  instance: EngineInstance;
+  authToken: string;
+}
+
+export const KmsAwsConfig: React.FC<KmsAwsConfigProps> = ({
+  instance,
+  authToken,
+}) => {
+  const { mutate: setAwsKmsConfig, isPending } = useEngineSetWalletConfig({
+    authToken,
+    instanceUrl: instance.url,
+  });
+  const { data: awsConfig } = useEngineWalletConfig({
+    authToken,
+    instanceUrl: instance.url,
+  });
+  const { isSupported: supportsMultipleWalletTypes } = useHasEngineFeature(
+    instance.url,
+    "HETEROGENEOUS_WALLET_TYPES",
+  );
+
+  const { onSuccess, onError } = useTxNotifications(
+    "Configuration set successfully.",
+    "Failed to set configuration.",
+  );
+
+  const defaultValues: SetWalletConfigInput = {
+    awsAccessKeyId: awsConfig?.awsAccessKeyId ?? "",
+    awsRegion: awsConfig?.awsRegion ?? "",
+    awsSecretAccessKey: "",
+    type: "aws-kms" as const,
+  };
+
+  const form = useForm<SetWalletConfigInput>({
+    defaultValues,
+    resetOptions: {
+      keepDirty: true,
+      keepDirtyValues: true,
+    },
+    values: defaultValues,
+  });
+
+  const onSubmit = (data: SetWalletConfigInput) => {
+    setAwsKmsConfig(data, {
+      onError: (error) => {
+        onError(error);
+      },
+      onSuccess: () => {
+        onSuccess();
+      },
+    });
+  };
+
+  const awsRegionId = useId();
+  const awsAccessKeyId = useId();
+  const awsSecretKeyId = useId();
+
+  return (
+    <div className="bg-card rounded-lg border mb-8">
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)}>
+          <div className="p-4 lg:p-6 ">
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold mb-1">Credentials</h2>
+
+              <p className="text-muted-foreground mb-1 text-sm">
+                AWS KMS wallets require credentials from your Amazon Web
+                Services account with sufficient permissions to manage KMS keys.{" "}
+                <br />
+                Wallets are stored in KMS keys on your AWS account.
+              </p>
+              <p className="text-muted-foreground text-sm">
+                For help and more advanced use cases,{" "}
+                <UnderlineLink
+                  href="https://portal.thirdweb.com/infrastructure/engine/features/backend-wallets"
+                  rel="noopener noreferrer"
+                  target="_blank"
+                >
+                  learn more about using AWS KMS wallets
+                </UnderlineLink>
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <FormFieldSetup
+                errorMessage={
+                  form.getFieldState("awsRegion", form.formState).error?.message
+                }
+                htmlFor="aws-region"
+                isRequired
+                label="Region"
+                tooltip={null}
+              >
+                <Input
+                  autoComplete="off"
+                  id={awsRegionId}
+                  placeholder="us-west-2"
+                  type="text"
+                  {...form.register("awsRegion")}
+                />
+              </FormFieldSetup>
+
+              <FormFieldSetup
+                errorMessage={
+                  form.getFieldState("awsAccessKeyId", form.formState).error
+                    ?.message
+                }
+                htmlFor={awsAccessKeyId}
+                isRequired
+                label="Access Key"
+                tooltip={null}
+              >
+                <Input
+                  autoComplete="off"
+                  id={awsAccessKeyId}
+                  placeholder="AKIA..."
+                  type="text"
+                  {...form.register("awsAccessKeyId")}
+                />
+              </FormFieldSetup>
+
+              <FormFieldSetup
+                errorMessage={
+                  form.getFieldState("awsSecretAccessKey", form.formState).error
+                    ?.message
+                }
+                htmlFor={awsSecretKeyId}
+                isRequired
+                label="Secret Key"
+                tooltip={null}
+              >
+                <Input
+                  autoComplete="off"
+                  id={awsSecretKeyId}
+                  placeholder="UW7A..."
+                  type="text"
+                  {...form.register("awsSecretAccessKey")}
+                />
+                <FormDescription className="pt-2">
+                  Secret key will not be shown again. Please save your secret
+                  key in a secure location
+                </FormDescription>
+              </FormFieldSetup>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-4 border-t border-dashed px-4 py-4 lg:px-6">
+            {!supportsMultipleWalletTypes && (
+              <p className="text-destructive-text text-sm">
+                This will clear other credentials.
+              </p>
+            )}
+            <Button
+              className="gap-2"
+              disabled={isPending || !form.formState.isDirty}
+              size="sm"
+              type="submit"
+            >
+              {isPending ? (
+                <Spinner className="size-4" />
+              ) : (
+                <SaveIcon className="size-4" />
+              )}
+              Save
+            </Button>
+          </div>
+        </form>
+      </Form>
+    </div>
+  );
+};

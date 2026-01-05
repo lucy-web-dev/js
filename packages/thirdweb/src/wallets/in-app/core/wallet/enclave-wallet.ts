@@ -5,7 +5,7 @@ import type { ThirdwebClient } from "../../../../client/client.js";
 import { eth_sendRawTransaction } from "../../../../rpc/actions/eth_sendRawTransaction.js";
 import { getRpcClient } from "../../../../rpc/rpc.js";
 import { getAddress } from "../../../../utils/address.js";
-import { type Hex, toHex } from "../../../../utils/encoding/hex.js";
+import { type Hex, isHex, toHex } from "../../../../utils/encoding/hex.js";
 import { parseTypedData } from "../../../../utils/signatures/helpers/parse-typed-data.js";
 import type { Prettify } from "../../../../utils/type-utils.js";
 import type {
@@ -13,6 +13,7 @@ import type {
   SendTransactionOption,
 } from "../../../interfaces/wallet.js";
 import { getUserStatus } from "../actions/get-enclave-user-status.js";
+import { signAuthorization as signEnclaveAuthorization } from "../actions/sign-authorization.enclave.js";
 import { signMessage as signEnclaveMessage } from "../actions/sign-message.enclave.js";
 import { signTransaction as signEnclaveTransaction } from "../actions/sign-transaction.enclave.js";
 import { signTypedData as signEnclaveTypedData } from "../actions/sign-typed-data.enclave.js";
@@ -104,22 +105,22 @@ export class EnclaveWallet implements IWebWallet {
       phoneNumber: userStatus.linkedAccounts.find(
         (account) => account.details.phone !== undefined,
       )?.details.phone,
-      userWalletId: userStatus.id || "",
       recoveryShareManagement: "ENCLAVE",
+      userWalletId: userStatus.id || "",
     };
 
     if (!wallet) {
       return {
-        status: "Logged In, Wallet Uninitialized",
         authDetails,
+        status: "Logged In, Wallet Uninitialized",
       };
     }
 
     return {
+      account: await this.getAccount(),
+      authDetails,
       status: "Logged In, Wallet Initialized",
       walletAddress: wallet.address,
-      authDetails,
-      account: await this.getAccount(),
     };
   }
 
@@ -135,67 +136,55 @@ export class EnclaveWallet implements IWebWallet {
 
     const _signTransaction = async (tx: SendTransactionOption) => {
       const rpcRequest = getRpcClient({
-        client,
         chain: getCachedChain(tx.chainId),
+        client,
       });
-      const transaction: Record<string, Hex | number | undefined> = {
-        to: tx.to ? getAddress(tx.to) : undefined,
-        data: tx.data,
-        value: typeof tx.value === "bigint" ? toHex(tx.value) : undefined,
-        gas:
-          typeof tx.gas === "bigint"
-            ? toHex(tx.gas + tx.gas / BigInt(10))
-            : undefined, // Add a 10% buffer to gas
-        nonce:
-          typeof tx.nonce === "number"
-            ? toHex(tx.nonce)
-            : toHex(
-                await import(
-                  "../../../../rpc/actions/eth_getTransactionCount.js"
-                ).then(({ eth_getTransactionCount }) =>
-                  eth_getTransactionCount(rpcRequest, {
-                    address: this.address,
-                    blockTag: "pending",
-                  }),
-                ),
-              ),
+      const transaction: Record<string, unknown> = {
         chainId: toHex(tx.chainId),
+        data: tx.data,
+        gas: hexlify(tx.gas),
+        nonce:
+          hexlify(tx.nonce) ||
+          toHex(
+            await import(
+              "../../../../rpc/actions/eth_getTransactionCount.js"
+            ).then(({ eth_getTransactionCount }) =>
+              eth_getTransactionCount(rpcRequest, {
+                address: getAddress(this.address),
+                blockTag: "pending",
+              }),
+            ),
+          ),
+        to: tx.to ? getAddress(tx.to) : undefined,
+        value: hexlify(tx.value),
       };
 
-      if (typeof tx.maxFeePerGas === "bigint") {
-        transaction.maxFeePerGas = toHex(tx.maxFeePerGas);
-        transaction.maxPriorityFeePerGas =
-          typeof tx.maxPriorityFeePerGas === "bigint"
-            ? toHex(tx.maxPriorityFeePerGas)
-            : undefined;
+      if (tx.authorizationList && tx.authorizationList.length > 0) {
+        transaction.type = 4;
+        transaction.authorizationList = tx.authorizationList;
+        transaction.maxFeePerGas = hexlify(tx.maxFeePerGas);
+        transaction.maxPriorityFeePerGas = hexlify(tx.maxPriorityFeePerGas);
+      } else if (hexlify(tx.maxFeePerGas)) {
+        transaction.maxFeePerGas = hexlify(tx.maxFeePerGas);
+        transaction.maxPriorityFeePerGas = hexlify(tx.maxPriorityFeePerGas);
         transaction.type = 2;
       } else {
-        transaction.gasPrice =
-          typeof tx.gasPrice === "bigint" ? toHex(tx.gasPrice) : undefined;
+        transaction.gasPrice = hexlify(tx.gasPrice);
         transaction.type = 0;
       }
+
       return signEnclaveTransaction({
         client,
-        storage,
         payload: transaction,
+        storage,
       });
     };
-    return {
+    const account: Account = {
       address: getAddress(address),
-      async signTransaction(tx) {
-        if (!tx.chainId) {
-          throw new Error("chainId required in tx to sign");
-        }
-
-        return _signTransaction({
-          chainId: tx.chainId,
-          ...tx,
-        });
-      },
       async sendTransaction(tx) {
         const rpcRequest = getRpcClient({
-          client,
           chain: getCachedChain(tx.chainId),
+          client,
         });
         const signedTx = await _signTransaction(tx);
 
@@ -205,29 +194,46 @@ export class EnclaveWallet implements IWebWallet {
         );
 
         trackTransaction({
-          client,
-          ecosystem,
           chainId: tx.chainId,
+          client,
+          contractAddress: tx.to ?? undefined,
+          ecosystem,
+          gasPrice: tx.gasPrice,
+          transactionHash,
           walletAddress: address,
           walletType: "inApp",
-          transactionHash,
-          contractAddress: tx.to ?? undefined,
-          gasPrice: tx.gasPrice,
         });
 
         return { transactionHash };
       },
-      async signMessage({ message }) {
+      async signAuthorization(payload) {
+        const authorization = await signEnclaveAuthorization({
+          client,
+          payload,
+          storage,
+        });
+        return {
+          address: getAddress(authorization.address),
+          chainId: Number.parseInt(authorization.chainId),
+          nonce: BigInt(authorization.nonce),
+          r: BigInt(authorization.r),
+          s: BigInt(authorization.s),
+          yParity: Number.parseInt(authorization.yParity),
+        };
+      },
+      async signMessage({ message, originalMessage, chainId }) {
         const messagePayload = (() => {
           if (typeof message === "string") {
-            return { message, isRaw: false };
+            return { chainId, isRaw: false, message, originalMessage };
           }
           return {
+            chainId,
+            isRaw: true,
             message:
               typeof message.raw === "string"
                 ? message.raw
                 : bytesToHex(message.raw),
-            isRaw: true,
+            originalMessage,
           };
         })();
 
@@ -237,6 +243,16 @@ export class EnclaveWallet implements IWebWallet {
           storage,
         });
         return signature as Hex;
+      },
+      async signTransaction(tx) {
+        if (!tx.chainId) {
+          throw new Error("chainId required in tx to sign");
+        }
+
+        return _signTransaction({
+          chainId: tx.chainId,
+          ...tx,
+        });
       },
       async signTypedData(_typedData) {
         const parsedTypedData = parseTypedData(_typedData);
@@ -248,6 +264,46 @@ export class EnclaveWallet implements IWebWallet {
 
         return signature as Hex;
       },
+      sendCalls: async (options) => {
+        const { inAppWalletSendCalls } = await import(
+          "../eip5792/in-app-wallet-calls.js"
+        );
+        const firstCall = options.calls[0];
+        if (!firstCall) {
+          throw new Error("No calls to send");
+        }
+        const client = firstCall.client;
+        const chain = firstCall.chain || options.chain;
+        const id = await inAppWalletSendCalls({
+          account: account,
+          calls: options.calls,
+          chain,
+        });
+        return { chain, client, id };
+      },
+      getCallsStatus: async (options) => {
+        const { inAppWalletGetCallsStatus } = await import(
+          "../eip5792/in-app-wallet-calls.js"
+        );
+        return inAppWalletGetCallsStatus(options);
+      },
+      getCapabilities: async (options) => {
+        return {
+          [options.chainId ?? 1]: {
+            atomic: {
+              status: "unsupported",
+            },
+            paymasterService: {
+              supported: false,
+            },
+          },
+        };
+      },
     };
+    return account;
   }
+}
+
+function hexlify(value: string | number | bigint | undefined) {
+  return value === undefined || isHex(value) ? value : toHex(value);
 }

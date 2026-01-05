@@ -27,6 +27,7 @@ export type MintToParams = Prettify<
 
 /**
  * Mints a specified amount of tokens to a given address.
+ * This method is only available on the `TokenERC20` contract.
  * @param options - The options for minting tokens.
  * @returns A prepared transaction object.
  * @extension ERC20
@@ -46,7 +47,6 @@ export type MintToParams = Prettify<
  */
 export function mintTo(options: BaseTransactionOptions<MintToParams>) {
   return generatedMintTo({
-    contract: options.contract,
     asyncParams: async () => {
       let amount: bigint;
       if ("amount" in options) {
@@ -60,10 +60,11 @@ export function mintTo(options: BaseTransactionOptions<MintToParams>) {
         amount = options.amountWei;
       }
       return {
-        to: options.to,
         amount: amount,
         overrides: options.overrides,
+        to: options.to,
       } as const;
     },
+    contract: options.contract,
   });
 }

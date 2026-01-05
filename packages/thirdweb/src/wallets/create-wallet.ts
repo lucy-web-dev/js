@@ -1,21 +1,15 @@
+import { trackConnect } from "../analytics/track/connect.js";
 import type { Chain } from "../chains/types.js";
+import { getCachedChainIfExists } from "../chains/utils.js";
+import { webLocalStorage } from "../utils/storage/webStorage.js";
+import { formatWalletConnectUrl } from "../utils/url.js";
+import { isMobile } from "../utils/web/isMobile.js";
+import { openWindow } from "../utils/web/openWindow.js";
+import { getWalletInfo } from "./__generated__/getWalletInfo.js";
 import type {
   InjectedSupportedWalletIds,
   WCSupportedWalletIds,
 } from "./__generated__/wallet-ids.js";
-import type { Account, Wallet } from "./interfaces/wallet.js";
-import type {
-  CreateWalletArgs,
-  EcosystemWalletId,
-  WalletAutoConnectionOption,
-  WalletId,
-} from "./wallet-types.js";
-
-import { trackConnect } from "../analytics/track/connect.js";
-import { getCachedChainIfExists } from "../chains/utils.js";
-import { webLocalStorage } from "../utils/storage/webStorage.js";
-import { isMobile } from "../utils/web/isMobile.js";
-import { openWindow } from "../utils/web/openWindow.js";
 import { coinbaseWalletSDK } from "./coinbase/coinbase-wallet.js";
 import { getCoinbaseWebProvider } from "./coinbase/coinbase-web.js";
 import { COINBASE } from "./constants.js";
@@ -23,9 +17,17 @@ import { isEcosystemWallet } from "./ecosystem/is-ecosystem-wallet.js";
 import { ecosystemWallet } from "./in-app/web/ecosystem.js";
 import { inAppWallet } from "./in-app/web/in-app.js";
 import { getInjectedProvider } from "./injected/index.js";
+import type { Account, Wallet } from "./interfaces/wallet.js";
 import { smartWallet } from "./smart/smart-wallet.js";
+import type { QROverlay } from "./wallet-connect/qr-overlay.js";
 import type { WCConnectOptions } from "./wallet-connect/types.js";
 import { createWalletEmitter } from "./wallet-emitter.js";
+import type {
+  CreateWalletArgs,
+  EcosystemWalletId,
+  WalletAutoConnectionOption,
+  WalletId,
+} from "./wallet-types.js";
 
 // TODO: figure out how to define the type without tuple args type and using function overloads
 
@@ -172,7 +174,6 @@ export function createWallet<const ID extends WalletId>(
       const options = creationOptions as CreateWalletArgs<typeof COINBASE>[1];
       return coinbaseWalletSDK({
         createOptions: options,
-        providerFactory: () => getCoinbaseWebProvider(options),
         onConnectRequested: async (provider) => {
           // on the web, make sure to show the coinbase popup IMMEDIATELY on connection requested
           // otherwise the popup might get blocked in safari
@@ -181,6 +182,7 @@ export function createWallet<const ID extends WalletId>(
           const { showCoinbasePopup } = await import("./coinbase/utils.js");
           return showCoinbasePopup(provider);
         },
+        providerFactory: () => getCoinbaseWebProvider(options),
       }) as Wallet<ID>;
     }
     /**
@@ -188,12 +190,9 @@ export function createWallet<const ID extends WalletId>(
      */
     default: {
       const emitter = createWalletEmitter<ID>();
-      let account: Account | undefined = undefined;
-      let chain: Chain | undefined = undefined;
-
-      const unsubscribeChain = emitter.subscribe("chainChanged", (newChain) => {
-        chain = newChain;
-      });
+      let account: Account | undefined;
+      let chain: Chain | undefined;
+      let unsubscribeChain: (() => void) | undefined;
 
       function reset() {
         account = undefined;
@@ -204,7 +203,7 @@ export function createWallet<const ID extends WalletId>(
 
       const unsubscribeDisconnect = emitter.subscribe("disconnect", () => {
         reset();
-        unsubscribeChain();
+        unsubscribeChain?.();
         unsubscribeDisconnect();
       });
 
@@ -222,18 +221,6 @@ export function createWallet<const ID extends WalletId>(
         : undefined;
 
       const wallet: Wallet<ID> = {
-        id,
-        subscribe: emitter.subscribe,
-        getConfig: () => args[1],
-        getChain() {
-          if (!chain) {
-            return undefined;
-          }
-
-          chain = getCachedChainIfExists(chain.id) || chain;
-          return chain;
-        },
-        getAccount: () => account,
         autoConnect: async (
           options: WalletAutoConnectionOption<
             WCSupportedWalletIds | InjectedSupportedWalletIds
@@ -252,22 +239,25 @@ export function createWallet<const ID extends WalletId>(
               doDisconnect,
               doSwitchChain,
             ] = await autoConnectEip1193Wallet({
-              id: id as InjectedSupportedWalletIds,
-              provider: getInjectedProvider(id),
-              emitter,
               chain: options.chain,
               client: options.client,
+              emitter,
+              id: id as InjectedSupportedWalletIds,
+              provider: getInjectedProvider(id),
             });
             // set the states
             account = connectedAccount;
             chain = connectedChain;
             handleDisconnect = doDisconnect;
             handleSwitchChain = doSwitchChain;
+            unsubscribeChain = emitter.subscribe("chainChanged", (newChain) => {
+              chain = newChain;
+            });
             trackConnect({
-              client: options.client,
-              walletType: id,
-              walletAddress: account.address,
               chainId: chain.id,
+              client: options.client,
+              walletAddress: account.address,
+              walletType: id,
             });
             // return account
             return account;
@@ -296,10 +286,10 @@ export function createWallet<const ID extends WalletId>(
             handleDisconnect = doDisconnect;
             handleSwitchChain = doSwitchChain;
             trackConnect({
-              client: options.client,
-              walletType: id,
-              walletAddress: account.address,
               chainId: chain.id,
+              client: options.client,
+              walletAddress: account.address,
+              walletType: id,
             });
             // return account
             return account;
@@ -312,38 +302,119 @@ export function createWallet<const ID extends WalletId>(
               "./wallet-connect/controller.js"
             );
 
-            const [
-              connectedAccount,
-              connectedChain,
-              doDisconnect,
-              doSwitchChain,
-            ] = await connectWC(
-              wcOptions,
-              emitter,
-              wallet.id as WCSupportedWalletIds | "walletConnect",
-              webLocalStorage,
-              sessionHandler,
-            );
-            // set the states
-            account = connectedAccount;
-            chain = connectedChain;
-            handleDisconnect = doDisconnect;
-            handleSwitchChain = doSwitchChain;
-            trackConnect({
-              client: wcOptions.client,
-              walletType: id,
-              walletAddress: account.address,
-              chainId: chain.id,
-            });
-            return account;
+            let qrOverlay: QROverlay | undefined;
+
+            try {
+              const [
+                connectedAccount,
+                connectedChain,
+                doDisconnect,
+                doSwitchChain,
+              ] = await connectWC(
+                {
+                  ...wcOptions,
+                  walletConnect: {
+                    ...wcOptions.walletConnect,
+                    onDisplayUri:
+                      wcOptions.walletConnect?.onDisplayUri ||
+                      (async (uri) => {
+                        // Check if we're in a browser environment
+                        if (
+                          typeof window !== "undefined" &&
+                          typeof document !== "undefined"
+                        ) {
+                          // on mobile, open the wallet app via deeplink
+                          if (isMobile()) {
+                            const walletInfo = await getWalletInfo(id);
+
+                            const mobileAppLink =
+                              walletInfo.mobile.native ||
+                              walletInfo.mobile.universal;
+                            if (mobileAppLink) {
+                              openWindow(
+                                formatWalletConnectUrl(mobileAppLink, uri)
+                                  .redirect,
+                              );
+                            } else {
+                              // on android, wc:// links show the app picker
+                              openWindow(uri);
+                            }
+                            return;
+                          }
+                          // on desktop, create a QR overlay
+                          else {
+                            try {
+                              const { createQROverlay } = await import(
+                                "./wallet-connect/qr-overlay.js"
+                              );
+
+                              // Clean up any existing overlay
+                              if (qrOverlay) {
+                                qrOverlay.destroy();
+                              }
+
+                              // Create new QR overlay
+                              qrOverlay = createQROverlay(uri, {
+                                theme:
+                                  wcOptions.walletConnect?.qrModalOptions
+                                    ?.themeMode ?? "dark",
+                                qrSize: 280,
+                                showCloseButton: true,
+                                onCancel: () => {
+                                  wcOptions.walletConnect?.onCancel?.();
+                                },
+                              });
+                            } catch (error) {
+                              console.error(
+                                "Failed to create QR overlay:",
+                                error,
+                              );
+                            }
+                          }
+                        }
+                      }),
+                  },
+                },
+                emitter,
+                wallet.id as WCSupportedWalletIds | "walletConnect",
+                webLocalStorage,
+                sessionHandler,
+              );
+
+              // Clean up QR overlay on successful connection
+              if (qrOverlay) {
+                qrOverlay.destroy();
+                qrOverlay = undefined;
+              }
+
+              // set the states
+              account = connectedAccount;
+              chain = connectedChain;
+              handleDisconnect = doDisconnect;
+              handleSwitchChain = doSwitchChain;
+              trackConnect({
+                chainId: chain.id,
+                client: wcOptions.client,
+                walletAddress: account.address,
+                walletType: id,
+              });
+              return account;
+            } catch (error) {
+              // Clean up QR overlay on connection error
+              if (qrOverlay) {
+                qrOverlay.destroy();
+                qrOverlay = undefined;
+              }
+              throw error;
+            }
           }
 
           if (id === "walletConnect") {
             const { client, chain: _chain, ...walletConnectOptions } = options;
 
             return wcConnect({
-              client,
               chain: _chain,
+              client,
               walletConnect: {
                 ...walletConnectOptions,
               },
@@ -366,22 +437,25 @@ export function createWallet<const ID extends WalletId>(
               doDisconnect,
               doSwitchChain,
             ] = await connectEip1193Wallet({
+              chain: options.chain,
+              client: options.client,
+              emitter,
               id: id as InjectedSupportedWalletIds,
               provider: getInjectedProvider(id),
-              client: options.client,
-              chain: options.chain,
-              emitter,
             });
             // set the states
             account = connectedAccount;
             chain = connectedChain;
             handleDisconnect = doDisconnect;
             handleSwitchChain = doSwitchChain;
+            unsubscribeChain = emitter.subscribe("chainChanged", (newChain) => {
+              chain = newChain;
+            });
             trackConnect({
-              client: options.client,
-              walletType: id,
-              walletAddress: account.address,
               chainId: chain.id,
+              client: options.client,
+              walletAddress: account.address,
+              walletType: id,
             });
             // return account
             return account;
@@ -397,7 +471,28 @@ export function createWallet<const ID extends WalletId>(
           reset();
           await handleDisconnect();
         },
-        switchChain: (c) => handleSwitchChain(c),
+        getAccount: () => account,
+        getChain() {
+          if (!chain) {
+            return undefined;
+          }
+
+          chain = getCachedChainIfExists(chain.id) || chain;
+          return chain;
+        },
+        getConfig: () => args[1],
+        id,
+        subscribe: emitter.subscribe,
+        switchChain: async (c) => {
+          // TODO: this should actually throw an error if the chain switch fails
+          // but our useSwitchActiveWalletChain hook currently doesn't handle this
+          try {
+            await handleSwitchChain(c);
+            chain = c;
+          } catch (e) {
+            console.error("Error switching chain", e);
+          }
+        },
       };
       return wallet;
     }

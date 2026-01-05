@@ -1,5 +1,5 @@
 import { getBytecode } from "../../contract/actions/get-bytecode.js";
-import type { ThirdwebContract } from "../../contract/contract.js";
+import { getContract, type ThirdwebContract } from "../../contract/contract.js";
 import { eth_getStorageAt } from "../../rpc/actions/eth_getStorageAt.js";
 import { getRpcClient } from "../../rpc/rpc.js";
 import { readContract } from "../../transaction/read-contract.js";
@@ -18,7 +18,7 @@ const ZERO_BYTES32 =
  * @returns A promise that resolves to an object containing the implementation address and bytecode.
  * @example
  * ```ts
- * import { resolveImplementation } from "thirdweb";
+ * import { resolveImplementation } from "thirdweb/utils";
  * const implementation = await resolveImplementation(contract);
  * ```
  * @contract
@@ -37,47 +37,53 @@ export async function resolveImplementation(
   if (minimalProxyImplementationAddress) {
     return {
       address: minimalProxyImplementationAddress,
-      bytecode: await getBytecode({
-        ...contract,
-        address: minimalProxyImplementationAddress,
-      }),
+      bytecode: await getBytecode(
+        getContract({
+          ...contract,
+          address: minimalProxyImplementationAddress,
+        }),
+      ),
     };
   }
 
   // check other proxy types
-  let implementationAddress: string | undefined;
   if (beacon && beacon !== AddressZero) {
     // In case of a BeaconProxy, it is setup as BeaconProxy --> Beacon --> Implementation
     // Hence we replace the proxy address with Beacon address, and continue further resolving below
-    // biome-ignore lint/style/noParameterAssign: we purposefully mutate the contract object here
-    contract = { ...contract, address: beacon };
-
-    implementationAddress = await getImplementationFromContractCall(contract);
-  } else {
-    implementationAddress = await getImplementationFromStorageSlot(contract);
+    contract = getContract({
+      ...contract,
+      address: beacon,
+    });
   }
 
-  if (
-    implementationAddress &&
-    isAddress(implementationAddress) &&
-    implementationAddress !== AddressZero
-  ) {
-    const implementationBytecode = await getBytecode({
-      ...contract,
-      address: implementationAddress,
-    });
-    // return the original contract bytecode if the implementation bytecode is empty
-    if (implementationBytecode === "0x") {
+  const implementations = await Promise.all([
+    getImplementationFromStorageSlot(contract),
+    getImplementationFromContractCall(contract),
+  ]);
+
+  for (const implementationAddress of implementations) {
+    if (
+      implementationAddress &&
+      isAddress(implementationAddress) &&
+      implementationAddress !== AddressZero
+    ) {
+      const implementationBytecode = await getBytecode({
+        ...contract,
+        address: implementationAddress,
+      });
+      // return the original contract bytecode if the implementation bytecode is empty
+      if (implementationBytecode === "0x") {
+        return {
+          address: contract.address,
+          bytecode: originalBytecode,
+        };
+      }
+
       return {
-        address: contract.address,
-        bytecode: originalBytecode,
+        address: implementationAddress,
+        bytecode: implementationBytecode,
       };
     }
-
-    return {
-      address: implementationAddress,
-      bytecode: implementationBytecode,
-    };
   }
 
   return { address: contract.address, bytecode: originalBytecode };
@@ -94,8 +100,8 @@ async function getBeaconFromStorageSlot(
    * bytes32(uint256(keccak256('eip1967.proxy.beacon')) - 1))
    */
   const rpcRequest = getRpcClient({
-    client: contract.client,
     chain: contract.chain,
+    client: contract.client,
   });
 
   try {
@@ -104,7 +110,10 @@ async function getBeaconFromStorageSlot(
       position:
         "0xa3f0ad74e5423aebfd80d3ef4346578335a9a72aeaee59ff6cb3582b35133d50",
     });
-    return `0x${proxyStorage.slice(-40)}`;
+    if (proxyStorage.length >= 40) {
+      return `0x${proxyStorage.slice(-40)}`;
+    }
+    return undefined;
   } catch {
     return undefined;
   }
@@ -115,8 +124,8 @@ async function getImplementationFromStorageSlot(
   contract: ThirdwebContract<any>,
 ): Promise<string | undefined> {
   const rpcRequest = getRpcClient({
-    client: contract.client,
     chain: contract.chain,
+    client: contract.client,
   });
 
   try {
@@ -152,17 +161,17 @@ async function getImplementationFromStorageSlot(
 }
 
 const UPGRADEABLE_PROXY_ABI = {
-  type: "function",
-  name: "implementation",
   inputs: [],
+  name: "implementation",
   outputs: [
     {
-      type: "address",
-      name: "",
       internalType: "address",
+      name: "",
+      type: "address",
     },
   ],
   stateMutability: "view",
+  type: "function",
 } as const;
 
 async function getImplementationFromContractCall(

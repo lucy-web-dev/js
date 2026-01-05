@@ -8,8 +8,8 @@ import {
   TEST_ACCOUNT_C,
 } from "../../../../test/src/test-wallets.js";
 import {
-  type ThirdwebContract,
   getContract,
+  type ThirdwebContract,
 } from "../../../contract/contract.js";
 import { parseEventLogs } from "../../../event/actions/parse-logs.js";
 import { getApprovalForTransaction } from "../../../extensions/erc20/write/getApprovalForTransaction.js";
@@ -34,6 +34,7 @@ import { getListing } from "./read/getListing.js";
 import { isListingValid } from "./utils.js";
 import { buyFromListing } from "./write/buyFromListing.js";
 import { createListing } from "./write/createListing.js";
+import { updateListing } from "./write/updateListing.js";
 
 const chain = ANVIL_CHAIN;
 const client = TEST_CLIENT;
@@ -49,29 +50,29 @@ describe.runIf(process.env.TW_SECRET_KEY)("Marketplace Direct Listings", () => {
       chain,
       client,
       params: {
-        name: "TestMarketPlace",
         contractURI: TEST_CONTRACT_URI,
+        name: "TestMarketPlace",
       },
     });
     const erc721Address = await deployERC721Contract({
-      type: "TokenERC721",
       account: TEST_ACCOUNT_B,
       chain,
       client,
       params: {
-        name: "TestERC721",
         contractURI: TEST_CONTRACT_URI,
+        name: "TestERC721",
       },
+      type: "TokenERC721",
     });
     const erc1155Address = await deployERC1155Contract({
-      type: "TokenERC1155",
       account: TEST_ACCOUNT_C,
       chain,
       client,
       params: {
-        name: "TestERC1155",
         contractURI: TEST_CONTRACT_URI,
+        name: "TestERC1155",
       },
+      type: "TokenERC1155",
     });
 
     marketplaceContract = getContract({
@@ -105,8 +106,8 @@ describe.runIf(process.env.TW_SECRET_KEY)("Marketplace Direct Listings", () => {
         transaction: mintToErc1155({
           contract: erc1155Contract,
           nft: { name: "erc1155 #0" },
-          to: TEST_ACCOUNT_C.address,
           supply: 100n,
+          to: TEST_ACCOUNT_C.address,
         }),
       }),
     ]);
@@ -116,16 +117,16 @@ describe.runIf(process.env.TW_SECRET_KEY)("Marketplace Direct Listings", () => {
       sendAndConfirmTransaction({
         account: TEST_ACCOUNT_B,
         transaction: setApprovalForAll721({
-          contract: erc721Contract,
           approved: true,
+          contract: erc721Contract,
           operator: marketplaceAddress,
         }),
       }),
       sendAndConfirmTransaction({
         account: TEST_ACCOUNT_C,
         transaction: setApprovalForAll1155({
-          contract: erc1155Contract,
           approved: true,
+          contract: erc1155Contract,
           operator: marketplaceAddress,
         }),
       }),
@@ -146,13 +147,13 @@ describe.runIf(process.env.TW_SECRET_KEY)("Marketplace Direct Listings", () => {
     expect(totalListingCount).toBe(0n);
 
     const receipt = await sendAndConfirmTransaction({
-      transaction: createListing({
-        contract: marketplaceContract,
-        assetContractAddress: erc721Contract.address,
-        tokenId: 0n,
-        pricePerToken: "1",
-      }),
       account: TEST_ACCOUNT_B,
+      transaction: createListing({
+        assetContractAddress: erc721Contract.address,
+        contract: marketplaceContract,
+        pricePerToken: "1",
+        tokenId: 0n,
+      }),
     });
 
     const listingEvents = parseEventLogs({
@@ -203,22 +204,14 @@ describe.runIf(process.env.TW_SECRET_KEY)("Marketplace Direct Listings", () => {
     expect(firstListing.creatorAddress).toBe(TEST_ACCOUNT_B.address);
     expect(firstListing.assetContractAddress).toBe(erc721Contract.address);
     expect(firstListing.tokenId).toBe(0n);
-    expect(firstListing.currencyValuePerToken).toMatchInlineSnapshot(`
-    {
-      "decimals": 18,
-      "displayValue": "1",
-      "name": "Anvil Ether",
-      "symbol": "ETH",
-      "value": 1000000000000000000n,
-    }
-  `);
+    expect(firstListing.currencyValuePerToken.displayValue).toBe("1");
     expect(firstListing.asset.metadata.name).toBe("erc721 #0");
     expect(firstListing.asset.id).toBe(0n);
     expect(firstListing.asset.owner).toBe(null);
     // check the listing is valid
     const firstListingValidity = await isListingValid({
-      listing: firstListing,
       contract: marketplaceContract,
+      listing: firstListing,
       quantity: 1n,
     });
 
@@ -230,13 +223,13 @@ describe.runIf(process.env.TW_SECRET_KEY)("Marketplace Direct Listings", () => {
     expect(nftBalanceOfAccountABeforePurchase).toBe(0n);
 
     await sendAndConfirmTransaction({
+      account: TEST_ACCOUNT_A,
       transaction: buyFromListing({
         contract: marketplaceContract,
         listingId: listingEvent.args.listingId,
-        recipient: TEST_ACCOUNT_A.address,
         quantity: 1n,
+        recipient: TEST_ACCOUNT_A.address,
       }),
-      account: TEST_ACCOUNT_A,
     });
 
     const [
@@ -262,14 +255,14 @@ describe.runIf(process.env.TW_SECRET_KEY)("Marketplace Direct Listings", () => {
     // this should fail because we're listing more than we have
     await expect(
       sendTransaction({
+        account: TEST_ACCOUNT_C,
         transaction: createListing({
-          contract: marketplaceContract,
           assetContractAddress: erc1155Contract.address,
-          tokenId: 0n,
+          contract: marketplaceContract,
           pricePerToken: "1",
           quantity: 101n,
+          tokenId: 0n,
         }),
-        account: TEST_ACCOUNT_C,
       }),
     ).rejects.toThrowErrorMatchingInlineSnapshot(`
       [TransactionError: Error - Marketplace: not owner or approved tokens.
@@ -279,14 +272,14 @@ describe.runIf(process.env.TW_SECRET_KEY)("Marketplace Direct Listings", () => {
     `);
 
     const receipt1155 = await sendAndConfirmTransaction({
+      account: TEST_ACCOUNT_C,
       transaction: createListing({
-        contract: marketplaceContract,
         assetContractAddress: erc1155Contract.address,
-        tokenId: 0n,
+        contract: marketplaceContract,
         pricePerToken: "0.01",
         quantity: 1n,
+        tokenId: 0n,
       }),
-      account: TEST_ACCOUNT_C,
     });
 
     const listingEvents1155 = parseEventLogs({
@@ -301,6 +294,18 @@ describe.runIf(process.env.TW_SECRET_KEY)("Marketplace Direct Listings", () => {
 
     expect(listingEvent1155.args.listingCreator).toBe(TEST_ACCOUNT_C.address);
     expect(listingEvent1155.args.assetContract).toBe(erc1155Contract.address);
+
+    await sendAndConfirmTransaction({
+      account: TEST_ACCOUNT_C,
+      transaction: updateListing({
+        assetContractAddress: erc1155Contract.address,
+        contract: marketplaceContract,
+        listingId: listingEvent1155.args.listingId,
+        pricePerToken: "0.05",
+        quantity: 1n,
+        tokenId: 0n,
+      }),
+    });
 
     const [
       listings1155After,
@@ -338,22 +343,14 @@ describe.runIf(process.env.TW_SECRET_KEY)("Marketplace Direct Listings", () => {
     expect(secondListing.creatorAddress).toBe(TEST_ACCOUNT_C.address);
     expect(secondListing.assetContractAddress).toBe(erc1155Contract.address);
     expect(secondListing.tokenId).toBe(0n);
-    expect(secondListing.currencyValuePerToken).toMatchInlineSnapshot(`
-      {
-        "decimals": 18,
-        "displayValue": "0.01",
-        "name": "Anvil Ether",
-        "symbol": "ETH",
-        "value": 10000000000000000n,
-      }
-    `);
+    expect(secondListing.currencyValuePerToken.displayValue).toBe("0.05");
     expect(secondListing.asset.metadata.name).toBe("erc1155 #0");
     expect(secondListing.asset.id).toBe(0n);
 
     // check the listing is valid
     const listingValidity = await isListingValid({
-      listing: secondListing,
       contract: marketplaceContract,
+      listing: secondListing,
       quantity: 1n,
     });
 
@@ -366,13 +363,13 @@ describe.runIf(process.env.TW_SECRET_KEY)("Marketplace Direct Listings", () => {
     expect(nft1155BalanceOfAccountABeforePurchase).toBe(0n);
 
     await sendAndConfirmTransaction({
+      account: TEST_ACCOUNT_A,
       transaction: buyFromListing({
         contract: marketplaceContract,
         listingId: listingEvent1155.args.listingId,
-        recipient: TEST_ACCOUNT_A.address,
         quantity: 1n,
+        recipient: TEST_ACCOUNT_A.address,
       }),
-      account: TEST_ACCOUNT_A,
     });
 
     const [
@@ -400,25 +397,25 @@ describe.runIf(process.env.TW_SECRET_KEY)("Marketplace Direct Listings", () => {
      * so that getApprovalForTransaction can work properly
      */
     const erc20Address = await deployERC20Contract({
+      account: TEST_ACCOUNT_C,
       chain,
       client,
-      account: TEST_ACCOUNT_C,
-      type: "TokenERC20",
       params: {
-        name: "MyToken",
         contractURI: TEST_CONTRACT_URI,
+        name: "MyToken",
       },
+      type: "TokenERC20",
     });
     await sendAndConfirmTransaction({
+      account: TEST_ACCOUNT_C,
       transaction: createListing({
-        contract: marketplaceContract,
         assetContractAddress: erc1155Contract.address,
-        tokenId: 0n,
+        contract: marketplaceContract,
+        currencyContractAddress: erc20Address,
         pricePerToken: "0.01",
         quantity: 1n,
-        currencyContractAddress: erc20Address,
+        tokenId: 0n,
       }),
-      account: TEST_ACCOUNT_C,
     });
     // get the last listing id
     const _allListings = await getAllListings({
@@ -440,8 +437,8 @@ describe.runIf(process.env.TW_SECRET_KEY)("Marketplace Direct Listings", () => {
       tokenAddress: erc20Address,
     });
     const approveTx = await getApprovalForTransaction({
-      transaction: buyListingTx,
       account: TEST_ACCOUNT_A,
+      transaction: buyListingTx,
     });
     expect(approveTx).not.toBe(null);
   }, 120_000);

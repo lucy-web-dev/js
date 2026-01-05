@@ -1,0 +1,29 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": [
+    "next.config.{js,ts,cjs,mjs}",
+    "src/app/**/{error,layout,loading,not-found,page,template,default}.{js,jsx,ts,tsx,mdx}",
+    "scripts/*.ts"
+  ],
+  "ignore": [
+    "src/components/ui/**",
+    "src/icons/**",
+    "src/components/others/Banner.tsx"
+  ],
+  "ignoreBinaries": ["only-allow"],
+  "ignoreDependencies": [
+    "@thirdweb-dev/chains",
+    "@thirdweb-dev/wallets",
+    "thirdweb",
+    "@workspace/ui",
+    "@types/flexsearch",
+    "@radix-ui/react-slot",
+    "tailwindcss-animate",
+    "class-variance-authority",
+    "@radix-ui/react-tooltip",
+    "react-children-utilities",
+    "react-markdown"
+  ],
+  "next": true,
+  "project": ["src/**"]
+}

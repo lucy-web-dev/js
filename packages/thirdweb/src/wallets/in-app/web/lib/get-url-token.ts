@@ -5,15 +5,17 @@ import type { AuthStoredTokenWithCookieReturnType } from "../../core/authenticat
 /**
  * Checks for an auth token and associated metadata in the current URL
  */
-export function getUrlToken(): {
-  walletId?: WalletId;
-  authResult?: AuthStoredTokenWithCookieReturnType;
-  authProvider?: AuthOption;
-  authCookie?: string;
-} {
-  if (!window?.location) {
+export function getUrlToken():
+  | {
+      walletId?: WalletId;
+      authResult?: AuthStoredTokenWithCookieReturnType;
+      authProvider?: AuthOption;
+      authCookie?: string;
+    }
+  | undefined {
+  if (typeof document === "undefined") {
     // Not in web
-    return {};
+    return undefined;
   }
 
   const queryString = window.location.search;
@@ -38,7 +40,7 @@ export function getUrlToken(): {
       "",
       `${window.location.pathname}?${params.toString()}`,
     );
-    return { walletId, authResult, authProvider, authCookie };
+    return { authCookie, authProvider, authResult, walletId };
   }
-  return {};
+  return undefined;
 }

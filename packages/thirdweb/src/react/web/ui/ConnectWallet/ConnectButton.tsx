@@ -2,6 +2,8 @@
 
 import styled from "@emotion/styled";
 import { useEffect, useMemo, useState } from "react";
+import { getDefaultWallets } from "../../../../wallets/defaultWallets.js";
+import { AccountProvider } from "../../../core/account/provider.js";
 import { iconSize } from "../../../core/design-system/index.js";
 import { useSiweAuth } from "../../../core/hooks/auth/useSiweAuth.js";
 import type { ConnectButtonProps } from "../../../core/hooks/connection/ConnectButtonProps.js";
@@ -11,24 +13,22 @@ import { useActiveWalletConnectionStatus } from "../../../core/hooks/wallets/use
 import { useConnectionManager } from "../../../core/providers/connection-manager.js";
 import { defaultTokens } from "../../../core/utils/defaultTokens.js";
 import {
-  WalletUIStatesProvider,
   useSetIsWalletModalOpen,
+  WalletUIStatesProvider,
 } from "../../providers/wallet-ui-states-provider.js";
 import { canFitWideModal } from "../../utils/canFitWideModal.js";
 import { usePreloadWalletProviders } from "../../utils/usePreloadWalletProviders.js";
-import { getDefaultWallets } from "../../wallets/defaultWallets.js";
 import { AutoConnect } from "../AutoConnect/AutoConnect.js";
-import { Modal } from "../components/Modal.js";
-import { Spinner } from "../components/Spinner.js";
 import { Container } from "../components/basic.js";
 import { Button } from "../components/buttons.js";
+import { Modal } from "../components/Modal.js";
+import { Spinner } from "../components/Spinner.js";
 import { fadeInAnimation } from "../design-system/animations.js";
-import { AccountProvider } from "../prebuilt/Account/provider.js";
 import { ConnectedWalletDetails } from "./Details.js";
-import ConnectModal from "./Modal/ConnectModal.js";
 import { LockIcon } from "./icons/LockIcon.js";
 import { useConnectLocale } from "./locale/getConnectLocale.js";
 import type { ConnectLocale } from "./locale/types.js";
+import ConnectModal from "./Modal/ConnectModal.js";
 import { SignatureScreen } from "./screens/SignatureScreen.js";
 
 const TW_CONNECT_WALLET = "tw-connect-wallet";
@@ -43,8 +43,8 @@ const TW_CONNECT_WALLET = "tw-connect-wallet";
  *
  * Once connected, the component allows to:
  *
- * - Reolve ENS names and avatars
- * - Manage multipple connected wallets
+ * - Resolve ENS names and avatars
+ * - Manage multiple connected wallets
  * - Send and receive native tokens and ERC20 tokens
  * - View ERC20 tokens and NFTs
  * - Onramp, bridge and swap tokens
@@ -160,6 +160,19 @@ const TW_CONNECT_WALLET = "tw-connect-wallet";
  * ```
  *
  * [View all available themes properties](https://portal.thirdweb.com/references/typescript/v5/Theme)
+ *
+ * ### Overriding styles using class names
+ *
+ * Some elements in this component have classes with a `tw-` prefix.
+ * You can target these classes in your own CSS stylesheet to override their styles.
+ *
+ * In some cases, you may need to use the `!important` flag for the override to take effect. Do not use on auto-generated class names, as they may change between builds.
+ *
+ * ```css
+ * .tw-back-button {
+ *   background-color: red !important;
+ * }
+ * ```
  *
  * ### Changing the display language
  *
@@ -292,15 +305,25 @@ export function ConnectButton(props: ConnectButtonProps) {
       getDefaultWallets({
         appMetadata: props.appMetadata,
         chains: props.chains,
+        executionMode: props.accountAbstraction
+          ? {
+              mode: "EIP4337",
+              smartAccount: props.accountAbstraction,
+            }
+          : undefined,
       }),
-    [props.wallets, props.appMetadata, props.chains],
+    [props.wallets, props.appMetadata, props.chains, props.accountAbstraction],
   );
   const localeQuery = useConnectLocale(props.locale || "en_US");
   const connectionManager = useConnectionManager();
+  const activeAccount = useActiveAccount();
+  const activeWallet = useActiveWallet();
+  const siweAuth = useSiweAuth(activeWallet, activeAccount, props.auth);
+  const hiddenWallets =
+    props.hiddenWallets || props.detailsModal?.hiddenWallets;
 
   usePreloadWalletProviders({
     wallets,
-    client: props.client,
   });
 
   // Add props.chain and props.chains to defined chains store
@@ -327,17 +350,18 @@ export function ConnectButton(props: ConnectButtonProps) {
 
   const autoConnectComp = props.autoConnect !== false && (
     <AutoConnect
-      chain={preferredChain}
+      accountAbstraction={props.accountAbstraction}
       appMetadata={props.appMetadata}
+      chain={preferredChain}
       client={props.client}
-      wallets={wallets}
+      onConnect={props.onConnect}
+      siweAuth={siweAuth}
       timeout={
         typeof props.autoConnect === "boolean"
           ? undefined
           : props.autoConnect?.timeout
       }
-      accountAbstraction={props.accountAbstraction}
-      onConnect={props.onConnect}
+      wallets={wallets}
     />
   );
 
@@ -345,49 +369,54 @@ export function ConnectButton(props: ConnectButtonProps) {
     const combinedClassName = `${props.connectButton?.className || ""} ${TW_CONNECT_WALLET}`;
     return (
       <AnimatedButton
-        disabled={true}
         className={combinedClassName}
-        variant="primary"
-        type="button"
+        disabled={true}
         style={{
-          minWidth: "165px",
           height: "50px",
+          minWidth: "165px",
           ...props.connectButton?.style,
         }}
+        type="button"
+        variant="primary"
       >
         {autoConnectComp}
-        <Spinner size="sm" color="primaryButtonText" />
+        <Spinner color="primaryButtonText" size="sm" />
       </AnimatedButton>
     );
   }
 
   return (
-    <WalletUIStatesProvider theme={props.theme} isOpen={false}>
-      <ConnectButtonInner {...props} connectLocale={localeQuery.data} />
+    <WalletUIStatesProvider isOpen={false} theme={props.theme}>
+      <ConnectButtonInner
+        {...props}
+        connectLocale={localeQuery.data}
+        siweAuth={siweAuth}
+      />
       <ConnectModal
-        shouldSetActive={true}
         accountAbstraction={props.accountAbstraction}
         auth={props.auth}
         chain={preferredChain}
         chains={props.chains}
         client={props.client}
         connectLocale={localeQuery.data}
+        hiddenWallets={hiddenWallets}
+        localeId={props.locale || "en_US"}
         meta={{
-          title: props.connectModal?.title,
-          titleIconUrl: props.connectModal?.titleIcon,
-          showThirdwebBranding: props.connectModal?.showThirdwebBranding,
-          termsOfServiceUrl: props.connectModal?.termsOfServiceUrl,
           privacyPolicyUrl: props.connectModal?.privacyPolicyUrl,
           requireApproval: props.connectModal?.requireApproval,
+          showThirdwebBranding: props.connectModal?.showThirdwebBranding,
+          termsOfServiceUrl: props.connectModal?.termsOfServiceUrl,
+          title: props.connectModal?.title,
+          titleIconUrl: props.connectModal?.titleIcon,
         }}
-        welcomeScreen={props.connectModal?.welcomeScreen}
-        size={size}
-        localeId={props.locale || "en_US"}
         onConnect={props.onConnect}
         recommendedWallets={props.recommendedWallets}
+        shouldSetActive={true}
         showAllWallets={props.showAllWallets}
+        size={size}
         walletConnect={props.walletConnect}
         wallets={wallets}
+        welcomeScreen={props.connectModal?.welcomeScreen}
       />
       {autoConnectComp}
     </WalletUIStatesProvider>
@@ -397,12 +426,14 @@ export function ConnectButton(props: ConnectButtonProps) {
 function ConnectButtonInner(
   props: ConnectButtonProps & {
     connectLocale: ConnectLocale;
+    siweAuth: ReturnType<typeof useSiweAuth>;
   },
 ) {
-  const activeWallet = useActiveWallet();
+  const siweAuth = props.siweAuth;
   const activeAccount = useActiveAccount();
-  const siweAuth = useSiweAuth(activeWallet, activeAccount, props.auth);
   const [showSignatureModal, setShowSignatureModal] = useState(false);
+  const hiddenWallets =
+    props.hiddenWallets || props.detailsModal?.hiddenWallets;
 
   // if wallet gets disconnected suddently, close the signature modal if it's open
   useEffect(() => {
@@ -444,18 +475,6 @@ function ConnectButtonInner(
     const combinedClassName = `${props.connectButton?.className || ""} ${TW_CONNECT_WALLET}`;
     return (
       <AnimatedButton
-        disabled={isLoading}
-        className={combinedClassName}
-        data-theme={theme}
-        data-is-loading={isLoading}
-        variant="primary"
-        type="button"
-        style={{
-          minWidth: "165px",
-          height: "50px",
-          fontSize: "16px",
-          ...props.connectButton?.style,
-        }}
         aria-label={
           connectionStatus === "connecting"
             ? locale.connecting
@@ -463,13 +482,25 @@ function ConnectButtonInner(
               ? connectButtonLabel
               : locale.defaultButtonTitle
         }
+        className={combinedClassName}
+        data-is-loading={isLoading}
+        data-test="connect-wallet-button"
+        data-theme={theme}
+        disabled={isLoading}
         onClick={() => {
           setIsWalletModalOpen(true);
         }}
-        data-test="connect-wallet-button"
+        style={{
+          fontSize: "16px",
+          height: "50px",
+          minWidth: "165px",
+          ...props.connectButton?.style,
+        }}
+        type="button"
+        variant="primary"
       >
         {isLoading ? (
-          <Spinner size="sm" color="primaryButtonText" />
+          <Spinner color="primaryButtonText" size="sm" />
         ) : (
           connectButtonLabel
         )}
@@ -480,21 +511,21 @@ function ConnectButtonInner(
   if (siweAuth.requiresAuth) {
     // loading state if loading
     // TODO: figure out a way to consolidate the loading states with the ones from locale loading
-    if (siweAuth.isLoading || siweAuth.isLoggingIn || siweAuth.isLoggingOut) {
+    if (siweAuth.isPending || siweAuth.isLoggingIn || siweAuth.isLoggingOut) {
       const combinedClassName = `${props.connectButton?.className || ""} ${TW_CONNECT_WALLET}`;
       return (
         <AnimatedButton
-          disabled={true}
           className={combinedClassName}
-          variant="primary"
-          type="button"
+          disabled={true}
           style={{
-            minWidth: "165px",
             height: "50px",
+            minWidth: "165px",
             ...props.connectButton?.style,
           }}
+          type="button"
+          variant="primary"
         >
-          <Spinner size="sm" color="primaryButtonText" />
+          <Spinner color="primaryButtonText" size="sm" />
         </AnimatedButton>
       );
     }
@@ -503,40 +534,42 @@ function ConnectButtonInner(
       return (
         <>
           <Button
-            variant="primary"
-            type="button"
+            className={props.signInButton?.className}
             onClick={() => {
               setShowSignatureModal(true);
             }}
-            className={props.signInButton?.className}
             style={{
-              minWidth: "165px",
               minHeight: "50px",
+              minWidth: "165px",
               ...props.signInButton?.style,
             }}
+            type="button"
+            variant="primary"
           >
             {siweAuth.isLoggingIn ? (
-              <Spinner size="sm" color="primaryButtonText" />
+              <Spinner color="primaryButtonText" size="sm" />
             ) : (
-              <Container flex="row" center="y" gap="sm">
+              <Container center="y" flex="row" gap="sm">
                 <LockIcon size={iconSize.sm} />
                 <span> {props.signInButton?.label || locale.signIn} </span>
               </Container>
             )}
           </Button>
           <Modal
-            size="compact"
+            className="tw-modal__sign-in"
+            title="Sign in"
             open={showSignatureModal}
             setOpen={setShowSignatureModal}
+            size="compact"
           >
             <SignatureScreen
+              auth={props.auth}
               client={props.client}
               connectLocale={locale}
               modalSize="compact"
-              termsOfServiceUrl={props.connectModal?.termsOfServiceUrl}
-              privacyPolicyUrl={props.connectModal?.privacyPolicyUrl}
               onDone={() => setShowSignatureModal(false)}
-              auth={props.auth}
+              privacyPolicyUrl={props.connectModal?.privacyPolicyUrl}
+              termsOfServiceUrl={props.connectModal?.termsOfServiceUrl}
             />
           </Modal>
         </>
@@ -548,21 +581,8 @@ function ConnectButtonInner(
   return (
     <AccountProvider address={activeAccount.address} client={props.client}>
       <ConnectedWalletDetails
-        theme={theme}
-        detailsButton={props.detailsButton}
-        detailsModal={props.detailsModal}
-        supportedTokens={supportedTokens}
-        supportedNFTs={props.supportedNFTs}
-        onDisconnect={(info) => {
-          // logout on explicit disconnect!
-          if (siweAuth.requiresAuth) {
-            siweAuth.doLogout();
-          }
-          props.onDisconnect?.(info);
-        }}
-        chains={props?.chains || []}
         chain={props.chain}
-        switchButton={props.switchButton}
+        chains={props?.chains || []}
         client={props.client}
         connectLocale={locale}
         connectOptions={{
@@ -571,12 +591,28 @@ function ConnectButtonInner(
           chain: props.chain,
           chains: props.chains,
           connectModal: props.connectModal,
+          hiddenWallets: hiddenWallets,
           recommendedWallets: props.recommendedWallets,
           showAllWallets: props.showAllWallets,
           walletConnect: props.walletConnect,
           wallets: props.wallets,
-          hiddenWallets: props.detailsModal?.hiddenWallets,
         }}
+        detailsButton={props.detailsButton}
+        detailsModal={{
+          ...props.detailsModal,
+          hiddenWallets: hiddenWallets,
+        }}
+        onDisconnect={(info) => {
+          // logout on explicit disconnect!
+          if (siweAuth.requiresAuth) {
+            siweAuth.doLogout();
+          }
+          props.onDisconnect?.(info);
+        }}
+        supportedNFTs={props.supportedNFTs}
+        supportedTokens={supportedTokens}
+        switchButton={props.switchButton}
+        theme={theme}
       />
     </AccountProvider>
   );

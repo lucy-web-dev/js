@@ -23,6 +23,8 @@ export type GetBalanceResult = {
   displayValue: string;
   symbol: string;
   name: string;
+  tokenAddress: string;
+  chainId: number;
 };
 
 /**
@@ -46,7 +48,9 @@ export async function getBalance(
   ]);
   return {
     ...currencyMetadata,
-    value: balanceWei,
+    chainId: options.contract.chain.id,
     displayValue: toTokens(balanceWei, currencyMetadata.decimals),
+    tokenAddress: options.contract.address,
+    value: balanceWei,
   };
 }

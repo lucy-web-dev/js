@@ -4,7 +4,7 @@ import { ReactIcon } from "@/icons";
 import { createMetadata } from "@doc";
 
 export const metadata = createMetadata({
-	title: "Fund wallets | thirdweb",
+	title: "Buy Crypto | thirdweb",
 	description: "Let users fund their wallets with crypto or fiat",
 });
 
@@ -12,56 +12,46 @@ export const metadata = createMetadata({
 
 Let users fund their wallets with crypto or fiat on all the supported chains.
 
-## Live Playground
-
-Try out the demo for yourself in the [fund wallets live playground](https://playground.thirdweb.com/connect/pay)
-
 <Stack>
 
 <ArticleIconCard
 	title="Try the demo"
 	icon={ExternalLink}
-	href="https://playground.thirdweb.com/connect/pay"
+	href="https://playground.thirdweb.com/bridge/buy-widget"
 	description="See the SDK in action on the live playground"
 />
 </Stack>
 
 ## Usage with UI Components
 
-The easiest way to fund wallets is to use the `PayEmbed` prebuilt UI component. Note that the `ConnectButton` also has a built-in funding flow that can also be customised.
+The easiest way to buy crypto is to use the `BuyWidget` prebuilt UI component.
 
 ```tsx
-import { PayEmbed } from "thirdweb/react";
+import { BuyWidget } from "thirdweb/react";
+import { base } from "thirdweb/chains";
 
 function App() {
   return (
-    <PayEmbed
+    <BuyWidget
       client={client}
-      payOptions={{
-        mode: "fund_wallet",
-        metadata: {
-          name: "Get funds",
-        },
-        prefillBuy: {
-          chain: base,
-          amount: "0.01",
-        },
-        // ... theme, currency, amounts, payment methods, etc.
-      }}
+      chain={base}
+      amount="0.01"
+      title="Get funds"
+      // ... theme, onSuccess, onError, etc.
     />
   );
 }
 ```
 
-Check out the [PayEmbed API reference](/references/typescript/v5/PayEmbed) for more information.
+Check out the [BuyWidget API reference](/references/typescript/v5/BuyWidget) for more information.
 
 <Stack>
 
 <ArticleIconCard
-	title="PayEmbed"
+	title="BuyWidget"
 	icon={ReactIcon}
-	href="/references/typescript/v5/PayEmbed"
-	description="Prebuilt UI to fund wallets with crypto or fiat"
+	href="/references/typescript/v5/BuyWidget"
+	description="Prebuilt UI to buy crypto by swapping or fiat onramps"
 />
 
 </Stack>

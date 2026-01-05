@@ -2,8 +2,10 @@
 import { useEffect, useMemo } from "react";
 import type { Chain } from "../../../../../chains/types.js";
 import type { ThirdwebClient } from "../../../../../client/client.js";
+import { getDefaultWallets } from "../../../../../wallets/defaultWallets.js";
 import type { Wallet } from "../../../../../wallets/interfaces/wallet.js";
 import type { SmartWalletOptions } from "../../../../../wallets/smart/types.js";
+import type { WalletId } from "../../../../../wallets/wallet-types.js";
 import {
   CustomThemeProvider,
   useCustomTheme,
@@ -14,14 +16,15 @@ import {
   useSiweAuth,
 } from "../../../../core/hooks/auth/useSiweAuth.js";
 import type { ConnectEmbedProps } from "../../../../core/hooks/connection/ConnectEmbedProps.js";
+import type { OnConnectCallback } from "../../../../core/hooks/connection/types.js";
 import { useActiveAccount } from "../../../../core/hooks/wallets/useActiveAccount.js";
 import { useActiveWallet } from "../../../../core/hooks/wallets/useActiveWallet.js";
 import { useIsAutoConnecting } from "../../../../core/hooks/wallets/useIsAutoConnecting.js";
 import { useConnectionManager } from "../../../../core/providers/connection-manager.js";
 import { WalletUIStatesProvider } from "../../../providers/wallet-ui-states-provider.js";
 import { canFitWideModal } from "../../../utils/canFitWideModal.js";
+import { cls } from "../../../utils/cls.js";
 import { usePreloadWalletProviders } from "../../../utils/usePreloadWalletProviders.js";
-import { getDefaultWallets } from "../../../wallets/defaultWallets.js";
 import { LoadingScreen } from "../../../wallets/shared/LoadingScreen.js";
 import { AutoConnect } from "../../AutoConnect/AutoConnect.js";
 import { DynamicHeight } from "../../components/DynamicHeight.js";
@@ -160,6 +163,19 @@ import { useSetupScreen } from "./screen.js";
  *
  * [View all available themes properties](https://portal.thirdweb.com/references/typescript/v5/Theme)
  *
+ * ### Overriding styles using class names
+ *
+ * Some elements in this component have classes with a `tw-` prefix.
+ * You can target these classes in your own CSS stylesheet to override their styles.
+ *
+ * In some cases, you may need to use the `!important` flag for the override to take effect. Do not use on auto-generated class names, as they may change between builds.
+ *
+ * ```css
+ * .tw-back-button {
+ *   background-color: red !important;
+ * }
+ * ```
+ *
  * ### Changing the display language
  *
  * ```tsx
@@ -215,7 +231,6 @@ export function ConnectEmbed(props: ConnectEmbedProps) {
 
   usePreloadWalletProviders({
     wallets,
-    client: props.client,
   });
 
   const modalSize = useMemo(() => {
@@ -227,11 +242,11 @@ export function ConnectEmbed(props: ConnectEmbedProps) {
   const meta = useMemo(() => {
     return {
       privacyPolicyUrl: props.privacyPolicyUrl,
+      requireApproval: props.requireApproval,
       showThirdwebBranding: props.showThirdwebBranding !== false,
       termsOfServiceUrl: props.termsOfServiceUrl,
       title: undefined,
       titleIconUrl: undefined,
-      requireApproval: props.requireApproval,
     };
   }, [
     props.privacyPolicyUrl,
@@ -245,17 +260,18 @@ export function ConnectEmbed(props: ConnectEmbedProps) {
 
   const autoConnectComp = props.autoConnect !== false && (
     <AutoConnect
-      chain={preferredChain}
-      appMetadata={props.appMetadata}
-      client={props.client}
-      wallets={wallets}
       accountAbstraction={props.accountAbstraction}
+      appMetadata={props.appMetadata}
+      chain={preferredChain}
+      client={props.client}
+      onConnect={props.onConnect}
+      siweAuth={siweAuth}
       timeout={
         typeof props.autoConnect === "boolean"
           ? undefined
           : props.autoConnect?.timeout
       }
-      onConnect={props.onConnect}
+      wallets={wallets}
     />
   );
 
@@ -265,7 +281,11 @@ export function ConnectEmbed(props: ConnectEmbedProps) {
         <>
           {autoConnectComp}
           <CustomThemeProvider theme={props.theme}>
-            <EmbedContainer modalSize={modalSize}>
+            <EmbedContainer
+              modalSize={modalSize}
+              className={cls("tw-widget-loading", props.className)}
+              style={props.style}
+            >
               <LoadingScreen />
             </EmbedContainer>
           </CustomThemeProvider>
@@ -274,26 +294,27 @@ export function ConnectEmbed(props: ConnectEmbedProps) {
     }
 
     return (
-      <WalletUIStatesProvider theme={props.theme} isOpen={true}>
+      <WalletUIStatesProvider isOpen={true} theme={props.theme}>
         <ConnectEmbedContent
-          auth={props.auth}
           accountAbstraction={props.accountAbstraction}
+          auth={props.auth}
           chain={preferredChain}
           chains={props.chains}
+          className={props.className}
           client={props.client}
           connectLocale={localeQuery.data}
-          size={modalSize}
-          meta={meta}
           header={props.header}
+          hiddenWallets={props.hiddenWallets}
           localeId={props.locale || "en_US"}
+          meta={meta}
+          modalSize={modalSize}
           onConnect={props.onConnect}
           recommendedWallets={props.recommendedWallets}
           showAllWallets={props.showAllWallets}
+          size={modalSize}
+          style={props.style}
           walletConnect={props.walletConnect}
           wallets={wallets}
-          className={props.className}
-          modalSize={modalSize}
-          style={props.style}
           welcomeScreen={props.welcomeScreen}
         />
         {autoConnectComp}
@@ -334,9 +355,10 @@ const ConnectEmbedContent = (props: {
     | true
     | undefined;
   localeId: LocaleId;
-  onConnect: ((wallet: Wallet) => void) | undefined;
+  onConnect: OnConnectCallback | undefined;
   recommendedWallets: Wallet[] | undefined;
   showAllWallets: boolean | undefined;
+  hiddenWallets: WalletId[] | undefined;
   walletConnect:
     | {
         projectId?: string;
@@ -348,8 +370,8 @@ const ConnectEmbedContent = (props: {
   // const requiresSignIn = false;
   const screenSetup = useSetupScreen({
     size: props.size,
-    welcomeScreen: undefined,
     wallets: props.wallets,
+    welcomeScreen: undefined,
   });
   const { setScreen, initialScreen, screen } = screenSetup;
   const activeWallet = useActiveWallet();
@@ -382,21 +404,14 @@ const ConnectEmbedContent = (props: {
   } else {
     content = (
       <ConnectModalContent
-        shouldSetActive={true}
-        screenSetup={screenSetup}
-        isOpen={true}
-        onClose={() => {
-          setScreen(initialScreen);
-        }}
-        setModalVisibility={() => {
-          // no op
-        }}
         accountAbstraction={props.accountAbstraction}
         auth={props.auth}
         chain={props.chain}
         chains={props.chains}
         client={props.client}
         connectLocale={props.connectLocale}
+        hideHeader={!props.header}
+        isOpen={true}
         meta={{
           ...props.meta,
           title:
@@ -406,24 +421,31 @@ const ConnectEmbedContent = (props: {
               ? props.header.titleIcon
               : undefined,
         }}
-        size={props.size}
-        welcomeScreen={props.welcomeScreen}
-        hideHeader={!props.header}
+        modalHeader={undefined}
+        onClose={() => {
+          setScreen(initialScreen);
+        }}
         onConnect={props.onConnect}
         recommendedWallets={props.recommendedWallets}
+        screenSetup={screenSetup}
+        setModalVisibility={() => {
+          // no op
+        }}
+        shouldSetActive={true}
         showAllWallets={props.showAllWallets}
+        size={props.size}
         walletConnect={props.walletConnect}
+        walletIdsToHide={props.hiddenWallets}
         wallets={props.wallets}
-        modalHeader={undefined}
-        walletIdsToHide={undefined}
+        welcomeScreen={props.welcomeScreen}
       />
     );
   }
 
   return (
     <EmbedContainer
-      modalSize={modalSize}
       className={props.className}
+      modalSize={modalSize}
       style={props.style}
     >
       {modalSize === "wide" ? (
@@ -441,23 +463,24 @@ export const EmbedContainer = /* @__PURE__ */ StyledDiv<{
   const { modalSize } = props;
   const theme = useCustomTheme();
   return {
-    color: theme.colors.primaryText,
-    background: theme.colors.modalBg,
-    height: modalSize === "compact" ? "auto" : wideModalMaxHeight,
-    width: modalSize === "compact" ? modalMaxWidthCompact : modalMaxWidthWide,
-    boxSizing: "border-box",
-    position: "relative",
-    lineHeight: "normal",
-    borderRadius: radius.xl,
-    border: `1px solid ${theme.colors.borderColor}`,
-    overflow: "hidden",
-    fontFamily: theme.fontFamily,
+    "& *": {
+      boxSizing: "border-box",
+    },
     "& *::selection": {
       backgroundColor: theme.colors.selectedTextBg,
       color: theme.colors.selectedTextColor,
     },
-    "& *": {
-      boxSizing: "border-box",
-    },
+    background: theme.colors.modalBg,
+    border: `1px solid ${theme.colors.borderColor}`,
+    borderRadius: radius.xl,
+    boxSizing: "border-box",
+    color: theme.colors.primaryText,
+    fontFamily: theme.fontFamily,
+    height: modalSize === "compact" ? "auto" : wideModalMaxHeight,
+    lineHeight: "normal",
+    overflow: "hidden",
+    position: "relative",
+    maxWidth: "100%",
+    width: modalSize === "compact" ? modalMaxWidthCompact : modalMaxWidthWide,
   };
 });

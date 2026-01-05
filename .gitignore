@@ -16,6 +16,7 @@ yalc.lock
 ./build/
 playwright-report/
 .env/
+.pnpm-store/
 
 # codecov binary
 codecov
@@ -31,3 +32,5 @@ storybook-static
 .aider*
 
 tsconfig.tsbuildinfo
+.cursor
+apps/dashboard/node-compile-cache

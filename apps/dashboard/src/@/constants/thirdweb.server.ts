@@ -1,17 +1,4 @@
-import {
-  DASHBOARD_THIRDWEB_CLIENT_ID,
-  DASHBOARD_THIRDWEB_SECRET_KEY,
-  IPFS_GATEWAY_URL,
-} from "@/constants/env";
-import {
-  THIRDWEB_BUNDLER_DOMAIN,
-  THIRDWEB_INAPP_WALLET_DOMAIN,
-  THIRDWEB_PAY_DOMAIN,
-  THIRDWEB_RPC_DOMAIN,
-  THIRDWEB_SOCIAL_API_DOMAIN,
-  THIRDWEB_STORAGE_DOMAIN,
-} from "constants/urls";
-import { createThirdwebClient } from "thirdweb";
+import { createThirdwebClient, type ThirdwebClient } from "thirdweb";
 import { populateEip712Transaction } from "thirdweb/transaction";
 import {
   getTransactionDecorator,
@@ -19,36 +6,60 @@ import {
   setTransactionDecorator,
 } from "thirdweb/utils";
 import { getZkPaymasterData } from "thirdweb/wallets/smart";
-import { getVercelEnv } from "../../lib/vercel-utils";
+import {
+  NEXT_PUBLIC_DASHBOARD_CLIENT_ID,
+  NEXT_PUBLIC_IPFS_GATEWAY_URL,
+} from "@/constants/public-envs";
+import {
+  THIRDWEB_BRIDGE_URL,
+  THIRDWEB_BUNDLER_DOMAIN,
+  THIRDWEB_ENGINE_CLOUD_URL,
+  THIRDWEB_INAPP_WALLET_DOMAIN,
+  THIRDWEB_INSIGHT_API_DOMAIN,
+  THIRDWEB_PAY_DOMAIN,
+  THIRDWEB_RPC_DOMAIN,
+  THIRDWEB_SOCIAL_API_DOMAIN,
+  THIRDWEB_STORAGE_DOMAIN,
+} from "@/constants/urls";
+import { getVercelEnv } from "@/utils/vercel";
 
-// returns a thirdweb client with optional JWT passed in
-export function getThirdwebClient(jwt?: string) {
+export function getConfiguredThirdwebClient(options: {
+  secretKey: string | undefined;
+  teamId: string | undefined;
+  clientId?: string;
+}): ThirdwebClient {
   if (getVercelEnv() !== "production") {
     // if not on production: run this when creating a client to set the domains
     setThirdwebDomains({
-      rpc: THIRDWEB_RPC_DOMAIN,
-      inAppWallet: THIRDWEB_INAPP_WALLET_DOMAIN,
-      pay: THIRDWEB_PAY_DOMAIN,
-      storage: THIRDWEB_STORAGE_DOMAIN,
-      social: THIRDWEB_SOCIAL_API_DOMAIN,
+      bridge: THIRDWEB_BRIDGE_URL,
       bundler: THIRDWEB_BUNDLER_DOMAIN,
+      inAppWallet: THIRDWEB_INAPP_WALLET_DOMAIN,
+      insight: THIRDWEB_INSIGHT_API_DOMAIN,
+      pay: THIRDWEB_PAY_DOMAIN,
+      rpc: THIRDWEB_RPC_DOMAIN,
+      social: THIRDWEB_SOCIAL_API_DOMAIN,
+      storage: THIRDWEB_STORAGE_DOMAIN,
+      engineCloud: new URL(THIRDWEB_ENGINE_CLOUD_URL).hostname,
     });
   }
 
   if (!getTransactionDecorator()) {
     setTransactionDecorator(async ({ account, transaction }) => {
-      // special override for sophon testnet (zk chain)
+      // special override for sophon (zk chain)
       // sophon only allows transactions through their paymaster
       // so always use eip712 tx + paymaster
-      if (transaction.chain.id === 531050104) {
+      if (
+        transaction.chain.id === 531050104 ||
+        transaction.chain.id === 50104
+      ) {
         const serializedTx = await populateEip712Transaction({
-          transaction,
           account,
+          transaction,
         });
         const pmData = await getZkPaymasterData({
           options: {
-            client: transaction.client,
             chain: transaction.chain,
+            client: transaction.client,
           },
           transaction: serializedTx,
         });
@@ -68,14 +79,20 @@ export function getThirdwebClient(jwt?: string) {
     });
   }
 
+  // During build time, provide fallbacks if credentials are missing
+  const clientId =
+    options.clientId || NEXT_PUBLIC_DASHBOARD_CLIENT_ID || "dummy-build-client";
+  const secretKey = options.secretKey || undefined;
+
   return createThirdwebClient({
-    secretKey: jwt ? jwt : DASHBOARD_THIRDWEB_SECRET_KEY,
-    clientId: DASHBOARD_THIRDWEB_CLIENT_ID,
+    clientId: clientId,
     config: {
       storage: {
-        gatewayUrl: IPFS_GATEWAY_URL,
+        gatewayUrl: NEXT_PUBLIC_IPFS_GATEWAY_URL,
       },
     },
+    secretKey: secretKey,
+    teamId: options.teamId,
   });
 }
 

@@ -1,4 +1,5 @@
 import type { SupportedSmsCountry } from "../../react/web/wallets/in-app/supported-sms-countries.js";
+import type { AsyncStorage } from "../../utils/storage/AsyncStorage.js";
 import type {
   InAppWalletAutoConnectOptions,
   InAppWalletConnectionOptions,
@@ -18,11 +19,20 @@ export type EcosystemWalletCreationOptions = {
      * The default country code to use for SMS authentication
      */
     defaultSmsCountryCode?: SupportedSmsCountry;
+
+    /**
+     * The list of allowed country codes to display in the country selector
+     */
+    allowedSmsCountryCodes?: SupportedSmsCountry[];
   };
   /**
    * The partnerId of the ecosystem wallet to connect to
    */
   partnerId?: string;
+  /**
+   * The storage to use for storing wallet state
+   */
+  storage?: AsyncStorage;
 };
 
 export type EcosystemWalletConnectionOptions = InAppWalletConnectionOptions;

@@ -3,10 +3,12 @@ import type { ThirdwebClient } from "../../../../client/client.js";
 import type { Wallet } from "../../../../wallets/interfaces/wallet.js";
 import type { SmartWalletOptions } from "../../../../wallets/smart/types.js";
 import type { AppMetadata } from "../../../../wallets/types.js";
+import type { WalletId } from "../../../../wallets/wallet-types.js";
 import type { WelcomeScreen } from "../../../web/ui/ConnectWallet/screens/types.js";
 import type { LocaleId } from "../../../web/ui/types.js";
 import type { Theme } from "../../design-system/index.js";
 import type { SiweAuthOptions } from "../auth/useSiweAuth.js";
+import type { OnConnectCallback } from "./types.js";
 
 export type ConnectEmbedProps = {
   /**
@@ -212,14 +214,15 @@ export type ConnectEmbedProps = {
    *
    * ```tsx
    * <ConnectEmbed
-   *  onConnect={(wallet) => {
-   *    console.log("connected to", wallet)
+   *  onConnect={(activeWallet, allConnectedWallets) => {
+   *    console.log("connected to", activeWallet)
+   *    console.log("all connected wallets", allConnectedWallets)
    *  }}
    * />
    * ```
    * ```
    */
-  onConnect?: (wallet: Wallet) => void;
+  onConnect?: OnConnectCallback;
 
   /**
    * By default, A "Powered by Thirdweb" branding is shown at the bottom of the embed.
@@ -271,6 +274,11 @@ export type ConnectEmbedProps = {
    * You can disable this button by setting `showAllWallets` prop to `false`
    */
   showAllWallets?: boolean;
+
+  /**
+   * All wallet IDs included in this array will be hidden from the wallet selection list.
+   */
+  hiddenWallets?: WalletId[];
 
   /**
    * ConnectEmbed supports two modal size variants: `compact` and `wide`.

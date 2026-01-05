@@ -32,19 +32,19 @@ export async function estimateGasCost(
   const from = options.from ?? options.account?.address ?? undefined;
   const gasLimit =
     (await resolvePromisedValue(transaction.gas)) ||
-    (await estimateGas({ transaction, from }));
+    (await estimateGas({ from, transaction }));
   const fees = await getDefaultGasOverrides(
     transaction.client,
     transaction.chain,
   );
   const gasPrice = fees.maxFeePerGas || fees.gasPrice;
-  if (!gasPrice) {
+  if (gasPrice === undefined) {
     throw new Error(
       `Unable to determine gas price for chain ${transaction.chain.id}`,
     );
   }
   let l1Fee: bigint;
-  if (isOpStackChain(transaction.chain)) {
+  if (await isOpStackChain(transaction.chain)) {
     const { estimateL1Fee } = await import("../../gas/estimate-l1-fee.js");
     l1Fee = await estimateL1Fee({
       transaction,

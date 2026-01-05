@@ -2,6 +2,7 @@ import type { Address } from "abitype";
 import { encodeAbiParameters } from "viem";
 import { ZERO_ADDRESS } from "../../../../constants/addresses.js";
 import { getContract } from "../../../../contract/contract.js";
+import { getAddress } from "../../../../utils/address.js";
 import { isHex } from "../../../../utils/encoding/helpers/is-hex.js";
 import { keccak256 } from "../../../../utils/hashing/keccak256.js";
 import { stringify } from "../../../../utils/json.js";
@@ -61,15 +62,15 @@ export async function prepareBiconomyTransaction({
     Math.floor(Date.now() / 1000) + (gasless.deadlineSeconds ?? 3600);
 
   const request = {
+    batchId: BATCH_ID,
+    batchNonce: nonce,
+    data: serializableTransaction.data,
+    deadline: deadline,
     from: account.address,
     to: serializableTransaction.to,
     token: ZERO_ADDRESS,
-    txGas: serializableTransaction.gas,
     tokenGasPrice: 0n,
-    batchId: BATCH_ID,
-    batchNonce: nonce,
-    deadline: deadline,
-    data: serializableTransaction.data,
+    txGas: serializableTransaction.gas,
   };
 
   if (!request.to) {
@@ -95,9 +96,9 @@ export async function prepareBiconomyTransaction({
       { type: "bytes32" },
     ],
     [
-      request.from,
-      request.to,
-      request.token,
+      getAddress(request.from),
+      getAddress(request.to),
+      getAddress(request.token),
       request.txGas,
       request.tokenGasPrice,
       request.batchId,
@@ -123,31 +124,30 @@ export async function relayBiconomyTransaction(
   const response = await fetch(
     "https://api.biconomy.io/api/v2/meta-tx/native",
     {
-      method: "POST",
       body: stringify({
         apiId: options.gasless.apiId,
-        params: [request, signature],
         from: request.from,
-        to: request.to,
         gasLimit: request.txGas,
+        params: [request, signature],
+        to: request.to,
       }),
       headers: {
-        "x-api-key": options.gasless.apiKey,
         "Content-Type": "application/json;charset=utf-8",
+        "x-api-key": options.gasless.apiKey,
       },
+      method: "POST",
     },
   );
   if (!response.ok) {
-    response.body?.cancel();
     throw new Error(`Failed to send transaction: ${await response.text()}`);
   }
   const json = await response.json();
   const transactionHash = json.txHash;
   if (isHex(transactionHash)) {
     return {
-      transactionHash: transactionHash,
       chain: options.transaction.chain,
       client: options.transaction.client,
+      transactionHash: transactionHash,
     };
   }
   throw new Error(`Failed to send transaction: ${stringify(json)}`);

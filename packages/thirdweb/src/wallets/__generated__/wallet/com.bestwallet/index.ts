@@ -5,7 +5,7 @@ export const wallet = {
   id: "com.bestwallet",
   name: "Best Wallet",
   homepage: "https://bestwallet.com/",
-  image_id: "7f9574ed-eb42-4e04-0888-be2939936700",
+  image_id: "c1bd1250-b97a-4e26-c584-554019bc1d00",
   app: {
     browser: null,
     ios: "https://apps.apple.com/app/best-wallet/id6451312105",

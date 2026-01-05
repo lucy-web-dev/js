@@ -3,9 +3,9 @@ import type { ThirdwebClient } from "../../../../client/client.js";
 import type { WalletId } from "../../../../wallets/wallet-types.js";
 import { iconSize, spacing } from "../../../core/design-system/index.js";
 import { WalletLogoSpinner } from "../../ui/ConnectWallet/screens/WalletLogoSpinner.js";
-import { Spacer } from "../../ui/components/Spacer.js";
 import { Container, Line, ModalHeader } from "../../ui/components/basic.js";
 import { Button } from "../../ui/components/buttons.js";
+import { Spacer } from "../../ui/components/Spacer.js";
 import { Text } from "../../ui/components/text.js";
 
 /**
@@ -31,20 +31,25 @@ export const ConnectingScreen: React.FC<{
   const { locale } = props;
 
   return (
-    <Container animate="fadein" fullHeight flex="column">
+    <Container
+      animate="fadein"
+      flex="column"
+      fullHeight
+      className="tw-connecting-wallet-screen"
+    >
       <Container
         p="lg"
         style={{
           paddingBottom: 0,
         }}
       >
-        <ModalHeader title={props.walletName} onBack={props.onBack} />
+        <ModalHeader onBack={props.onBack} title={props.walletName} />
       </Container>
 
       <Container
-        flex="column"
         center="y"
         expand
+        flex="column"
         px={props.size === "compact" ? "lg" : "xxl"}
         relative
         style={{
@@ -65,28 +70,36 @@ export const ConnectingScreen: React.FC<{
             animationDuration: "200ms",
           }}
         >
-          <Text center color="primaryText" size="lg" weight={600}>
+          <Text
+            center
+            color="primaryText"
+            size="lg"
+            weight={500}
+            className="tw-screen-title"
+            data-status={props.errorConnecting ? "failed" : "in-progress"}
+          >
             {props.errorConnecting ? locale.failed : locale.inProgress}
           </Text>
 
           <Spacer y="md" />
 
           {!props.errorConnecting ? (
-            <Text balance center multiline>
+            <Text balance center multiline className="tw-screen-description">
               {locale.instruction}
             </Text>
           ) : (
-            <Container flex="row" center="x" animate="fadein">
+            <Container animate="fadein" center="x" flex="row">
               <Button
+                className="tw-retry-button"
                 fullWidth
-                variant="accent"
                 onClick={props.onRetry}
                 style={{
-                  gap: spacing.xs,
                   alignItems: "center",
+                  gap: spacing.xs,
                 }}
+                variant="accent"
               >
-                <ReloadIcon width={iconSize.sm} height={iconSize.sm} />
+                <ReloadIcon height={iconSize.sm} width={iconSize.sm} />
                 {locale.tryAgain}
               </Button>
             </Container>
@@ -98,8 +111,12 @@ export const ConnectingScreen: React.FC<{
         <>
           <Spacer y="xl" />
           <Line />
-          <Container flex="row" center="x" p="lg">
-            <Button variant="link" onClick={props.onGetStarted}>
+          <Container center="x" flex="row" p="lg">
+            <Button
+              onClick={props.onGetStarted}
+              variant="link"
+              className="tw-get-started-button"
+            >
               {locale.getStartedLink}
             </Button>
           </Container>

@@ -1,20 +1,17 @@
-import {
-  ArticleIconCard,
-  Details,
-  Heading,
-  createMetadata,
-} from "@/components/Document";
+import GithubSlugger from "github-slugger";
+import { FileTextIcon, FolderOpenIcon } from "lucide-react";
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import invariant from "tiny-invariant";
+import type { TransformedDoc } from "typedoc-better-json";
+import { createMetadata, Details, Heading } from "@/components/Document";
 import { Breadcrumb } from "@/components/Document/Breadcrumb";
 import { DocLayout } from "@/components/Layouts/DocLayout";
 import type { LinkGroup, LinkMeta } from "@/components/others/Sidebar";
 import { sluggerContext } from "@/contexts/slugger";
-import GithubSlugger from "github-slugger";
-import { FileTextIcon, FolderOpenIcon } from "lucide-react";
-import type { Metadata } from "next";
-import { notFound } from "next/navigation";
-import invariant from "tiny-invariant";
-import type { TransformedDoc } from "typedoc-better-json";
 import type { MetadataImageIcon } from "../../../../components/Document/metadata";
+import { cn } from "../../../../lib/utils";
 import { RootTDoc } from "./Root";
 import { getSidebarLinkGroups } from "./utils/getSidebarLinkgroups";
 import { fetchAllSlugs, getSlugToDocMap } from "./utils/slugs";
@@ -56,15 +53,16 @@ export function getTDocPage(options: {
       if (docSlug in subgroups) {
         return (
           <CategoryPage
-            slug={docSlug as keyof typeof subgroups}
             doc={doc}
             packageSlug={packageSlug}
+            slug={docSlug as keyof typeof subgroups}
             version={version}
           />
         );
       }
 
-      const selectedDoc = docSlug && slugToDoc[docSlug];
+      const selectedDoc =
+        docSlug && (slugToDoc[docSlug] || slugToDoc[`common/${docSlug}`]);
 
       if (!selectedDoc) {
         notFound();
@@ -75,12 +73,12 @@ export function getTDocPage(options: {
           <Breadcrumb
             crumbs={[
               {
-                name: "References",
                 href: `/references/${packageSlug}/${version}`,
+                name: "References",
               },
               {
-                name: selectedDoc.name,
                 href: `/references/${packageSlug}/${version}/${selectedDoc.name}`,
+                name: selectedDoc.name,
               },
             ]}
           />
@@ -116,15 +114,12 @@ export function getTDocPage(options: {
           const paths = await getDoc(version)
             .then((doc) => fetchAllSlugs(doc))
             .then((slugs) => {
-              return [
-                ...slugs.map((slug) => {
-                  return {
-                    slug: slug.split("/") as string[],
-                    version: version,
-                  };
-                }),
-                { version, slug: [] },
-              ];
+              return Array.from(new Set(slugs)).map((slug) => {
+                return {
+                  slug: slug.split("/") as string[],
+                  version: version,
+                };
+              });
             });
           return paths;
         }),
@@ -148,24 +143,24 @@ export function getTDocPage(options: {
     }
 
     return createMetadata({
-      title: `${docName} - ${sdkTitle}`,
       description: `${docName} API Reference - ${sdkTitle}`,
       image: {
-        title: docName,
         icon: metadataIcon,
+        title: docName,
       },
+      title: `${docName} - ${sdkTitle}`,
     });
   }
 
   return {
+    default: Page,
     // force-static on dev and previews to lower the build time and vercel cost
     dynamic: (process.env.VERCEL_ENV !== "preview" &&
     process.env.VERCEL_ENV !== "development"
       ? "force-static"
       : "auto") as "force-static" | "auto",
-    default: Page,
-    generateStaticParams,
     generateMetadata,
+    generateStaticParams,
   };
 }
 
@@ -185,11 +180,11 @@ export function getTDocLayout(options: {
     return (
       <DocLayout
         sideBar={{
-          name: sdkTitle,
           links: getSidebarLinkGroups(
             doc,
             `/references/${packageSlug}/${version}`,
           ),
+          name: sdkTitle,
         }}
       >
         {props.children}
@@ -214,7 +209,7 @@ async function IndexContent(props: {
 
   return (
     <div>
-      <Heading id="reference" level={1}>
+      <Heading anchorId="reference" level={1}>
         {props.sdkTitle} Reference
       </Heading>
 
@@ -223,10 +218,10 @@ async function IndexContent(props: {
           const slug = nameToSubgroupSlug[linkGroup.name];
           return (
             <ArticleIconCard
-              key={linkGroup.name}
               href={`/references/${props.packageSlug}/${props.version}/${slug}`}
-              title={linkGroup.name}
               icon={FolderOpenIcon}
+              key={linkGroup.name}
+              title={linkGroup.name}
             />
           );
         })}
@@ -259,10 +254,10 @@ function CategoryPage(props: {
 
   return (
     <div>
-      <Heading level={1} id={props.slug}>
+      <Heading anchorId={props.slug} level={1}>
         {subgroups[props.slug]}
       </Heading>
-      <RenderLinkGroup linkGroup={linkGroup} level={0} />
+      <RenderLinkGroup level={0} linkGroup={linkGroup} />
     </div>
   );
 }
@@ -286,11 +281,11 @@ function RenderLinkGroup(props: { linkGroup: LinkGroup; level: number }) {
           const link = _link as LinkMeta;
           return (
             <ArticleIconCard
-              title={link.name}
-              key={link.href}
+              className="p-3"
               href={link.href}
               icon={FileTextIcon}
-              className="p-3"
+              key={link.href}
+              title={link.name}
             />
           );
         })}
@@ -305,7 +300,7 @@ function RenderLinkGroup(props: { linkGroup: LinkGroup; level: number }) {
         if ("links" in link) {
           return (
             // biome-ignore lint/suspicious/noArrayIndexKey: nothing better available
-            <GroupOfLinks linkGroup={link} level={props.level + 1} key={i} />
+            <GroupOfLinks key={i} level={props.level + 1} linkGroup={link} />
           );
         }
       })}
@@ -313,9 +308,9 @@ function RenderLinkGroup(props: { linkGroup: LinkGroup; level: number }) {
         <GroupOfLinks
           level={props.level + 1}
           linkGroup={{
+            expanded: true,
             links: ungroupedLinks,
             name: "Others",
-            expanded: true,
           }}
         />
       )}
@@ -329,13 +324,47 @@ function GroupOfLinks(props: { linkGroup: LinkGroup; level: number }) {
 
   return (
     <Details
-      id={slugger.slug(props.linkGroup.name)}
-      summary={props.linkGroup.name}
       accordionItemClassName="m-0"
       accordionTriggerClassName="rounded-lg"
-      headingClassName="py-2 text-xl"
+      anchorId={slugger.slug(props.linkGroup.name)}
+      headingClassName="py-0.5 text-lg font-medium"
+      summary={props.linkGroup.name}
     >
-      <RenderLinkGroup linkGroup={props.linkGroup} level={props.level + 1} />
+      <RenderLinkGroup level={props.level + 1} linkGroup={props.linkGroup} />
     </Details>
+  );
+}
+
+function ArticleIconCard(props: {
+  title: string;
+  href: string;
+  icon?: React.FC<{ className?: string }>;
+  className?: string;
+}) {
+  const isExternal = props.href.startsWith("http");
+  return (
+    <Link
+      className={cn(
+        "flex items-center gap-4 rounded-xl border bg-card p-4 transition-colors hover:border-active-border",
+        props.className,
+      )}
+      data-noindex
+      href={props.href}
+      target={isExternal ? "_blank" : undefined}
+    >
+      {props.icon && (
+        <div className="shrink-0">
+          <div className="rounded-full p-2.5 bg-background border">
+            <props.icon className="size-3.5 text-muted-foreground" />
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-col gap-1.5">
+        <h3 className="font-semibold text-base text-foreground leading-none">
+          {props.title}
+        </h3>
+      </div>
+    </Link>
   );
 }

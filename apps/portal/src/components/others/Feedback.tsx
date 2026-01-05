@@ -1,73 +1,70 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { BadgeCheckIcon, ThumbsDownIcon, ThumbsUpIcon } from "lucide-react";
-import posthog from "posthog-js";
 import { useState } from "react";
+import { reportFeedback } from "@/analytics/report";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Textarea } from "../ui/textarea";
 
 export function Feedback() {
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const feedbackEvent = "Portal Feedback";
   const [feedback, setFeedback] = useState("");
 
   if (!isSubmitted) {
     return (
-      <div className="flex flex-col gap-3 md:h-16 md:flex-row md:items-center md:gap-5">
-        <p>Was this page helpful?</p>
-
-        <div className="flex gap-3">
+      <div className="md:h-16 flex items-center gap-4">
+        <p className="text-sm text-foreground">Was this page helpful?</p>
+        <div className="flex gap-2">
           <Button
-            variant="outline"
+            className="gap-2 bg-card rounded-lg"
             onClick={() => {
               setIsSubmitted(true);
-              posthog.capture(feedbackEvent, {
-                response: "yes",
-              });
+              reportFeedback({ helpful: true });
             }}
+            variant="outline"
           >
             Yes
-            <ThumbsUpIcon className="size-4 text-f-300" />
+            <ThumbsUpIcon className="size-4 text-muted-foreground" />
           </Button>
 
           <Dialog>
             <DialogTrigger asChild>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  posthog.capture(feedbackEvent, {
-                    response: "no",
-                  });
-                }}
-              >
+              <Button className="gap-2 bg-card rounded-lg" variant="outline">
                 No
-                <ThumbsDownIcon className="size-4 text-f-300" />
+                <ThumbsDownIcon className="size-4 text-muted-foreground" />
               </Button>
             </DialogTrigger>
 
             <DialogContent className="p-5">
-              <h3 className="mb-3 font-semibold text-f-100 text-lg">
-                Apologies for any confusion.
-              </h3>
-              <p className="mb-5 font-medium text-f-300">
-                Please provide details about the issue you encountered to help
-                us improve our documentation.
-              </p>
-              <textarea
-                className="mb-2 h-32 w-full rounded-sm border bg-b-800 p-2 font-medium text-f-100 outline-none placeholder:font-semibold"
-                value={feedback}
-                placeholder="Your feedback..."
+              <DialogHeader className="mb-5">
+                <DialogTitle>Apologies for any confusion.</DialogTitle>
+                <DialogDescription>
+                  Please provide details about the issue you encountered to help
+                  us improve our documentation.
+                </DialogDescription>
+              </DialogHeader>
+
+              <Textarea
+                className="mb-2 h-32 w-full bg-card"
                 onChange={(e) => {
                   setFeedback(e.target.value);
                 }}
+                placeholder="Your feedback..."
+                value={feedback}
               />
               <div className="mt-3 flex flex-row-reverse">
                 <Button
                   onClick={() => {
                     setIsSubmitted(true);
-                    posthog.capture("Portal Feedback", {
-                      feedback: feedback,
-                    });
+                    reportFeedback({ feedback, helpful: false });
                   }}
                 >
                   Submit
@@ -81,9 +78,9 @@ export function Feedback() {
   }
   return (
     <div className="fade-in-0 animate-in duration-500">
-      <div className="flex items-center gap-2 text-accent-500 md:h-16">
-        <BadgeCheckIcon />
-        <p className="font-semibold text-accent-500">
+      <div className="flex items-center gap-2 text-foreground md:h-16">
+        <BadgeCheckIcon className="size-4" />
+        <p className="font-semibold text-foreground text-sm">
           Thank you for your feedback!
         </p>
       </div>

@@ -17,11 +17,11 @@ export function CopyButton(props: { text: string }) {
 
   return (
     <Button
-      variant="outline"
+      className="size-auto bg-background p-2"
       onClick={copyToClipboard}
-      className="bg-b-900 p-2"
+      variant="outline"
     >
-      <Icon className="size-3 text-f-300" />
+      <Icon className="size-3 text-muted-foreground" />
     </Button>
   );
 }

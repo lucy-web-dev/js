@@ -1,4 +1,5 @@
 import { useContext } from "react";
+import { randomBytesHex } from "../../../../utils/random.js";
 import {
   type SendTransactionConfig,
   type ShowModalData,
@@ -82,9 +83,40 @@ import { TransactionModal } from "../../ui/TransactionButton/TransactionModal.js
  *     value: toWei("0.1"),
  *     chain: sepolia,
  *     client: thirdwebClient,
+ *     // Specify a token required for the transaction
+ *     erc20Value: {
+ *       amountWei: toWei("0.1"),
+ *       tokenAddress: "0x...",
+ *     },
  *   });
  *   sendTx(transaction);
  * };
+ * ```
+ *
+ * ### Configuring the Pay Modal
+ *
+ * When the wallet does not have enough funds to send the transaction, a modal is shown to the user to buy the required funds and then continue with the transaction.
+ *
+ * You can configure the pay modal by passing a [`SendTransactionPayModalConfig`](https://portal.thirdweb.com/references/typescript/v5/SendTransactionPayModalConfig) object to the `payModal` config.
+ *
+ * ```tsx
+ * import { useSendTransaction } from "thirdweb/react";
+ *
+ * const sendTx = useSendTransaction({
+ *   payModal: {
+ *     theme: "light",
+ *   },
+ * });
+ * ```
+ *
+ * By default, the pay modal is enabled. You can disable it by passing `payModal: false` to the config.
+ *
+ * ```tsx
+ * import { useSendTransaction } from "thirdweb/react";
+ *
+ * const sendTx = useSendTransaction({
+ *   payModal: false,
+ * });
  * ```
  *
  * @transaction
@@ -105,37 +137,42 @@ export function useSendTransaction(config: SendTransactionConfig = {}) {
     if (payModal === false) return;
     setRootEl(
       <TransactionModal
-        title={payModal?.metadata?.name || "Transaction"}
-        tx={data.tx}
-        onComplete={data.sendTx}
+        country={payModal?.country}
+        currency={payModal?.currency}
+        client={data.tx.client}
+        localeId={payModal?.locale || "en_US"}
+        modalMode={data.mode}
         onClose={() => {
           setRootEl(null);
           data.rejectTx(
             new Error("User rejected transaction by closing modal"),
           );
         }}
+        onComplete={data.sendTx}
         onTxSent={data.resolveTx}
-        client={data.tx.client}
-        localeId={payModal?.locale || "en_US"}
-        supportedTokens={payModal?.supportedTokens}
-        theme={payModal?.theme || "dark"}
         payOptions={{
           buyWithCrypto: payModal?.buyWithCrypto,
           buyWithFiat: payModal?.buyWithFiat,
-          purchaseData: payModal?.purchaseData,
-          mode: "transaction",
-          transaction: data.tx,
           metadata: payModal?.metadata,
+          mode: "transaction",
           onPurchaseSuccess: payModal?.onPurchaseSuccess,
+          purchaseData: payModal?.purchaseData,
+          showThirdwebBranding: payModal?.showThirdwebBranding,
+          transaction: data.tx,
         }}
+        supportedTokens={payModal?.supportedTokens}
+        theme={payModal?.theme || "dark"}
+        title={payModal?.metadata?.name || "Transaction"}
+        tx={data.tx}
+        txId={randomBytesHex()}
       />,
     );
   };
 
   return useSendTransactionCore({
+    gasless: config.gasless,
     showPayModal:
       !payModalEnabled || payModal === false ? undefined : showPayModal,
-    gasless: config.gasless,
     switchChain,
     wallet,
   });

@@ -7,7 +7,7 @@ export const wallet = {
   homepage: "https://zengo.com/",
   image_id: "6133c399-ae32-4eba-0c5a-0fb84492bf00",
   app: {
-    browser: null,
+    browser: "https://web.zengo.com/",
     ios: "https://apps.apple.com/us/app/zengo-crypto-bitcoin-wallet/id1440147115",
     android: "https://play.google.com/store/apps/details?id=com.zengo.wallet",
     mac: null,
@@ -26,6 +26,6 @@ export const wallet = {
   },
   desktop: {
     native: null,
-    universal: null,
+    universal: "https://web.zengo.com/",
   },
 } as const;

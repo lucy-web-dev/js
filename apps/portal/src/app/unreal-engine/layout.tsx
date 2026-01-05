@@ -6,14 +6,9 @@ import { sidebar } from "./sidebar";
 export default async function Layout(props: { children: React.ReactNode }) {
   return (
     <DocLayout
-      sideBar={sidebar}
       editPageButton={true}
-      sidebarHeader={
-        <div className="flex-col items-center gap-1">
-          <p className="py-5 font-semibold text-f-100 text-lg">Connect</p>
-          <PlatformSelector selected="Unreal Engine" />
-        </div>
-      }
+      sideBar={sidebar}
+      sidebarHeader={<PlatformSelector selected="Unreal Engine" />}
     >
       {props.children}
     </DocLayout>
@@ -21,11 +16,11 @@ export default async function Layout(props: { children: React.ReactNode }) {
 }
 
 export const metadata = createMetadata({
-  image: {
-    title: "Thirdweb Unreal Engine SDK",
-    icon: "unreal-engine",
-  },
-  title: "Thirdweb Unreal Engine SDK",
   description:
     "Seamlessly create In-App Wallets, sign in with email or socials, unlock Account Abstraction features and more.",
+  image: {
+    icon: "unreal-engine",
+    title: "Thirdweb Unreal Engine SDK",
+  },
+  title: "Thirdweb Unreal Engine SDK",
 });

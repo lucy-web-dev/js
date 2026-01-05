@@ -7,13 +7,13 @@ import { ethereum } from "../../../../../chains/chain-definitions/ethereum.js";
 import { sepolia } from "../../../../../chains/chain-definitions/sepolia.js";
 import { defineChain } from "../../../../../chains/utils.js";
 import { NATIVE_TOKEN_ADDRESS } from "../../../../../constants/addresses.js";
+import { AccountProvider } from "../../../../core/account/provider.js";
 import {
-  AccountBalance,
   formatAccountFiatBalance,
   formatAccountTokenBalance,
   loadAccountBalance,
-} from "./balance.js";
-import { AccountProvider } from "./provider.js";
+} from "../../../../core/utils/account.js";
+import { AccountBalance } from "./balance.js";
 
 const queryClient = new QueryClient();
 
@@ -24,9 +24,9 @@ describe.runIf(process.env.TW_SECRET_KEY)("AccountBalance component", () => {
         <AccountProvider address={VITALIK_WALLET} client={TEST_CLIENT}>
           <AccountBalance
             chain={ethereum}
-            loadingComponent={<span />}
             fallbackComponent={<span />}
             formatFn={() => "nope"}
+            loadingComponent={<span />}
           />
         </AccountProvider>
       </QueryClientProvider>,
@@ -38,9 +38,9 @@ describe.runIf(process.env.TW_SECRET_KEY)("AccountBalance component", () => {
 
   it("`loadAccountBalance` should fetch the native balance properly", async () => {
     const result = await loadAccountBalance({
-      client: TEST_CLIENT,
-      chain: ethereum,
       address: VITALIK_WALLET,
+      chain: ethereum,
+      client: TEST_CLIENT,
     });
 
     expect(Number.isNaN(result.balance)).toBe(false);
@@ -49,9 +49,9 @@ describe.runIf(process.env.TW_SECRET_KEY)("AccountBalance component", () => {
 
   it("`loadAccountBalance` should fetch the token balance properly", async () => {
     const result = await loadAccountBalance({
-      client: TEST_CLIENT,
-      chain: ethereum,
       address: VITALIK_WALLET,
+      chain: ethereum,
+      client: TEST_CLIENT,
       // USDC
       tokenAddress: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
     });
@@ -62,9 +62,9 @@ describe.runIf(process.env.TW_SECRET_KEY)("AccountBalance component", () => {
 
   it("`loadAccountBalance` should fetch the fiat balance properly", async () => {
     const result = await loadAccountBalance({
-      client: TEST_CLIENT,
-      chain: ethereum,
       address: VITALIK_WALLET,
+      chain: ethereum,
+      client: TEST_CLIENT,
       showBalanceInFiat: "USD",
     });
 
@@ -72,19 +72,13 @@ describe.runIf(process.env.TW_SECRET_KEY)("AccountBalance component", () => {
     expect(result.symbol).toBe("$");
   });
 
-  it("`loadAccountBalance` should throw if `chain` is not passed", async () => {
-    await expect(() =>
-      loadAccountBalance({ client: TEST_CLIENT, address: VITALIK_WALLET }),
-    ).rejects.toThrowError("chain is required");
-  });
-
   it("`loadAccountBalance` should throw if `tokenAddress` is mistakenly passed as native token", async () => {
-    await expect(() =>
+    await expect(
       loadAccountBalance({
-        client: TEST_CLIENT,
         address: VITALIK_WALLET,
-        tokenAddress: NATIVE_TOKEN_ADDRESS,
         chain: ethereum,
+        client: TEST_CLIENT,
+        tokenAddress: NATIVE_TOKEN_ADDRESS,
       }),
     ).rejects.toThrowError(
       `Invalid tokenAddress - cannot be ${NATIVE_TOKEN_ADDRESS}`,
@@ -92,22 +86,24 @@ describe.runIf(process.env.TW_SECRET_KEY)("AccountBalance component", () => {
   });
 
   it("`loadAccountBalance` should throw if `address` is not a valid evm address", async () => {
-    await expect(() =>
+    await expect(
       loadAccountBalance({
-        client: TEST_CLIENT,
-        address: "haha",
+        // biome-ignore lint/suspicious/noExplicitAny: for the test
+        address: "haha" as any,
         chain: ethereum,
+        client: TEST_CLIENT,
       }),
     ).rejects.toThrowError("Invalid wallet address. Expected an EVM address");
   });
 
   it("`loadAccountBalance` should throw if `tokenAddress` is passed but is not a valid evm address", async () => {
-    await expect(() =>
+    await expect(
       loadAccountBalance({
-        client: TEST_CLIENT,
         address: VITALIK_WALLET,
-        tokenAddress: "haha",
         chain: ethereum,
+        client: TEST_CLIENT,
+        // biome-ignore lint/suspicious/noExplicitAny: for the test
+        tokenAddress: "haha" as any,
       }),
     ).rejects.toThrowError(
       "Invalid tokenAddress. Expected an EVM contract address",
@@ -118,24 +114,24 @@ describe.runIf(process.env.TW_SECRET_KEY)("AccountBalance component", () => {
     expect(
       formatAccountTokenBalance({
         balance: 1.1999,
-        symbol: "ETH",
         decimals: 1,
+        symbol: "ETH",
       }),
     ).toBe("1.2 ETH");
   });
 
   it("`formatAccountFiatBalance` should display fiat symbol followed by a rounded-up fiat value", () => {
     expect(
-      formatAccountFiatBalance({ balance: 55.001, symbol: "$", decimals: 0 }),
+      formatAccountFiatBalance({ balance: 55.001, decimals: 0, symbol: "$" }),
     ).toBe("$55");
   });
 
   it("`loadAccountBalance` should throw if failed to load tokenBalance (native token)", async () => {
-    await expect(() =>
+    await expect(
       loadAccountBalance({
-        client: TEST_CLIENT,
         address: VITALIK_WALLET,
         chain: defineChain(-1),
+        client: TEST_CLIENT,
       }),
     ).rejects.toThrowError(
       `Failed to retrieve native token balance for address: ${VITALIK_WALLET} on chainId:-1`,
@@ -143,11 +139,11 @@ describe.runIf(process.env.TW_SECRET_KEY)("AccountBalance component", () => {
   });
 
   it("`loadAccountBalance` should throw if failed to load tokenBalance (erc20 token)", async () => {
-    await expect(() =>
+    await expect(
       loadAccountBalance({
-        client: TEST_CLIENT,
         address: VITALIK_WALLET,
         chain: defineChain(-1),
+        client: TEST_CLIENT,
         tokenAddress: "0xFfEBd97b29AD3b2BecF8E554e4a638A56C6Bbd59",
       }),
     ).rejects.toThrowError(
@@ -156,11 +152,11 @@ describe.runIf(process.env.TW_SECRET_KEY)("AccountBalance component", () => {
   });
 
   it("if fetching fiat value then it should throw if failed to resolve (native token)", async () => {
-    await expect(() =>
+    await expect(
       loadAccountBalance({
-        client: TEST_CLIENT,
         address: VITALIK_WALLET,
         chain: sepolia,
+        client: TEST_CLIENT,
         showBalanceInFiat: "USD",
       }),
     ).rejects.toThrowError(
@@ -169,11 +165,11 @@ describe.runIf(process.env.TW_SECRET_KEY)("AccountBalance component", () => {
   });
 
   it("if fetching fiat value then it should throw if failed to resolve (erc20 token)", async () => {
-    await expect(() =>
+    await expect(
       loadAccountBalance({
-        client: TEST_CLIENT,
         address: VITALIK_WALLET,
         chain: sepolia,
+        client: TEST_CLIENT,
         showBalanceInFiat: "USD",
         // this is a random erc20 token on sepolia that vitalik's wallet owns
         tokenAddress: "0xFfEBd97b29AD3b2BecF8E554e4a638A56C6Bbd59",

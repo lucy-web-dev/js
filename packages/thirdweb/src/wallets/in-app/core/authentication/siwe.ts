@@ -1,6 +1,7 @@
 import { signLoginPayload } from "../../../../auth/core/sign-login-payload.js";
 import type { LoginPayload } from "../../../../auth/core/types.js";
 import type { Chain } from "../../../../chains/types.js";
+import { getCachedChain } from "../../../../chains/utils.js";
 import type { ThirdwebClient } from "../../../../client/client.js";
 import { getClientFetch } from "../../../../utils/fetch.js";
 import { stringify } from "../../../../utils/json.js";
@@ -9,20 +10,26 @@ import type { Ecosystem } from "../wallet/types.js";
 import { getLoginCallbackUrl, getLoginUrl } from "./getLoginPath.js";
 import type { AuthStoredTokenWithCookieReturnType } from "./types.js";
 
+// wallets that cannot sign with ethereum mainnet, require a specific chain always
+const NON_ETHEREUM_WALLETS = ["xyz.abs"];
+
 /**
  * @internal
  */
 export async function siweAuthenticate(args: {
   wallet: Wallet;
-  chain: Chain;
   client: ThirdwebClient;
+  chain?: Chain;
   ecosystem?: Ecosystem;
 }): Promise<AuthStoredTokenWithCookieReturnType> {
-  const { wallet, chain } = args;
-  // only connect if the wallet doesn't already have an account
+  const { wallet, client, ecosystem, chain } = args;
+  const siweChain = NON_ETHEREUM_WALLETS.includes(wallet.id)
+    ? chain || getCachedChain(1)
+    : getCachedChain(1); // fallback to mainnet for SIWE for wide wallet compatibility
+  // only connect if the wallet doesn't alnready have an account
   const account =
-    wallet.getAccount() || (await wallet.connect({ client: args.client }));
-  const clientFetch = getClientFetch(args.client, args.ecosystem);
+    wallet.getAccount() || (await wallet.connect({ chain: siweChain, client }));
+  const clientFetch = getClientFetch(client, ecosystem);
 
   const payload = await (async () => {
     const path = getLoginUrl({
@@ -31,14 +38,14 @@ export async function siweAuthenticate(args: {
       ecosystem: args.ecosystem,
     });
     const res = await clientFetch(
-      `${path}&address=${account.address}&chainId=${chain.id}`,
+      `${path}&address=${account.address}&chainId=${siweChain.id}`,
     );
 
     if (!res.ok) throw new Error("Failed to generate SIWE login payload");
 
     return (await res.json()) satisfies LoginPayload;
   })();
-  const { signature } = await signLoginPayload({ payload, account });
+  const { signature } = await signLoginPayload({ account, payload });
 
   const authResult = await (async () => {
     const path = getLoginCallbackUrl({
@@ -49,14 +56,14 @@ export async function siweAuthenticate(args: {
     const res = await clientFetch(
       `${path}&signature=${signature}&payload=${encodeURIComponent(payload)}`,
       {
-        method: "POST",
+        body: stringify({
+          payload,
+          signature,
+        }),
         headers: {
           "Content-Type": "application/json",
         },
-        body: stringify({
-          signature,
-          payload,
-        }),
+        method: "POST",
       },
     );
 

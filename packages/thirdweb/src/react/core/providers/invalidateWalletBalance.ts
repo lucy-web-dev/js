@@ -4,9 +4,18 @@ export function invalidateWalletBalance(
   queryClient: QueryClient,
   chainId?: number,
 ) {
-  return queryClient.invalidateQueries({
-    // invalidate any walletBalance queries for this chainId
-    // TODO: add wallet address in here if we can get it somehow
+  queryClient.invalidateQueries({
     queryKey: chainId ? ["walletBalance", chainId] : ["walletBalance"],
+  });
+  queryClient.invalidateQueries({
+    queryKey: chainId
+      ? ["internal_account_balance", chainId]
+      : ["internal_account_balance"],
+  });
+  queryClient.invalidateQueries({
+    queryKey: chainId ? ["nfts", chainId] : ["nfts"],
+  });
+  queryClient.invalidateQueries({
+    queryKey: chainId ? ["tokens", chainId] : ["tokens"],
   });
 }

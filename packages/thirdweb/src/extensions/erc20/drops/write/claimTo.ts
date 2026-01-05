@@ -1,5 +1,8 @@
 import type { Address } from "abitype";
-import type { BaseTransactionOptions } from "../../../../transaction/types.js";
+import type {
+  BaseTransactionOptions,
+  WithOverrides,
+} from "../../../../transaction/types.js";
 import { getClaimParams } from "../../../../utils/extensions/drops/get-claim-params.js";
 import { isGetContractMetadataSupported } from "../../../common/read/getContractMetadata.js";
 import * as GeneratedClaim from "../../__generated__/IDropERC20/write/claim.js";
@@ -18,6 +21,8 @@ export type ClaimToParams = {
 
 /**
  * Claim ERC20 NFTs to a specified address
+ * This method is only available on the `DropERC20` contract.
+ *
  * @param options - The options for the transaction
  * @extension ERC20
  * @example
@@ -49,9 +54,10 @@ export type ClaimToParams = {
  * @throws If no claim condition is set
  * @returns A promise that resolves with the submitted transaction hash.
  */
-export function claimTo(options: BaseTransactionOptions<ClaimToParams>) {
+export function claimTo(
+  options: BaseTransactionOptions<WithOverrides<ClaimToParams>>,
+) {
   return GeneratedClaim.claim({
-    contract: options.contract,
     asyncParams: async () => {
       const quantity = await (async () => {
         if ("quantityInWei" in options) {
@@ -66,15 +72,17 @@ export function claimTo(options: BaseTransactionOptions<ClaimToParams>) {
       })();
 
       return getClaimParams({
-        type: "erc20",
         contract: options.contract,
-        to: options.to,
-        quantity,
         from: options.from,
-        tokenDecimals: await decimals({ contract: options.contract }),
+        quantity,
         singlePhaseDrop: options.singlePhaseDrop,
+        to: options.to,
+        tokenDecimals: await decimals({ contract: options.contract }),
+        type: "erc20",
       });
     },
+    contract: options.contract,
+    overrides: options.overrides,
   });
 }
 

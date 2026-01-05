@@ -1,8 +1,10 @@
 "use client";
 import { CheckIcon, CopyIcon as CopyIconSVG } from "@radix-ui/react-icons";
+import { radius } from "../../../core/design-system/index.js";
 import { useClipboard } from "../hooks/useCopyClipboard.js";
-import { ToolTip } from "./Tooltip.js";
 import { Container } from "./basic.js";
+import { Button } from "./buttons.js";
+import { ToolTip } from "./Tooltip.js";
 
 /**
  * @internal
@@ -13,39 +15,46 @@ export const CopyIcon: React.FC<{
   side?: "top" | "bottom" | "left" | "right";
   align?: "start" | "center" | "end";
   hasCopied?: boolean;
+  iconSize?: number;
 }> = (props) => {
   const { hasCopied, onCopy } = useClipboard(props.text);
   const showCheckIcon = props.hasCopied || hasCopied;
 
   return (
-    <div
+    <Button
       onClick={onCopy}
+      variant="ghost-solid"
       style={{
-        display: "flex",
         alignItems: "center",
+        display: "flex",
+        padding: 2,
         justifyContent: "center",
-      }}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          onCopy();
-        }
+        borderRadius: radius.sm,
       }}
     >
-      <ToolTip tip={props.tip} side={props.side} align={props.align}>
+      <ToolTip align={props.align} side={props.side} tip={props.tip}>
         <div>
           <Container
-            color={showCheckIcon ? "success" : undefined}
-            flex="row"
             center="both"
+            color={showCheckIcon ? "success" : "secondaryText"}
+            flex="row"
           >
             {showCheckIcon ? (
-              <CheckIcon className="tw-check-icon" />
+              <CheckIcon
+                className="tw-check-icon"
+                width={props.iconSize || 16}
+                height={props.iconSize || 16}
+              />
             ) : (
-              <CopyIconSVG className="tw-copy-icon" />
+              <CopyIconSVG
+                className="tw-copy-icon"
+                width={props.iconSize || 16}
+                height={props.iconSize || 16}
+              />
             )}
           </Container>
         </div>
       </ToolTip>
-    </div>
+    </Button>
   );
 };

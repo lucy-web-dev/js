@@ -3,10 +3,11 @@ import { version } from "../version.js";
 import type { Ecosystem } from "../wallets/in-app/core/wallet/types.js";
 import { LruMap } from "./caching/lru.js";
 import {
-  type OperatingSystem,
   detectOS,
   detectPlatform,
+  type OperatingSystem,
 } from "./detect-platform.js";
+import { getServiceKey } from "./domains.js";
 import { isJWT } from "./jwt/is-jwt.js";
 import { IS_DEV } from "./process.js";
 
@@ -20,22 +21,33 @@ export function getClientFetch(client: ThirdwebClient, ecosystem?: Ecosystem) {
    * @internal
    */
   async function fetchWithHeaders(
-    url: string,
-    init?: Omit<RequestInit, "signal"> & { requestTimeoutMs?: number },
+    url: string | Request,
+    init?: Omit<RequestInit, "signal"> & {
+      requestTimeoutMs?: number;
+      useAuthToken?: boolean;
+    },
   ): Promise<Response> {
-    const { requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT, ...restInit } =
-      init || {};
+    const {
+      requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT,
+      useAuthToken,
+      ...restInit
+    } = init || {};
 
-    let headers = restInit.headers ? new Headers(restInit.headers) : undefined;
+    let headers = restInit.headers
+      ? new Headers(restInit.headers)
+      : typeof url === "object"
+        ? url.headers
+        : undefined;
+    const urlString = typeof url === "string" ? url : url.url;
 
     // check if we are making a request to a thirdweb service (we don't want to send any headers to non-thirdweb services)
-    if (isThirdwebUrl(url)) {
+    if (isThirdwebUrl(urlString)) {
       if (!headers) {
         headers = new Headers();
       }
       // auth token if secret key === jwt
       const authToken =
-        client.secretKey && isJWT(client.secretKey)
+        useAuthToken && client.secretKey && isJWT(client.secretKey)
           ? client.secretKey
           : undefined;
       // secret key if secret key !== jwt
@@ -45,19 +57,37 @@ export function getClientFetch(client: ThirdwebClient, ecosystem?: Ecosystem) {
           : undefined;
       const clientId = client.clientId;
 
+      if (authToken && isBundlerUrl(urlString)) {
+        headers.set("authorization", `Bearer ${authToken}`);
+        if (client.teamId) {
+          headers.set("x-team-id", client.teamId);
+        }
+
+        if (clientId) {
+          headers.set("x-client-id", clientId);
+        }
+      }
       // if we have an auth token set, use that (thirdweb dashboard sets this for the user)
       // pay urls should never send the auth token, because we always want the "developer" to be the one making the request, not the "end user"
-      if (
+      else if (
         authToken &&
-        !isPayUrl(url) &&
-        !isInAppWalletUrl(url) &&
-        !isBundlerUrl(url)
+        !isPayUrl(urlString) &&
+        !isInAppWalletUrl(urlString)
       ) {
         headers.set("authorization", `Bearer ${authToken}`);
-      } else if (secretKey) {
-        headers.set("x-secret-key", secretKey);
-      } else if (clientId) {
-        headers.set("x-client-id", clientId);
+        // if we have a specific teamId set, add it to the request headers
+        if (client.teamId) {
+          headers.set("x-team-id", client.teamId);
+        }
+      } else {
+        // only set secret key or client id if we are NOT using the auth token!
+        if (secretKey) {
+          headers.set("x-secret-key", secretKey);
+        }
+
+        if (clientId) {
+          headers.set("x-client-id", clientId);
+        }
       }
 
       if (ecosystem) {
@@ -69,6 +99,11 @@ export function getClientFetch(client: ThirdwebClient, ecosystem?: Ecosystem) {
       // this already internally caches
       for (const [key, value] of getPlatformHeaders()) {
         (headers as Headers).set(key, value);
+      }
+
+      const serviceKey = getServiceKey();
+      if (serviceKey) {
+        headers.set("x-service-api-key", serviceKey);
       }
     }
 
@@ -101,6 +136,7 @@ const THIRDWEB_DOMAINS = [
   // dev domains
   ".thirdweb.dev",
   ".thirdweb-dev.com",
+  ".thirdwebstorage-dev.com",
 ] as const;
 
 export const IS_THIRDWEB_URL_CACHE = new LruMap<boolean>(4096);
@@ -186,7 +222,7 @@ export function getPlatformHeaders() {
     os = detectOS(navigator.userAgent);
   }
 
-  let bundleId: string | undefined = undefined;
+  let bundleId: string | undefined;
   if (typeof globalThis !== "undefined" && "Application" in globalThis) {
     // shims use wallet connect RN module which injects Application info in globalThis
     // biome-ignore lint/suspicious/noExplicitAny: get around globalThis typing
@@ -194,10 +230,10 @@ export function getPlatformHeaders() {
   }
 
   previousPlatform = Object.entries({
+    "x-sdk-name": SDK_NAME,
+    "x-sdk-os": os ? parseOs(os) : "unknown",
     "x-sdk-platform": detectPlatform(),
     "x-sdk-version": version,
-    "x-sdk-os": os ? parseOs(os) : "unknown",
-    "x-sdk-name": SDK_NAME,
     ...(bundleId ? { "x-bundle-id": bundleId } : {}),
   });
 

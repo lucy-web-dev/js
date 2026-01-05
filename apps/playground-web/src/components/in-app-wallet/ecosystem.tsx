@@ -3,15 +3,17 @@ import type { ConnectButtonProps } from "thirdweb/react";
 import { ecosystemWallet } from "thirdweb/wallets";
 import { StyledConnectEmbed } from "../styled-connect-embed";
 
-const getEcosystem = () => {
+const getEcosystemWallet = () => {
   if (
     process.env.NEXT_PUBLIC_IN_APP_WALLET_URL?.endsWith(".thirdweb-dev.com")
   ) {
     // dev ecosystem
-    return "ecosystem.catlovers";
+    return ecosystemWallet("ecosystem.catfans");
   }
   // prod ecosystem
-  return "ecosystem.new-age";
+  return ecosystemWallet("ecosystem.thirdweb-engs", {
+    partnerId: "50fd8850-3c6c-48dd-969c-622f88b52d95",
+  });
 };
 
 export function EcosystemConnectEmbed(
@@ -20,7 +22,14 @@ export function EcosystemConnectEmbed(
   return (
     <StyledConnectEmbed
       {...props}
-      wallets={[ecosystemWallet(getEcosystem())]}
+      wallets={[getEcosystemWallet()]}
+      onConnect={(activeWallet, allConnectedWallets) => {
+        console.log("active wallet", activeWallet.id);
+        console.log(
+          "all connected wallets",
+          allConnectedWallets.map((wallet) => wallet.id),
+        );
+      }}
     />
   );
 }

@@ -22,11 +22,11 @@ export const wallet = {
   },
   rdns: null,
   mobile: {
-    native: " payperless.com://",
+    native: " payperless://",
     universal: null,
   },
   desktop: {
     native: null,
-    universal: null,
+    universal: "https://payperless.com",
   },
 } as const;

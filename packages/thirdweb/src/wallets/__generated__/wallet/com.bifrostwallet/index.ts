@@ -5,7 +5,7 @@ export const wallet = {
   id: "com.bifrostwallet",
   name: "Bifrost Wallet",
   homepage: "https://bifrostwallet.com",
-  image_id: "86be07e2-6652-4fd1-5f33-651682c95400",
+  image_id: "c1ab3987-7e3c-43fa-0b27-c746f6135a00",
   app: {
     browser: null,
     ios: "https://apps.apple.com/us/app/bifrost-wallet/id1577198351",
@@ -23,7 +23,7 @@ export const wallet = {
   rdns: "com.bifrostwallet",
   mobile: {
     native: "bifrostwallet://",
-    universal: "https://app.bifrostwallet.com",
+    universal: "https://app.bifrostwallet.com/",
   },
   desktop: {
     native: null,

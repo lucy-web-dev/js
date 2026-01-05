@@ -1,16 +1,16 @@
 import type { ThirdwebClient } from "../../client/client.js";
-import { isCoinbaseSDKWallet } from "../coinbase/coinbase-web.js";
-import { isInAppWallet } from "../in-app/core/wallet/index.js";
-import { getInjectedProvider } from "../injected/index.js";
+import { hexToBigInt, hexToNumber } from "../../utils/encoding/hex.js";
 import type { Wallet } from "../interfaces/wallet.js";
-import { isSmartWallet } from "../smart/index.js";
-import { isWalletConnect } from "../wallet-connect/controller.js";
-import type { GetCallsStatusResponse, WalletSendCallsId } from "./types.js";
+import type {
+  GetCallsStatusRawResponse,
+  GetCallsStatusResponse,
+  WalletSendCallsId,
+} from "./types.js";
 
 export type GetCallsStatusOptions = {
   wallet: Wallet;
   client: ThirdwebClient;
-  bundleId: WalletSendCallsId;
+  id: WalletSendCallsId;
 };
 
 /**
@@ -32,20 +32,19 @@ export type GetCallsStatusOptions = {
  *
  *  const client = createThirdwebClient({ clientId: ... });
  *
- *  const bundleId = await sendCalls({ wallet, client, calls });
+ *  const result = await sendCalls({ wallet, client, calls });
  *
  *  let result;
- *  while (result.status !== "CONFIRMED") {
- *    result = await getCallsStatus({ wallet, client, bundleId });
+ *  while (result.status !== "success") {
+ *    result = await getCallsStatus(result);
  *  }
  * ```
- * @extension EIP5792
  * @extension EIP5792
  */
 export async function getCallsStatus({
   wallet,
   client,
-  bundleId,
+  id,
 }: GetCallsStatusOptions): Promise<GetCallsStatusResponse> {
   const account = wallet.getAccount();
   if (!account) {
@@ -54,38 +53,58 @@ export async function getCallsStatus({
     );
   }
 
-  // These conveniently operate the same
-  if (isSmartWallet(wallet) || isInAppWallet(wallet)) {
-    const { inAppWalletGetCallsStatus } = await import(
-      "../in-app/core/eip5972/in-app-wallet-calls.js"
+  const chain = wallet.getChain();
+  if (!chain) {
+    throw new Error(
+      `Failed to get call status, no chain found for wallet ${wallet.id}`,
     );
-    return inAppWalletGetCallsStatus({ wallet, client, bundleId });
   }
 
-  if (isCoinbaseSDKWallet(wallet)) {
-    const { coinbaseSDKWalletGetCallsStatus } = await import(
-      "../coinbase/coinbase-web.js"
-    );
-    return coinbaseSDKWalletGetCallsStatus({ wallet, bundleId });
+  if (account.getCallsStatus) {
+    return account.getCallsStatus({ id, chain, client });
   }
 
-  if (isWalletConnect(wallet)) {
-    throw new Error("getCallsStatus is not yet supported for Wallet Connect");
-  }
+  throw new Error(
+    `Failed to get call status, wallet ${wallet.id} does not support EIP-5792`,
+  );
+}
 
-  // Default to injected wallet
-  const provider = getInjectedProvider(wallet.id);
-  try {
-    return await provider.request({
-      method: "wallet_getCallsStatus",
-      params: [bundleId],
-    });
-  } catch (error) {
-    if (/unsupport|not support/i.test((error as Error).message)) {
-      throw new Error(
-        `${wallet.id} does not support wallet_getCallsStatus, reach out to them directly to request EIP-5792 support.`,
-      );
-    }
-    throw error;
-  }
+const receiptStatuses = {
+  "0x0": "reverted",
+  "0x1": "success",
+} as const;
+
+export function toGetCallsStatusResponse(
+  response: GetCallsStatusRawResponse,
+): GetCallsStatusResponse {
+  const [status, statusCode] = (() => {
+    const statusCode = response.status;
+    if (statusCode >= 100 && statusCode < 200)
+      return ["pending", statusCode] as const;
+    if (statusCode >= 200 && statusCode < 300)
+      return ["success", statusCode] as const;
+    if (statusCode >= 300 && statusCode < 700)
+      return ["failure", statusCode] as const;
+    // @ts-expect-error: for backwards compatibility
+    if (statusCode === "CONFIRMED") return ["success", 200] as const;
+    // @ts-expect-error: for backwards compatibility
+    if (statusCode === "PENDING") return ["pending", 100] as const;
+    return [undefined, statusCode];
+  })();
+  return {
+    ...response,
+    atomic: response.atomic,
+    // @ts-expect-error: for backwards compatibility
+    chainId: response.chainId ? hexToNumber(response.chainId) : undefined,
+    receipts:
+      response.receipts?.map((receipt) => ({
+        ...receipt,
+        blockNumber: hexToBigInt(receipt.blockNumber),
+        gasUsed: hexToBigInt(receipt.gasUsed),
+        status: receiptStatuses[receipt.status as "0x0" | "0x1"],
+      })) ?? [],
+    status,
+    statusCode,
+    version: response.version,
+  };
 }

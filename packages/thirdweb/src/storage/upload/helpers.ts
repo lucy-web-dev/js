@@ -125,7 +125,7 @@ export function buildFormData(
         // but then we skip because we don't need to upload it multiple times
         continue;
       }
-      // otherwise if file names are the same but they are not the same file then we should throw an error (trying to upload to differnt files but with the same names)
+      // otherwise if file names are the same but they are not the same file then we should throw an error (trying to upload to different files but with the same names)
       throw new Error(
         `[DUPLICATE_FILE_NAME_ERROR] File name ${fileName} was passed for more than one different file.`,
       );
@@ -139,8 +139,8 @@ export function buildFormData(
   }
 
   const metadata = {
-    name: "Storage SDK",
     keyvalues: { ...options?.metadata },
+    name: "Storage SDK",
   };
   form.append("pinataMetadata", JSON.stringify(metadata));
 
@@ -154,9 +154,9 @@ export function buildFormData(
   }
 
   return {
-    form,
     // encode the file names on the way out (which is what the upload backend expects)
     fileNames: fileNames.map((fName) => encodeURIComponent(fName)),
+    form,
   };
 }
 

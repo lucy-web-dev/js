@@ -1,11 +1,11 @@
 export const reservedScreens = {
-  main: "main",
   getStarted: "getStarted",
-  signIn: "signIn",
+  main: "main",
   showAll: "showAll",
+  signIn: "signIn",
 };
 
-export const modalMaxWidthCompact = "360px";
+export const modalMaxWidthCompact = "400px";
 
 const wideModalWidth = 730;
 export const modalMaxWidthWide = `${wideModalWidth}px`;
@@ -20,5 +20,5 @@ export const modalCloseFadeOutDuration = 250;
  * @internal
  */
 export function onModalUnmount(cb: () => void) {
-  setTimeout(cb, modalCloseFadeOutDuration + 100);
+  setTimeout(cb, modalCloseFadeOutDuration + 200);
 }

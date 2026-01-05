@@ -1,4 +1,7 @@
-import type { BaseTransactionOptions } from "../../../../transaction/types.js";
+import type {
+  BaseTransactionOptions,
+  WithOverrides,
+} from "../../../../transaction/types.js";
 import { getMulticallSetClaimConditionTransactions } from "../../../../utils/extensions/drops/get-multicall-set-claim-claim-conditon-transactions.js";
 import type { ClaimConditionsInput } from "../../../../utils/extensions/drops/types.js";
 import { isSetContractURISupported } from "../../../common/__generated__/IContractMetadata/write/setContractURI.js";
@@ -21,6 +24,7 @@ export type SetClaimConditionsParams = {
 
 /**
  * Set the claim conditions for a ERC20 drop
+ * This method is only available on the `DropERC20` contract.
  * @param options
  * @returns the prepared transaction
  * @extension ERC20
@@ -46,21 +50,22 @@ export type SetClaimConditionsParams = {
  * ```
  */
 export function setClaimConditions(
-  options: BaseTransactionOptions<SetClaimConditionsParams>,
+  options: BaseTransactionOptions<WithOverrides<SetClaimConditionsParams>>,
 ) {
   return multicall({
-    contract: options.contract,
     asyncParams: async () => {
       return {
         data: await getMulticallSetClaimConditionTransactions({
           contract: options.contract,
           phases: options.phases,
           resetClaimEligibility: options.resetClaimEligibility,
-          tokenDecimals: await decimals({ contract: options.contract }),
           singlePhase: options.singlePhaseDrop,
+          tokenDecimals: await decimals({ contract: options.contract }),
         }),
       };
     },
+    contract: options.contract,
+    overrides: options.overrides,
   });
 }
 

@@ -26,9 +26,6 @@ const filesToIgnore = new Set([
   // macOS stuff
   "public/assets/product-pages/.DS_Store",
   "public/assets/.DS_Store",
-  // pdfs
-  "public/Thirdweb_Terms_of_Service.pdf",
-  "public/thirdweb_Privacy_Policy_May_2022.pdf",
 ]);
 
 function getAllFilesInFolder(folderPath: string) {
@@ -91,7 +88,7 @@ function main(params: { assetsFolder: string; srcFolder: string }) {
   // remove the files for which its name can be found in the content of the file
   folderVisitor(params.srcFolder, (content) => {
     for (const assetFileName of assetFileNames) {
-      if (content.includes(assetFileName.name)) {
+      if (content.includes(`/${assetFileName.name}`)) {
         unusedFileNames.delete(assetFileName);
       }
     }

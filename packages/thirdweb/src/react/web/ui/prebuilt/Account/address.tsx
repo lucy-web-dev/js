@@ -1,6 +1,6 @@
 "use client";
 
-import { useAccountContext } from "./provider.js";
+import { useAccountContext } from "../../../../core/account/provider.js";
 
 /**
  * @component

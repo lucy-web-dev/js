@@ -5,12 +5,12 @@ export function Author(props: { name: string; profileImage?: string | null }) {
     <div className="flex items-center gap-1.5">
       {props.profileImage && (
         <img
-          src={props.profileImage}
-          className="size-8 rounded-[50%] border"
           alt=""
+          className="size-6 rounded-[50%] border"
+          src={props.profileImage}
         />
       )}
-      <span className="font-medium text-f-200 text-sm">{props.name}</span>
+      <span className="text-muted-foreground text-sm">{props.name}</span>
     </div>
   );
 }

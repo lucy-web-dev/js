@@ -1,11 +1,13 @@
 import type { Account } from "viem/accounts";
 
 import type { Chain } from "../../chains/types.js";
+import { getCachedChain } from "../../chains/utils.js";
 import type { ThirdwebClient } from "../../client/client.js";
 import { getRpcClient } from "../../rpc/rpc.js";
 import { estimateGas } from "../../transaction/actions/estimate-gas.js";
 import { sendTransaction } from "../../transaction/actions/send-transaction.js";
 import { prepareTransaction } from "../../transaction/prepare-transaction.js";
+import { hexToNumber, isHex } from "../../utils/encoding/hex.js";
 import type { Wallet } from "../../wallets/interfaces/wallet.js";
 import type { EIP1193Provider } from "./types.js";
 
@@ -55,80 +57,155 @@ export type ToEip1193ProviderOptions = {
  */
 export function toProvider(options: ToEip1193ProviderOptions): EIP1193Provider {
   const { chain, client, wallet, connectOverride } = options;
-  const rpcClient = getRpcClient({ client, chain });
+  const rpcClient = getRpcClient({ chain, client });
   return {
     on: wallet.subscribe,
     removeListener: () => {
       // should invoke the return fn from subscribe instead
     },
     request: async (request) => {
-      if (request.method === "eth_sendTransaction") {
-        const account = wallet.getAccount();
-        if (!account) {
-          throw new Error("Account not connected");
-        }
-        const result = await sendTransaction({
-          transaction: prepareTransaction({
-            ...request.params[0],
-            chain,
-            client,
-          }),
-          account: account,
-        });
-        return result.transactionHash;
-      }
-      if (request.method === "eth_estimateGas") {
-        const account = wallet.getAccount();
-        if (!account) {
-          throw new Error("Account not connected");
-        }
-        return estimateGas({
-          transaction: prepareTransaction({
-            ...request.params[0],
-            chain,
-            client,
-          }),
-          account,
-        });
-      }
-      if (request.method === "personal_sign") {
-        const account = wallet.getAccount();
-        if (!account) {
-          throw new Error("Account not connected");
-        }
-        return account.signMessage({
-          message: {
-            raw: request.params[0],
-          },
-        });
-      }
-      if (request.method === "eth_signTypedData_v4") {
-        const account = wallet.getAccount();
-        if (!account) {
-          throw new Error("Account not connected");
-        }
-        const data = JSON.parse(request.params[1]);
-        return account.signTypedData(data);
-      }
-      if (request.method === "eth_accounts") {
-        const account = wallet.getAccount();
-        if (!account) {
-          throw new Error("Account not connected");
-        }
-        return [account.address];
-      }
-      if (request.method === "eth_requestAccounts") {
-        const account = connectOverride
-          ? await connectOverride(wallet)
-          : await wallet.connect({
+      switch (request.method) {
+        case "eth_sendTransaction": {
+          const account = wallet.getAccount();
+          if (!account) {
+            throw new Error("Account not connected");
+          }
+          const result = await sendTransaction({
+            account: account,
+            transaction: prepareTransaction({
+              ...request.params[0],
+              chain,
               client,
-            });
-        if (!account) {
-          throw new Error("Unable to connect wallet");
+            }),
+          });
+          return result.transactionHash;
         }
-        return [account.address];
+        case "eth_estimateGas": {
+          const account = wallet.getAccount();
+          if (!account) {
+            throw new Error("Account not connected");
+          }
+          return estimateGas({
+            account,
+            transaction: prepareTransaction({
+              ...request.params[0],
+              chain,
+              client,
+            }),
+          });
+        }
+        case "personal_sign": {
+          const account = wallet.getAccount();
+          if (!account) {
+            throw new Error("Account not connected");
+          }
+          return account.signMessage({
+            message: {
+              raw: request.params[0],
+            },
+          });
+        }
+        case "eth_signTypedData_v4": {
+          const account = wallet.getAccount();
+          if (!account) {
+            throw new Error("Account not connected");
+          }
+          const data = JSON.parse(request.params[1]);
+          return account.signTypedData(data);
+        }
+        case "eth_accounts": {
+          const account = wallet.getAccount();
+          if (!account) {
+            return [];
+          }
+          return [account.address];
+        }
+        case "eth_requestAccounts": {
+          const connectedAccount = wallet.getAccount();
+          if (connectedAccount) {
+            return [connectedAccount.address];
+          }
+          const account = connectOverride
+            ? await connectOverride(wallet)
+            : await wallet
+                .connect({
+                  client,
+                })
+                .catch((e) => {
+                  console.error("Error connecting wallet", e);
+                  return null;
+                });
+          if (!account) {
+            throw new Error(
+              "Unable to connect wallet - try passing a connectOverride function",
+            );
+          }
+          return [account.address];
+        }
+        case "wallet_switchEthereumChain":
+        case "wallet_addEthereumChain": {
+          const data = request.params[0];
+          const chainIdHex = data.chainId;
+          if (!chainIdHex) {
+            throw new Error("Chain ID is required");
+          }
+          // chainId is hex most likely, convert to number
+          const chainId = isHex(chainIdHex)
+            ? hexToNumber(chainIdHex)
+            : chainIdHex;
+          const chain = getCachedChain(chainId);
+          return wallet.switchChain(chain);
+        }
+        case "wallet_getCapabilities": {
+          const account = wallet.getAccount();
+          if (!account) {
+            throw new Error("Account not connected");
+          }
+          if (!account.getCapabilities) {
+            throw new Error("Wallet does not support EIP-5792");
+          }
+          const chains = request.params[1];
+          if (chains && Array.isArray(chains)) {
+            const firstChainStr = chains[0];
+            const firstChainId = isHex(firstChainStr)
+              ? hexToNumber(firstChainStr)
+              : Number(firstChainStr);
+            return account.getCapabilities(
+              firstChainId ? { chainId: firstChainId } : {},
+            );
+          }
+          return account.getCapabilities({});
+        }
+        case "wallet_sendCalls": {
+          const account = wallet.getAccount();
+          if (!account) {
+            throw new Error("Account not connected");
+          }
+          if (!account.sendCalls) {
+            throw new Error("Wallet does not support EIP-5792");
+          }
+          return account.sendCalls({
+            ...request.params[0],
+            chain: chain,
+          });
+        }
+        case "wallet_getCallsStatus": {
+          const account = wallet.getAccount();
+          if (!account) {
+            throw new Error("Account not connected");
+          }
+          if (!account.getCallsStatus) {
+            throw new Error("Wallet does not support EIP-5792");
+          }
+          return account.getCallsStatus({
+            id: request.params[0],
+            chain: chain,
+            client: client,
+          });
+        }
+        default:
+          return rpcClient(request);
       }
-      return rpcClient(request);
     },
   };
 }

@@ -1,5 +1,4 @@
 "use client";
-
 import { useState } from "react";
 import { getContract } from "thirdweb";
 import { zkSyncSepolia } from "thirdweb/chains";
@@ -15,11 +14,17 @@ import { shortenHex } from "thirdweb/utils";
 import { THIRDWEB_CLIENT } from "../../lib/client";
 import { WALLETS } from "../../lib/constants";
 
+// const chain = abstractTestnet;
+// const editionDropContract = getContract({
+//   client: THIRDWEB_CLIENT,
+//   address: "0x8A24a7Df38fA5fCCcFD1259e90Fb6996fDdfcADa",
+//   chain,
+// });
 const chain = zkSyncSepolia;
 const editionDropContract = getContract({
-  client: THIRDWEB_CLIENT,
   address: "0xd563ACBeD80e63B257B2524562BdD7Ec666eEE77",
   chain,
+  client: THIRDWEB_CLIENT,
 });
 const editionDropTokenId = 0n;
 
@@ -31,9 +36,9 @@ export function SponsoredTxZksyncPreview() {
     tokenId: editionDropTokenId,
   });
   const { data: ownedNfts } = useReadContract(getOwnedNFTs, {
-    contract: editionDropContract,
     // biome-ignore lint/style/noNonNullAssertion: handled by queryOptions
     address: smartAccount?.address!,
+    contract: editionDropContract,
     queryOptions: { enabled: !!smartAccount },
   });
 
@@ -45,23 +50,23 @@ export function SponsoredTxZksyncPreview() {
         <>
           <div className="flex flex-col justify-center gap-2 p-2">
             <ConnectButton
-              client={THIRDWEB_CLIENT}
-              chain={chain}
-              wallets={WALLETS}
               accountAbstraction={{
                 chain,
                 sponsorGas: true,
               }}
+              chain={chain}
+              client={THIRDWEB_CLIENT}
               connectButton={{
                 label: "Login to mint this Kitten!",
               }}
+              wallets={WALLETS}
             />
           </div>
           {nft ? (
             <MediaRenderer
               client={THIRDWEB_CLIENT}
               src={nft.metadata.image}
-              style={{ width: "400px", marginTop: "10px" }}
+              style={{ marginTop: "10px", width: "400px" }}
             />
           ) : null}
           {smartAccount ? (
@@ -71,26 +76,27 @@ export function SponsoredTxZksyncPreview() {
                 Kittens
               </p>
               <TransactionButton
-                transaction={() =>
-                  claimTo({
-                    contract: editionDropContract,
-                    tokenId: editionDropTokenId,
-                    to: smartAccount.address,
-                    quantity: 1n,
-                  })
-                }
-                payModal={{
-                  metadata: nft?.metadata,
-                }}
-                onError={(error) => {
-                  alert(`Error: ${error.message}`);
-                }}
                 onClick={() => {
                   setTxHash(null);
+                }}
+                onError={(error) => {
+                  console.error("error", error);
+                  alert(`Error: ${error.message}`);
                 }}
                 onTransactionConfirmed={async (receipt) => {
                   setTxHash(receipt.transactionHash);
                 }}
+                payModal={{
+                  metadata: nft?.metadata,
+                }}
+                transaction={() =>
+                  claimTo({
+                    contract: editionDropContract,
+                    quantity: 1n,
+                    to: smartAccount.address,
+                    tokenId: editionDropTokenId,
+                  })
+                }
               >
                 Mint
               </TransactionButton>
@@ -101,10 +107,10 @@ export function SponsoredTxZksyncPreview() {
               <p className="mb-2 text-center text-green-500">
                 Minted! Tx Hash:{" "}
                 <a
-                  href={`${chain.blockExplorers?.[0]?.url}/tx/${txHash}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
                   className="underline"
+                  href={`${chain.blockExplorers?.[0]?.url}/tx/${txHash}`}
+                  rel="noopener noreferrer"
+                  target="_blank"
                 >
                   {shortenHex(txHash)}
                 </a>

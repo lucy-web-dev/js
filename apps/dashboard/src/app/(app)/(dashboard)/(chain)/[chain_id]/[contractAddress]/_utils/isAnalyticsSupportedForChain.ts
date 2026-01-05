@@ -1,0 +1,39 @@
+import { INSIGHT_SERVICE_API_KEY } from "@/constants/server-envs";
+import { getVercelEnv } from "@/utils/vercel";
+
+const thirdwebDomain =
+  getVercelEnv() !== "production" ? "thirdweb-dev" : "thirdweb";
+
+export async function isInsightSupportedForChain(
+  chainId: number,
+): Promise<boolean> {
+  try {
+    const res = await fetch(
+      `https://insight.${thirdwebDomain}.com/service/chains/${chainId}`,
+      {
+        headers: {
+          // service api key required - because this is endpoint is internal
+          "x-service-api-key": INSIGHT_SERVICE_API_KEY,
+        },
+      },
+    );
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error(
+        "failed to fetch chain services for chain",
+        chainId,
+        errorText,
+      );
+      return false;
+    }
+
+    const json = (await res.json()) as { data: boolean };
+
+    return json.data;
+  } catch (e) {
+    console.error(`Error checking analytics support for chain ${chainId}`);
+    console.error(e);
+  }
+  return false;
+}

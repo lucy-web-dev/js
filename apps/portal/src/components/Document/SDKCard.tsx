@@ -1,17 +1,25 @@
 import Link from "next/link";
+import { cn } from "../../lib/utils";
 
 export function SDKCard(props: {
   title: string;
   href: string;
+  isExternal?: boolean;
   icon?: React.FC<{ className?: string }>;
+  iconClassName?: string;
 }) {
   return (
     <Link
+      className="flex items-center gap-3 rounded-xl border bg-card px-4 py-3.5 transition-colors hover:border-active-border text-foreground/80 hover:text-foreground shadow-sm"
       href={props.href}
-      className="flex items-center gap-4 rounded-lg border bg-b-800 p-4 transition-colors hover:border-accent-500 hover:bg-accent-900"
+      target={props.isExternal ? "_blank" : undefined}
     >
-      {props.icon && <props.icon className="size-8 shrink-0" />}
-      <h3 className="font-semibold text-f-100 text-lg">{props.title}</h3>
+      {props.icon && (
+        <div className="rounded-full p-1.5 bg-background shrink-0 border">
+          <props.icon className={cn("size-4", props.iconClassName)} />
+        </div>
+      )}
+      <h3 className="text-foreground text-sm font-medium">{props.title}</h3>
     </Link>
   );
 }

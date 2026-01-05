@@ -1,26 +1,29 @@
 "use client";
 import { baseSepolia } from "thirdweb/chains";
 import { useActiveAccount, useLinkProfile, useProfiles } from "thirdweb/react";
-import { type WalletId, createWallet } from "thirdweb/wallets";
+import { createWallet, type WalletId } from "thirdweb/wallets";
 import { THIRDWEB_CLIENT } from "../../lib/client";
-import CodeClient, { CodeLoading } from "../code/code.client";
+import { CodeClient } from "../code/code.client";
+import { StyledConnectButton } from "../styled-connect-button";
 import { Button } from "../ui/button";
 
 export function LinkedAccounts() {
+  const account = useActiveAccount();
   const { data: profiles } = useProfiles({
     client: THIRDWEB_CLIENT,
   });
 
   return (
     <div className="flex flex-col gap-4 p-6">
-      {profiles ? (
-        <CodeClient
-          code={JSON.stringify(profiles, null, 2)}
-          lang={"json"}
-          loader={<CodeLoading />}
-        />
+      {account ? (
+        <div>
+          <CodeClient
+            code={JSON.stringify(profiles || [], null, 2)}
+            lang={"json"}
+          />
+        </div>
       ) : (
-        <p>Login to see linked profiles</p>
+        <StyledConnectButton />
       )}
     </div>
   );
@@ -31,10 +34,10 @@ export function LinkAccount() {
   const account = useActiveAccount();
   const linkWallet = async (walletId: WalletId) => {
     linkProfile({
+      chain: baseSepolia,
       client: THIRDWEB_CLIENT,
       strategy: "wallet",
       wallet: createWallet(walletId),
-      chain: baseSepolia,
     });
   };
 
@@ -54,7 +57,7 @@ export function LinkAccount() {
             <p>Linking...</p>
           ) : (
             <>
-              {/* 
+              {/*
               TODO make cb smart wallet linking work
               <Button
                 variant="default"
@@ -65,18 +68,18 @@ export function LinkAccount() {
                 Link Coinbase Wallet
               </Button> */}
               <Button
-                variant="default"
-                onClick={() => linkWallet("io.metamask")}
                 className="rounded-full p-6"
                 disabled={isPending}
+                onClick={() => linkWallet("io.metamask")}
+                variant="default"
               >
                 Link MetaMask
               </Button>
               <Button
-                variant="default"
-                onClick={linkPasskey}
                 className="rounded-full p-6"
                 disabled={isPending}
+                onClick={linkPasskey}
+                variant="default"
               >
                 Link Passkey
               </Button>
@@ -85,7 +88,7 @@ export function LinkAccount() {
           {error && <p className="text-red-500">Error: {error.message}</p>}
         </>
       ) : (
-        <p>Login to link another account.</p>
+        <StyledConnectButton />
       )}
     </div>
   );

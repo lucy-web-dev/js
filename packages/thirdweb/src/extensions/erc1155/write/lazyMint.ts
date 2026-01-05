@@ -1,5 +1,8 @@
 import type { FileOrBufferOrString } from "../../../storage/upload/types.js";
-import type { BaseTransactionOptions } from "../../../transaction/types.js";
+import type {
+  BaseTransactionOptions,
+  WithOverrides,
+} from "../../../transaction/types.js";
 import {
   getBaseUriFromBatch,
   uploadOrExtractURIs,
@@ -31,12 +34,13 @@ type NFTInput = Prettify<
 /**
  * @extension ERC1155
  */
-export type LazyMintParams = {
+export type LazyMintParams = WithOverrides<{
   nfts: (NFTInput | string)[];
-};
+}>;
 
 /**
  * Lazily mints ERC1155 tokens.
+ * This method is only available on the `DropERC1155` contract.
  * @param options - The options for the lazy minting process.
  * @returns A promise that resolves to the prepared contract call.
  * @extension ERC1155
@@ -61,7 +65,6 @@ export type LazyMintParams = {
  */
 export function lazyMint(options: BaseTransactionOptions<LazyMintParams>) {
   return LazyMint.lazyMint({
-    contract: options.contract,
     asyncParams: async () => {
       const startFileNumber = await nextTokenIdToMint({
         contract: options.contract,
@@ -82,6 +85,8 @@ export function lazyMint(options: BaseTransactionOptions<LazyMintParams>) {
         extraData: "0x",
       } as const;
     },
+    contract: options.contract,
+    overrides: options.overrides,
   });
 }
 

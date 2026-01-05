@@ -15,7 +15,9 @@ import type { EIP1193Provider } from "./types.js";
  * Options for creating an EIP-1193 provider adapter.
  */
 export type FromEip1193AdapterOptions = {
-  provider: EIP1193Provider | (() => Promise<EIP1193Provider>);
+  provider:
+    | EIP1193Provider
+    | ((params?: { chainId?: number }) => Promise<EIP1193Provider>);
   walletId?: WalletId;
 };
 
@@ -60,16 +62,14 @@ export type FromEip1193AdapterOptions = {
 export function fromProvider(options: FromEip1193AdapterOptions): Wallet {
   const id: WalletId = options.walletId ?? "adapter";
   const emitter = createWalletEmitter();
-  let account: Account | undefined = undefined;
-  let chain: Chain | undefined = undefined;
-  let provider: EIP1193Provider | undefined = undefined;
-  const getProvider = async () => {
-    if (!provider) {
-      provider =
-        typeof options.provider === "function"
-          ? await options.provider()
-          : options.provider;
-    }
+  let account: Account | undefined;
+  let chain: Chain | undefined;
+  let provider: EIP1193Provider | undefined;
+  const getProvider = async (params?: { chainId?: number }) => {
+    provider =
+      typeof options.provider === "function"
+        ? await options.provider(params)
+        : options.provider;
     return provider;
   };
 
@@ -102,26 +102,14 @@ export function fromProvider(options: FromEip1193AdapterOptions): Wallet {
   };
 
   return {
-    id,
-    subscribe: emitter.subscribe,
-    getConfig: () => undefined,
-    getChain() {
-      if (!chain) {
-        return undefined;
-      }
-
-      chain = getCachedChainIfExists(chain.id) || chain;
-      return chain;
-    },
-    getAccount: () => account,
-    connect: async (connectOptions) => {
+    autoConnect: async (connectOptions) => {
       const [connectedAccount, connectedChain, doDisconnect, doSwitchChain] =
-        await connectEip1193Wallet({
-          id,
-          provider: await getProvider(),
-          client: connectOptions.client,
+        await autoConnectEip1193Wallet({
           chain: connectOptions.chain,
+          client: connectOptions.client,
           emitter,
+          id,
+          provider: await getProvider({ chainId: connectOptions.chain?.id }),
         });
       // set the states
       account = connectedAccount;
@@ -131,20 +119,20 @@ export function fromProvider(options: FromEip1193AdapterOptions): Wallet {
       emitter.emit("onConnect", connectOptions);
       trackConnect({
         client: connectOptions.client,
-        walletType: id,
         walletAddress: account.address,
+        walletType: id,
       });
       // return account
       return account;
     },
-    autoConnect: async (connectOptions) => {
+    connect: async (connectOptions) => {
       const [connectedAccount, connectedChain, doDisconnect, doSwitchChain] =
-        await autoConnectEip1193Wallet({
-          id,
-          provider: await getProvider(),
-          emitter,
+        await connectEip1193Wallet({
           chain: connectOptions.chain,
           client: connectOptions.client,
+          emitter,
+          id,
+          provider: await getProvider({ chainId: connectOptions.chain?.id }),
         });
       // set the states
       account = connectedAccount;
@@ -154,8 +142,8 @@ export function fromProvider(options: FromEip1193AdapterOptions): Wallet {
       emitter.emit("onConnect", connectOptions);
       trackConnect({
         client: connectOptions.client,
-        walletType: id,
         walletAddress: account.address,
+        walletType: id,
       });
       // return account
       return account;
@@ -165,6 +153,18 @@ export function fromProvider(options: FromEip1193AdapterOptions): Wallet {
       await handleDisconnect();
       emitter.emit("disconnect", undefined);
     },
+    getAccount: () => account,
+    getChain() {
+      if (!chain) {
+        return undefined;
+      }
+
+      chain = getCachedChainIfExists(chain.id) || chain;
+      return chain;
+    },
+    getConfig: () => undefined,
+    id,
+    subscribe: emitter.subscribe,
     switchChain: async (c) => {
       await handleSwitchChain(c);
       emitter.emit("chainChanged", c);

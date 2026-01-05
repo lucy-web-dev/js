@@ -18,6 +18,7 @@ export function useTransactionCostAndData(args: {
   transaction: PreparedTransaction;
   account: Account | undefined;
   supportedDestinations: SupportedChainAndTokens;
+  refetchIntervalMs?: number;
 }) {
   const { transaction, account, supportedDestinations } = args;
   // Compute query key of the transaction first
@@ -39,22 +40,17 @@ export function useTransactionCostAndData(args: {
       encode(transaction),
     ]).then(([value, erc20Value, to, data]) => {
       setTxQueryKey({
-        value: value?.toString(),
-        erc20Value: erc20Value?.amountWei?.toString(),
-        erc20Currency: erc20Value?.tokenAddress,
-        to,
         data,
+        erc20Currency: erc20Value?.tokenAddress,
+        erc20Value: erc20Value?.amountWei?.toString(),
+        to,
+        value: value?.toString(),
       });
     });
   }, [transaction]);
 
   return useQuery({
-    queryKey: [
-      "transaction-cost",
-      transaction.chain.id,
-      account?.address,
-      txQueryKey,
-    ],
+    enabled: !!transaction && !!txQueryKey,
     queryFn: async () => {
       if (!account) {
         throw new Error("No payer account found");
@@ -62,28 +58,28 @@ export function useTransactionCostAndData(args: {
 
       const erc20Value = await resolvePromisedValue(transaction.erc20Value);
       if (erc20Value) {
-        const [tokenBalance, tokenMeta, gasCostWei] = await Promise.all([
-          getWalletBalance({
-            address: account.address,
-            chain: transaction.chain,
-            client: transaction.client,
-            tokenAddress: erc20Value.tokenAddress,
-          }),
-          getCurrencyMetadata({
-            contract: getContract({
-              address: erc20Value.tokenAddress,
+        const [tokenBalance, tokenMeta, gasCostWei, chainMetadata] =
+          await Promise.all([
+            getWalletBalance({
+              address: account.address,
               chain: transaction.chain,
               client: transaction.client,
+              tokenAddress: erc20Value.tokenAddress,
             }),
-          }),
-          getTransactionGasCost(transaction, account?.address),
-        ]);
+            getCurrencyMetadata({
+              contract: getContract({
+                address: erc20Value.tokenAddress,
+                chain: transaction.chain,
+                client: transaction.client,
+              }),
+            }),
+            getTransactionGasCost(transaction, account?.address),
+            getChainMetadata(transaction.chain),
+          ]);
         const transactionValueWei = erc20Value.amountWei;
         const walletBalance = tokenBalance;
         const currency = {
           address: erc20Value.tokenAddress,
-          name: tokenMeta.name,
-          symbol: tokenMeta.symbol,
           icon: supportedDestinations
             .find((c) => c.chain.id === transaction.chain.id)
             ?.tokens.find(
@@ -91,13 +87,16 @@ export function useTransactionCostAndData(args: {
                 t.address.toLowerCase() ===
                 erc20Value.tokenAddress.toLowerCase(),
             )?.icon,
+          name: tokenMeta.name,
+          symbol: tokenMeta.symbol,
         };
         return {
-          token: currency,
+          chainMetadata,
           decimals: tokenMeta.decimals,
-          walletBalance,
           gasCostWei,
+          token: currency,
           transactionValueWei,
+          walletBalance,
         } satisfies TransactionCostAndData;
       }
 
@@ -115,25 +114,25 @@ export function useTransactionCostAndData(args: {
       const transactionValueWei =
         (await resolvePromisedValue(transaction.value)) || 0n;
       return {
+        chainMetadata,
+        decimals: 18,
+        gasCostWei,
         token: {
           address: NATIVE_TOKEN_ADDRESS,
+          icon: chainMetadata.icon?.url,
           name: chainMetadata.nativeCurrency.name,
           symbol: chainMetadata.nativeCurrency.symbol,
-          icon: chainMetadata.icon?.url,
         },
-        decimals: 18,
-        walletBalance,
-        gasCostWei,
         transactionValueWei,
+        walletBalance,
       } satisfies TransactionCostAndData;
     },
-    enabled: !!transaction && !!txQueryKey,
-    refetchInterval: () => {
-      if (transaction.erc20Value) {
-        // if erc20 value is set, we don't need to poll
-        return undefined;
-      }
-      return 30_000;
-    },
+    queryKey: [
+      "transaction-cost",
+      transaction.chain.id,
+      account?.address,
+      txQueryKey,
+    ],
+    refetchInterval: args.refetchIntervalMs || 30_000,
   });
 }

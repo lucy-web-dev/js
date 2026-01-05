@@ -11,6 +11,7 @@ import {
   APPLE_ICON,
   DISCORD_ICON,
   EMAIL_ICON,
+  EPIC_ICON,
   FACEBOOK_ICON,
   FARCASTER_ICON,
   GITHUB_ICON,
@@ -21,6 +22,7 @@ import {
   PHONE_ICON,
   STEAM_ICON,
   TELEGRAM_ICON,
+  TIKTOK_ICON,
   TWITCH_ICON,
   WALLET_ICON,
   X_ICON,
@@ -37,7 +39,7 @@ export const WalletImage = (props: {
   const { wallet, avatar, size, client } = props;
 
   const { data: imageData } = useQuery({
-    queryKey: ["wallet-image", wallet.id, wallet.getAccount()?.address],
+    enabled: !avatar,
     queryFn: async (): Promise<string> => {
       let activeEOAId = wallet.id;
       if (wallet.id === "smart") {
@@ -69,16 +71,16 @@ export const WalletImage = (props: {
 
       return WALLET_ICON;
     },
-    enabled: !avatar,
+    queryKey: ["wallet-image", wallet.id, wallet.getAccount()?.address],
   });
 
   const data = avatar || imageData || WALLET_ICON;
   return (
     <RNImage
-      theme={props.theme}
+      color={props.theme.colors.accentButtonBg}
       data={data}
       size={size}
-      color={props.theme.colors.accentButtonBg}
+      theme={props.theme}
     />
   );
 };
@@ -103,6 +105,10 @@ export function getAuthProviderImage(authProvider: string | null): string {
       return LINE_ICON;
     case "x":
       return X_ICON;
+    case "tiktok":
+      return TIKTOK_ICON;
+    case "epic":
+      return EPIC_ICON;
     case "farcaster":
       return FARCASTER_ICON;
     case "telegram":

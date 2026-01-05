@@ -16,12 +16,12 @@ describe("InputSelectionUI", () => {
     render(
       <InputSelectionUI
         defaultSmsCountryCode="CA"
+        format="phone"
+        name=""
         onSelect={vi.fn()}
         placeholder=""
-        name=""
-        type=""
         submitButtonText=""
-        format="phone"
+        type=""
       />,
     );
 
@@ -31,15 +31,38 @@ describe("InputSelectionUI", () => {
   it('should initialize countryCodeInfo with "US +1" if defaultSmsCountryCode is not provided', () => {
     render(
       <InputSelectionUI
+        format="phone"
+        name=""
         onSelect={vi.fn()}
         placeholder=""
-        name=""
-        type=""
         submitButtonText=""
-        format="phone"
+        type=""
       />,
     );
 
     expect(screen.getByRole("combobox")).toHaveValue("US +1");
+  });
+
+  it("should filter countries based on allowedSmsCountryCodes", () => {
+    const mockGetCountrySelector = vi.mocked(getCountrySelector);
+    mockGetCountrySelector.mockReturnValue("IN +91");
+
+    render(
+      <InputSelectionUI
+        allowedSmsCountryCodes={["IN", "BR"]}
+        format="phone"
+        name=""
+        onSelect={vi.fn()}
+        placeholder=""
+        submitButtonText=""
+        type=""
+      />,
+    );
+
+    const options = screen.getAllByRole("option");
+    const optionTexts = options.map((o) => o.textContent);
+    expect(optionTexts.some((t) => t?.includes("India"))).toBe(true);
+    expect(optionTexts.some((t) => t?.includes("Brazil"))).toBe(true);
+    expect(optionTexts.some((t) => t?.includes("United States"))).toBe(false);
   });
 });

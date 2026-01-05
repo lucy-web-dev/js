@@ -1,4 +1,7 @@
-import type { BaseTransactionOptions } from "../../../transaction/types.js";
+import type {
+  BaseTransactionOptions,
+  WithOverrides,
+} from "../../../transaction/types.js";
 import type { Prettify } from "../../../utils/type-utils.js";
 import { toUnits } from "../../../utils/units.js";
 import { multicall } from "../../common/__generated__/IMulticall/write/multicall.js";
@@ -8,18 +11,20 @@ import { encodeTransfer } from "../__generated__/IERC20/write/transfer.js";
  * Represents the parameters for a batch transfer operation.
  * @extension ERC20
  */
-export type TransferBatchParams = Prettify<{
-  batch: Array<
-    { to: string } & (
-      | {
-          amount: number | string;
-        }
-      | {
-          amountWei: bigint;
-        }
-    )
-  >;
-}>;
+export type TransferBatchParams = Prettify<
+  WithOverrides<{
+    batch: Array<
+      { to: string } & (
+        | {
+            amount: number | string;
+          }
+        | {
+            amountWei: bigint;
+          }
+      )
+    >;
+  }>
+>;
 
 /**
  * Transfers a batch of ERC20 tokens from the sender's address to the specified recipient address.
@@ -51,24 +56,25 @@ export function transferBatch(
   options: BaseTransactionOptions<TransferBatchParams>,
 ) {
   return multicall({
-    contract: options.contract,
     asyncParams: async () => {
       const content = await optimizeTransferContent(options);
       return {
         data: content.map((item) => {
           return encodeTransfer({
-            to: item.to,
-            value: item.amountWei,
             overrides: {
               erc20Value: {
                 amountWei: item.amountWei,
                 tokenAddress: options.contract.address,
               },
             },
+            to: item.to,
+            value: item.amountWei,
           });
         }),
       };
     },
+    contract: options.contract,
+    overrides: options.overrides,
   });
 }
 
@@ -127,8 +133,8 @@ export async function optimizeTransferContent(
         existingRecord.amountWei = existingRecord.amountWei + amountInWei;
       } else {
         acc.push({
-          to: record.to,
           amountWei: amountInWei,
+          to: record.to,
         });
       }
 

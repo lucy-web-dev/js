@@ -1,9 +1,9 @@
-import { baseSepolia } from "./chain-definitions/base-sepolia.js";
 import { base } from "./chain-definitions/base.js";
-import { optimismSepolia } from "./chain-definitions/optimism-sepolia.js";
+import { baseSepolia } from "./chain-definitions/base-sepolia.js";
 import { optimism } from "./chain-definitions/optimism.js";
-import { zoraSepolia } from "./chain-definitions/zora-sepolia.js";
+import { optimismSepolia } from "./chain-definitions/optimism-sepolia.js";
 import { zora } from "./chain-definitions/zora.js";
+import { zoraSepolia } from "./chain-definitions/zora-sepolia.js";
 import type { Chain } from "./types.js";
 
 const opChains = [
@@ -25,6 +25,21 @@ const opChains = [
  * TODO this should be in the chain definition itself
  * @internal
  */
-export function isOpStackChain(chain: Chain) {
-  return opChains.includes(chain.id);
+export async function isOpStackChain(chain: Chain) {
+  if (chain.id === 1337 || chain.id === 31337) {
+    return false;
+  }
+
+  if (opChains.includes(chain.id)) {
+    return true;
+  }
+  // fallback to checking the stack on rpc
+  try {
+    const { getChainMetadata } = await import("./utils.js");
+    const chainMetadata = await getChainMetadata(chain);
+    return chainMetadata.stackType === "optimism_bedrock";
+  } catch {
+    // If the network check fails, assume it's not a OP chain
+    return false;
+  }
 }

@@ -5,9 +5,12 @@ import {
   getChainSymbol,
 } from "../../chains/utils.js";
 import type { ThirdwebClient } from "../../client/client.js";
+import { NATIVE_TOKEN_ADDRESS } from "../../constants/addresses.js";
 import { getContract } from "../../contract/contract.js";
+import type { GetBalanceResult } from "../../extensions/erc20/read/getBalance.js";
 import { eth_getBalance } from "../../rpc/actions/eth_getBalance.js";
 import { getRpcClient } from "../../rpc/rpc.js";
+import { getAddress } from "../../utils/address.js";
 import { toTokens } from "../../utils/units.js";
 
 export type GetWalletBalanceOptions = {
@@ -20,13 +23,7 @@ export type GetWalletBalanceOptions = {
   tokenAddress?: string;
 };
 
-export type GetWalletBalanceResult = {
-  value: bigint;
-  decimals: number;
-  displayValue: string;
-  symbol: string;
-  name: string;
-};
+export type GetWalletBalanceResult = GetBalanceResult;
 
 /**
  * Retrieves the balance of a token or native currency for a given wallet.
@@ -45,21 +42,32 @@ export type GetWalletBalanceResult = {
  */
 export async function getWalletBalance(
   options: GetWalletBalanceOptions,
-): Promise<GetWalletBalanceResult> {
-  const { address, client, chain, tokenAddress } = options;
+): Promise<GetBalanceResult> {
+  const { address, client, chain } = options;
+
+  // Scipper chain (42429) uses a wrapped native token for balance queries
+  const tokenAddress =
+    options.tokenAddress ||
+    (chain.id === 42429
+      ? "0x20c0000000000000000000000000000000000000"
+      : undefined);
+
   // erc20 case
-  if (tokenAddress) {
+  if (
+    tokenAddress &&
+    getAddress(tokenAddress) !== getAddress(NATIVE_TOKEN_ADDRESS)
+  ) {
     // load balanceOf dynamically to avoid circular dependency
     const { getBalance } = await import(
       "../../extensions/erc20/read/getBalance.js"
     );
     return getBalance({
-      contract: getContract({ client, chain, address: tokenAddress }),
       address,
+      contract: getContract({ address: tokenAddress, chain, client }),
     });
   }
   // native token case
-  const rpcRequest = getRpcClient({ client, chain });
+  const rpcRequest = getRpcClient({ chain, client });
 
   const [nativeSymbol, nativeDecimals, nativeName, nativeBalance] =
     await Promise.all([
@@ -70,10 +78,12 @@ export async function getWalletBalance(
     ]);
 
   return {
-    value: nativeBalance,
+    chainId: chain.id,
     decimals: nativeDecimals,
     displayValue: toTokens(nativeBalance, nativeDecimals),
-    symbol: nativeSymbol,
     name: nativeName,
+    symbol: nativeSymbol,
+    tokenAddress: tokenAddress ?? NATIVE_TOKEN_ADDRESS,
+    value: nativeBalance,
   };
 }

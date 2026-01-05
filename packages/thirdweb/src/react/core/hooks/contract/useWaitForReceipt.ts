@@ -17,22 +17,25 @@ import {
  * @transaction
  */
 export function useWaitForReceipt(
-  options: WaitForReceiptOptions | undefined,
+  options:
+    | (WaitForReceiptOptions & { queryOptions?: { enabled?: boolean } })
+    | undefined,
 ): UseQueryResult<TransactionReceipt> {
   return useQuery({
-    queryKey: [
-      "waitForReceipt",
-      // TODO: here chain can be undfined so we go to a `-1` chain but this feels wrong
-      options?.chain.id || -1,
-      options?.transactionHash,
-    ] as const,
+    enabled:
+      !!options?.transactionHash && (options?.queryOptions?.enabled ?? true),
     queryFn: async () => {
       if (!options?.transactionHash) {
         throw new Error("No transaction hash or user op hash provided");
       }
       return waitForReceipt(options);
     },
-    enabled: !!options?.transactionHash,
+    queryKey: [
+      "waitForReceipt",
+      // TODO: here chain can be undefined so we go to a `-1` chain but this feels wrong
+      options?.chain.id || -1,
+      options?.transactionHash,
+    ] as const,
     retry: false,
   });
 }

@@ -1,4 +1,4 @@
-import { maxUint256 } from "viem";
+import { maxUint256 } from "ox/Solidity";
 import { multicall } from "../../../extensions/common/__generated__/IMulticall/write/multicall.js";
 import { upload } from "../../../storage/upload.js";
 import type {
@@ -40,6 +40,7 @@ export type MintToBatchParams = WithOverrides<{
 
 /**
  * This extension batches multiple `mintTo` extensions into one single multicall.
+ * This method is only available on the `TokenERC1155` contract.
  * Keep in mind that there is a limit of how many NFTs you can mint per transaction.
  * This limit varies depends on the network that you are transacting on.
  *
@@ -81,7 +82,6 @@ export function mintToBatch(
   options: BaseTransactionOptions<MintToBatchParams>,
 ) {
   return multicall({
-    contract: options.contract,
     asyncParams: async () => {
       const data = await Promise.all(
         options.nfts.map(async (nft) => {
@@ -93,16 +93,17 @@ export function mintToBatch(
                   files: [nft.metadata],
                 });
           return encodeMintTo({
+            amount: nft.supply,
             to: options.to,
             // maxUint256 is used to indicate that this is a NEW token!
             tokenId: maxUint256,
             uri,
-            amount: nft.supply,
           });
         }),
       );
       return { data };
     },
+    contract: options.contract,
     overrides: options.overrides,
   });
 }

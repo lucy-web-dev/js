@@ -8,17 +8,20 @@ import {
   TEST_ACCOUNT_C,
   TEST_ACCOUNT_D,
 } from "../../../test/src/test-wallets.js";
-import { type ThirdwebContract, getContract } from "../../contract/contract.js";
+import { getContract, type ThirdwebContract } from "../../contract/contract.js";
 import { sendAndConfirmTransaction } from "../../transaction/actions/send-and-confirm-transaction.js";
 import { resolvePromisedValue } from "../../utils/promise/resolve-promised-value.js";
-import { toEther } from "../../utils/units.js";
+import { toEther, toWei } from "../../utils/units.js";
 import { name } from "../common/read/name.js";
 import { deployERC20Contract } from "../prebuilts/deploy-erc20.js";
+import { canClaim } from "./drops/read/canClaim.js";
 import { getClaimConditions } from "./drops/read/getClaimConditions.js";
 import { claimTo } from "./drops/write/claimTo.js";
 import { resetClaimEligibility } from "./drops/write/resetClaimEligibility.js";
 import { setClaimConditions } from "./drops/write/setClaimConditions.js";
 import { getBalance } from "./read/getBalance.js";
+import { getApprovalForTransaction } from "./write/getApprovalForTransaction.js";
+import { mintTo } from "./write/mintTo.js";
 
 describe.runIf(process.env.TW_SECRET_KEY)(
   "DropERC20",
@@ -42,9 +45,9 @@ describe.runIf(process.env.TW_SECRET_KEY)(
       expect(contractAddress).toBeDefined();
       const deployedName = await name({
         contract: getContract({
-          client: TEST_CLIENT,
-          chain: ANVIL_CHAIN,
           address: contractAddress,
+          chain: ANVIL_CHAIN,
+          client: TEST_CLIENT,
         }),
       });
       expect(deployedName).toBe("Test DropERC20");
@@ -58,60 +61,52 @@ describe.runIf(process.env.TW_SECRET_KEY)(
     }, 60_000);
 
     it("should allow to claim tokens", async () => {
-      await expect(
-        getBalance({ contract, address: TEST_ACCOUNT_A.address }),
-      ).resolves.toMatchInlineSnapshot(`
-        {
-          "decimals": 18,
-          "displayValue": "0",
-          "name": "Test DropERC20",
-          "symbol": "",
-          "value": 0n,
-        }
-      `);
+      expect(
+        (await getBalance({ address: TEST_ACCOUNT_A.address, contract }))
+          .displayValue,
+      ).toBe("0");
       await sendAndConfirmTransaction({
+        account: TEST_ACCOUNT_A,
         transaction: setClaimConditions({
           contract,
           phases: [{}],
         }),
-        account: TEST_ACCOUNT_A,
       });
-      const claimTx = claimTo({
-        contract,
-        to: TEST_ACCOUNT_A.address,
-        quantity: "1",
-      });
-      await sendAndConfirmTransaction({
-        transaction: claimTx,
-        account: TEST_ACCOUNT_A,
-      });
-      await expect(
-        getBalance({ contract, address: TEST_ACCOUNT_A.address }),
-      ).resolves.toMatchInlineSnapshot(`
+
+      expect(
+        await canClaim({
+          claimer: TEST_ACCOUNT_A.address,
+          contract,
+          quantity: "1",
+        }),
+      ).toMatchInlineSnapshot(`
         {
-          "decimals": 18,
-          "displayValue": "1",
-          "name": "Test DropERC20",
-          "symbol": "",
-          "value": 1000000000000000000n,
+          "result": true,
         }
       `);
+      const claimTx = claimTo({
+        contract,
+        quantity: "1",
+        to: TEST_ACCOUNT_A.address,
+      });
+      await sendAndConfirmTransaction({
+        account: TEST_ACCOUNT_A,
+        transaction: claimTx,
+      });
+      expect(
+        (await getBalance({ address: TEST_ACCOUNT_A.address, contract }))
+          .displayValue,
+      ).toBe("1");
     });
 
     it("should allow to claim tokens with value", async () => {
-      await expect(
-        getBalance({ contract, address: TEST_ACCOUNT_C.address }),
-      ).resolves.toMatchInlineSnapshot(`
-        {
-          "decimals": 18,
-          "displayValue": "0",
-          "name": "Test DropERC20",
-          "symbol": "",
-          "value": 0n,
-        }
-      `);
+      expect(
+        (await getBalance({ address: TEST_ACCOUNT_C.address, contract }))
+          .displayValue,
+      ).toBe("0");
       // set cc with price
       await sendAndConfirmTransaction({
+        account: TEST_ACCOUNT_A,
         transaction: setClaimConditions({
           contract,
           phases: [
@@ -120,12 +115,11 @@ describe.runIf(process.env.TW_SECRET_KEY)(
             },
           ],
         }),
-        account: TEST_ACCOUNT_A,
       });
       const claimTx = claimTo({
         contract,
-        to: TEST_ACCOUNT_C.address,
         quantity: "2",
+        to: TEST_ACCOUNT_C.address,
       });
       // assert value is set correctly
       const value = await resolvePromisedValue(claimTx.value);
@@ -134,49 +128,148 @@ describe.runIf(process.env.TW_SECRET_KEY)(
       expect(toEther(value)).toBe("0.02");
       // claim
       await sendAndConfirmTransaction({
-        transaction: claimTx,
         account: TEST_ACCOUNT_C,
+        transaction: claimTx,
       });
-      await expect(
-        getBalance({ contract, address: TEST_ACCOUNT_C.address }),
-      ).resolves.toMatchInlineSnapshot(`
-        {
-          "decimals": 18,
-          "displayValue": "2",
-          "name": "Test DropERC20",
-          "symbol": "",
-          "value": 2000000000000000000n,
-        }
-      `);
+      expect(
+        (await getBalance({ address: TEST_ACCOUNT_C.address, contract }))
+          .displayValue,
+      ).toBe("2");
+    });
+
+    it("should allow to claim tokens with erc20 price", async () => {
+      expect(
+        (await getBalance({ address: TEST_ACCOUNT_C.address, contract }))
+          .displayValue,
+      ).toBe("2");
+      const erc20ContractAddres = await deployERC20Contract({
+        account: TEST_ACCOUNT_A,
+        chain: ANVIL_CHAIN,
+        client: TEST_CLIENT,
+        params: {
+          name: "Test DropERC20",
+        },
+        type: "TokenERC20",
+      });
+      const erc20Contract = getContract({
+        address: erc20ContractAddres,
+        chain: ANVIL_CHAIN,
+        client: TEST_CLIENT,
+      });
+      const mintToTx = mintTo({
+        amount: "0.02",
+        contract: erc20Contract,
+        to: TEST_ACCOUNT_C.address,
+      });
+      await sendAndConfirmTransaction({
+        account: TEST_ACCOUNT_A,
+        transaction: mintToTx,
+      });
+      expect(
+        (
+          await getBalance({
+            address: TEST_ACCOUNT_C.address,
+            contract: erc20Contract,
+          })
+        ).displayValue,
+      ).toBe("0.02");
+      // set cc with price
+      await sendAndConfirmTransaction({
+        account: TEST_ACCOUNT_A,
+        transaction: setClaimConditions({
+          contract,
+          phases: [
+            {
+              currencyAddress: erc20ContractAddres,
+              price: "0.01",
+            },
+          ],
+        }),
+      });
+      const claimTx = claimTo({
+        contract,
+        quantity: "2",
+        to: TEST_ACCOUNT_C.address,
+      });
+      // assert value is set correctly
+      const value = await resolvePromisedValue(claimTx.erc20Value);
+      expect(value).toBeDefined();
+      if (!value) throw new Error("value is undefined");
+      expect(value.amountWei).toBe(toWei("0.02"));
+      const approve = await getApprovalForTransaction({
+        account: TEST_ACCOUNT_C,
+        transaction: claimTx,
+      });
+      if (approve) {
+        await sendAndConfirmTransaction({
+          account: TEST_ACCOUNT_C,
+          transaction: approve,
+        });
+      }
+      // claim
+      await sendAndConfirmTransaction({
+        account: TEST_ACCOUNT_C,
+        transaction: claimTx,
+      });
+      expect(
+        (await getBalance({ address: TEST_ACCOUNT_C.address, contract }))
+          .displayValue,
+      ).toBe("4");
+      expect(
+        (
+          await getBalance({
+            address: TEST_ACCOUNT_C.address,
+            contract: erc20Contract,
+          })
+        ).displayValue,
+      ).toBe("0");
     });
 
     describe("Allowlists", () => {
       it("should allow to claim tokens with an allowlist", async () => {
         await sendAndConfirmTransaction({
+          account: TEST_ACCOUNT_A,
           transaction: setClaimConditions({
             contract,
             phases: [
               {
+                maxClaimablePerWallet: 0n,
                 overrideList: [
                   { address: TEST_ACCOUNT_A.address, maxClaimable: "100" },
                   { address: VITALIK_WALLET, maxClaimable: "100" },
                 ],
-                maxClaimablePerWallet: 0n,
               },
             ],
           }),
-          account: TEST_ACCOUNT_A,
         });
 
-        await expect(
-          getBalance({ contract, address: TEST_ACCOUNT_B.address }),
-        ).resolves.toMatchInlineSnapshot(`
+        expect(
+          (await getBalance({ address: TEST_ACCOUNT_B.address, contract }))
+            .displayValue,
+        ).toBe("0");
+
+        expect(
+          await canClaim({
+            claimer: TEST_ACCOUNT_A.address,
+            contract,
+            quantity: "1",
+          }),
+        ).toMatchInlineSnapshot(`
           {
-            "decimals": 18,
-            "displayValue": "0",
-            "name": "Test DropERC20",
-            "symbol": "",
-            "value": 0n,
+            "result": true,
+          }
+        `);
+
+        expect(
+          await canClaim({
+            claimer: TEST_ACCOUNT_B.address,
+            contract,
+            quantity: "1",
+          }),
+        ).toMatchInlineSnapshot(`
+          {
+            "reason": "DropClaimExceedLimit - 0,1000000000000000000",
+            "result": false,
           }
         `);
 
@@ -185,30 +278,23 @@ describe.runIf(process.env.TW_SECRET_KEY)(
           transaction: claimTo({
             contract,
             from: TEST_ACCOUNT_A.address,
-            to: TEST_ACCOUNT_B.address,
             quantity: "1",
+            to: TEST_ACCOUNT_B.address,
           }),
         });
 
-        await expect(
-          getBalance({ contract, address: TEST_ACCOUNT_B.address }),
-        ).resolves.toMatchInlineSnapshot(`
-          {
-            "decimals": 18,
-            "displayValue": "1",
-            "name": "Test DropERC20",
-            "symbol": "",
-            "value": 1000000000000000000n,
-          }
-        `);
+        expect(
+          (await getBalance({ address: TEST_ACCOUNT_B.address, contract }))
+            .displayValue,
+        ).toBe("1");
 
         await expect(
           sendAndConfirmTransaction({
             account: TEST_ACCOUNT_B,
             transaction: claimTo({
               contract,
-              to: TEST_ACCOUNT_B.address,
               quantity: "1",
+              to: TEST_ACCOUNT_B.address,
             }),
           }),
         ).rejects.toThrowErrorMatchingInlineSnapshot(`
@@ -221,32 +307,25 @@ describe.runIf(process.env.TW_SECRET_KEY)(
 
       it("should respect max claimable", async () => {
         await sendAndConfirmTransaction({
+          account: TEST_ACCOUNT_A,
           transaction: setClaimConditions({
             contract,
             phases: [
               {
+                maxClaimablePerWallet: 0n,
                 overrideList: [
                   { address: TEST_ACCOUNT_A.address, maxClaimable: "3" },
                   { address: VITALIK_WALLET, maxClaimable: "3" },
                 ],
-                maxClaimablePerWallet: 0n,
               },
             ],
           }),
-          account: TEST_ACCOUNT_A,
         });
 
-        await expect(
-          getBalance({ contract, address: TEST_ACCOUNT_A.address }),
-        ).resolves.toMatchInlineSnapshot(`
-          {
-            "decimals": 18,
-            "displayValue": "1",
-            "name": "Test DropERC20",
-            "symbol": "",
-            "value": 1000000000000000000n,
-          }
-        `);
+        expect(
+          (await getBalance({ address: TEST_ACCOUNT_A.address, contract }))
+            .displayValue,
+        ).toBe("1");
 
         // we try to claim an extra `2` tokens
         // this should faile bcause the max claimable is `3` and we have previously already claimed 2 tokens (one for ourselves, one for the other wallet)
@@ -257,8 +336,8 @@ describe.runIf(process.env.TW_SECRET_KEY)(
             account: TEST_ACCOUNT_A,
             transaction: claimTo({
               contract,
-              to: TEST_ACCOUNT_A.address,
               quantity: "2",
+              to: TEST_ACCOUNT_A.address,
             }),
           }),
         ).rejects.toThrowErrorMatchingInlineSnapshot(`
@@ -275,31 +354,26 @@ describe.runIf(process.env.TW_SECRET_KEY)(
           account: TEST_ACCOUNT_A,
           transaction: claimTo({
             contract,
-            to: TEST_ACCOUNT_A.address,
             quantity: "1",
+            to: TEST_ACCOUNT_A.address,
           }),
         });
 
-        await expect(
-          getBalance({ contract, address: TEST_ACCOUNT_A.address }),
-        ).resolves.toMatchInlineSnapshot(`
-          {
-            "decimals": 18,
-            "displayValue": "2",
-            "name": "Test DropERC20",
-            "symbol": "",
-            "value": 2000000000000000000n,
-          }
-        `);
+        expect(
+          (await getBalance({ address: TEST_ACCOUNT_A.address, contract }))
+            .displayValue,
+        ).toBe("2");
       });
     });
 
     it("should respect price", async () => {
       await sendAndConfirmTransaction({
+        account: TEST_ACCOUNT_A,
         transaction: setClaimConditions({
           contract,
           phases: [
             {
+              maxClaimablePerWallet: 0n,
               overrideList: [
                 {
                   address: TEST_ACCOUNT_A.address,
@@ -307,50 +381,35 @@ describe.runIf(process.env.TW_SECRET_KEY)(
                   price: "0",
                 },
               ],
-              maxClaimablePerWallet: 0n,
               price: "1000",
             },
           ],
         }),
-        account: TEST_ACCOUNT_A,
       });
 
-      await expect(
-        getBalance({ contract, address: TEST_ACCOUNT_A.address }),
-      ).resolves.toMatchInlineSnapshot(`
-        {
-          "decimals": 18,
-          "displayValue": "2",
-          "name": "Test DropERC20",
-          "symbol": "",
-          "value": 2000000000000000000n,
-        }
-      `);
+      expect(
+        (await getBalance({ address: TEST_ACCOUNT_A.address, contract }))
+          .displayValue,
+      ).toBe("2");
 
       await sendAndConfirmTransaction({
         account: TEST_ACCOUNT_A,
         transaction: claimTo({
           contract,
-          to: TEST_ACCOUNT_A.address,
           quantity: "1",
+          to: TEST_ACCOUNT_A.address,
         }),
       });
 
-      await expect(
-        getBalance({ contract, address: TEST_ACCOUNT_A.address }),
-      ).resolves.toMatchInlineSnapshot(`
-        {
-          "decimals": 18,
-          "displayValue": "3",
-          "name": "Test DropERC20",
-          "symbol": "",
-          "value": 3000000000000000000n,
-        }
-      `);
+      expect(
+        (await getBalance({ address: TEST_ACCOUNT_A.address, contract }))
+          .displayValue,
+      ).toBe("3");
     });
 
     it("should be able to retrieve multiple phases", async () => {
       await sendAndConfirmTransaction({
+        account: TEST_ACCOUNT_A,
         transaction: setClaimConditions({
           contract,
           phases: [
@@ -364,7 +423,6 @@ describe.runIf(process.env.TW_SECRET_KEY)(
             },
           ],
         }),
-        account: TEST_ACCOUNT_A,
       });
 
       const phases = await getClaimConditions({ contract });
@@ -376,6 +434,7 @@ describe.runIf(process.env.TW_SECRET_KEY)(
     it("should be able to reset claim eligibility", async () => {
       // set claim conditions to only allow one claim
       await sendAndConfirmTransaction({
+        account: TEST_ACCOUNT_A,
         transaction: setClaimConditions({
           contract,
           phases: [
@@ -384,41 +443,33 @@ describe.runIf(process.env.TW_SECRET_KEY)(
             },
           ],
         }),
-        account: TEST_ACCOUNT_A,
       });
       // claim one token
       await sendAndConfirmTransaction({
-        transaction: claimTo({
-          contract,
-          // fresh account to avoid any previous claims
-          to: TEST_ACCOUNT_D.address,
-          quantityInWei: 1n,
-        }),
         // fresh account to avoid any previous claims
         account: TEST_ACCOUNT_D,
+        transaction: claimTo({
+          contract,
+          quantityInWei: 1n,
+          // fresh account to avoid any previous claims
+          to: TEST_ACCOUNT_D.address,
+        }),
       });
       // check that the account has claimed one token
-      await expect(
-        getBalance({ contract, address: TEST_ACCOUNT_D.address }),
-      ).resolves.toMatchInlineSnapshot(`
-        {
-          "decimals": 18,
-          "displayValue": "0.000000000000000001",
-          "name": "Test DropERC20",
-          "symbol": "",
-          "value": 1n,
-        }
-      `);
+      expect(
+        (await getBalance({ address: TEST_ACCOUNT_D.address, contract }))
+          .displayValue,
+      ).toBe("0.000000000000000001");
 
       // attempt to claim another token (this should fail)
       await expect(
         sendAndConfirmTransaction({
+          account: TEST_ACCOUNT_D,
           transaction: claimTo({
             contract,
-            to: TEST_ACCOUNT_D.address,
             quantityInWei: 1n,
+            to: TEST_ACCOUNT_D.address,
           }),
-          account: TEST_ACCOUNT_D,
         }),
       ).rejects.toThrowErrorMatchingInlineSnapshot(`
         [TransactionError: DropClaimExceedLimit - 1,2
@@ -429,32 +480,25 @@ describe.runIf(process.env.TW_SECRET_KEY)(
 
       // reset claim eligibility
       await sendAndConfirmTransaction({
+        account: TEST_ACCOUNT_A,
         transaction: resetClaimEligibility({
           contract,
         }),
-        account: TEST_ACCOUNT_A,
       });
       // attempt to claim another token (this should succeed)
       await sendAndConfirmTransaction({
+        account: TEST_ACCOUNT_D,
         transaction: claimTo({
           contract,
-          to: TEST_ACCOUNT_D.address,
           quantityInWei: 1n,
+          to: TEST_ACCOUNT_D.address,
         }),
-        account: TEST_ACCOUNT_D,
       });
       // check that the account has claimed two tokens
-      await expect(
-        getBalance({ contract, address: TEST_ACCOUNT_D.address }),
-      ).resolves.toMatchInlineSnapshot(`
-        {
-          "decimals": 18,
-          "displayValue": "0.000000000000000002",
-          "name": "Test DropERC20",
-          "symbol": "",
-          "value": 2n,
-        }
-      `);
+      expect(
+        (await getBalance({ address: TEST_ACCOUNT_D.address, contract }))
+          .displayValue,
+      ).toBe("0.000000000000000002");
     });
   },
 );

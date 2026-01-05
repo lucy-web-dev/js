@@ -1,27 +1,22 @@
-import { DocLayout } from "@/components/Layouts/DocLayout";
 import { createMetadata } from "@doc";
+import { DocLayout } from "@/components/Layouts/DocLayout";
 import { PlatformSelector } from "../../../components/others/PlatformSelector";
 import { sidebar } from "./sidebar";
 
 export default async function Layout(props: { children: React.ReactNode }) {
   return (
     <DocLayout
-      sideBar={sidebar}
       editPageButton={true}
-      sidebarHeader={
-        <div className="flex-col items-center gap-1">
-          <p className="py-5 font-semibold text-f-100 text-lg">Connect</p>
-          <PlatformSelector selected="React Native" />
-        </div>
-      }
+      sideBar={sidebar}
+      sidebarHeader={<PlatformSelector selected="React Native" />}
     >
-      <div data-noindex>{props.children}</div>
+      <div>{props.children}</div>
     </DocLayout>
   );
 }
 
 export const metadata = createMetadata({
-  title: "thirdweb React Native SDK",
   description:
     "A type-safe library to interact with any EVM-compatible blockchain in React Native applications",
+  title: "thirdweb React Native SDK",
 });

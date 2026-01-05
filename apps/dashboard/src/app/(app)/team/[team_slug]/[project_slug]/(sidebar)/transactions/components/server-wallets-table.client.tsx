@@ -1,0 +1,811 @@
+"use client";
+
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { format, formatDistanceToNowStrict } from "date-fns";
+import {
+  CheckIcon,
+  MoreVerticalIcon,
+  RefreshCcwIcon,
+  SendIcon,
+  XIcon,
+} from "lucide-react";
+import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useState } from "react";
+import { toast } from "sonner";
+import type { ThirdwebClient } from "thirdweb";
+import { useWalletBalance } from "thirdweb/react";
+import {
+  DEFAULT_ACCOUNT_FACTORY_V0_7,
+  predictSmartAccountAddress,
+} from "thirdweb/wallets/smart";
+import type { Project } from "@/api/project/projects";
+import { FundWalletModal } from "@/components/blocks/fund-wallets-modal";
+import { SingleNetworkSelector } from "@/components/blocks/NetworkSelectors";
+import { PaginationButtons } from "@/components/blocks/pagination-buttons";
+import { SolanaAddress } from "@/components/blocks/solana-address";
+import { WalletAddress } from "@/components/blocks/wallet-address";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { TabButtons } from "@/components/ui/tabs";
+import { ToolTipLabel } from "@/components/ui/tooltip";
+import { useV5DashboardChain } from "@/hooks/chains/v5-adapter";
+import { WalletProductIcon } from "@/icons/WalletProductIcon";
+import { useDashboardRouter } from "@/lib/DashboardRouter";
+import { cn } from "@/lib/utils";
+import { fetchSolanaBalance } from "../lib/getSolanaBalance";
+import { updateDefaultProjectWallet } from "../lib/vault.client";
+import { CreateServerWallet } from "../server-wallets/components/create-server-wallet.client";
+import type { Wallet as EVMWallet } from "../server-wallets/wallet-table/types";
+import { CreateSolanaWallet } from "../solana-wallets/components/create-solana-wallet.client";
+import { UpgradeSolanaPermissions } from "../solana-wallets/components/upgrade-solana-permissions.client";
+import type { SolanaWallet } from "../solana-wallets/wallet-table/types";
+
+type WalletChain = "evm" | "solana";
+
+interface ServerWalletsTableProps {
+  evmWallets: EVMWallet[];
+  evmTotalRecords: number;
+  evmCurrentPage: number;
+  evmTotalPages: number;
+  solanaWallets: SolanaWallet[];
+  solanaTotalRecords: number;
+  solanaCurrentPage: number;
+  solanaTotalPages: number;
+  project: Project;
+  teamSlug: string;
+  client: ThirdwebClient;
+  solanaPermissionError?: boolean;
+  authToken: string;
+  pageSize: number;
+}
+
+export function ServerWalletsTable(props: ServerWalletsTableProps) {
+  const {
+    evmWallets,
+    solanaWallets,
+    project,
+    teamSlug,
+    evmTotalRecords,
+    evmCurrentPage,
+    evmTotalPages,
+    solanaTotalRecords,
+    solanaCurrentPage,
+    solanaTotalPages,
+    client,
+    solanaPermissionError,
+    authToken,
+    pageSize,
+  } = props;
+
+  const [activeChain, setActiveChain] = useState<WalletChain>("evm");
+  const [selectedChainId, setSelectedChainId] = useState<number>(1);
+  const [selectedSolanaChain, setSelectedSolanaChain] = useState<
+    "solana:mainnet" | "solana:devnet"
+  >("solana:mainnet");
+  const [showSmartAccount, setShowSmartAccount] = useState(false);
+  const queryClient = useQueryClient();
+
+  const wallets = activeChain === "evm" ? evmWallets : solanaWallets;
+  const currentPage =
+    activeChain === "evm" ? evmCurrentPage : solanaCurrentPage;
+  const totalPages = activeChain === "evm" ? evmTotalPages : solanaTotalPages;
+  const totalRecords =
+    activeChain === "evm" ? evmTotalRecords : solanaTotalRecords;
+
+  return (
+    <div>
+      <div className="overflow-hidden rounded-xl border border-border bg-card">
+        {/* Header */}
+        <div className="flex flex-col lg:flex-row lg:justify-between p-4 lg:px-6 py-5 lg:items-center gap-5">
+          <div>
+            <div className="flex mb-3">
+              <div className="p-2 rounded-full bg-background border border-border">
+                <WalletProductIcon className="size-5 text-muted-foreground" />
+              </div>
+            </div>
+            <h2 className="font-semibold text-2xl tracking-tight">
+              Server Wallets
+            </h2>
+            <p className="text-muted-foreground text-sm">
+              Create and manage server wallets for your project
+            </p>
+          </div>
+
+          <div className="flex flex-col items-start lg:items-end gap-5 border-t lg:border-t-0 pt-5 lg:pt-0 border-dashed">
+            <div className="flex flex-row gap-2.5">
+              {activeChain === "evm" && (
+                <>
+                  <CreateServerWallet project={project} teamSlug={teamSlug} />
+                  <SingleNetworkSelector
+                    chainId={selectedChainId}
+                    onChange={setSelectedChainId}
+                    client={client}
+                    disableChainId
+                    className="w-fit min-w-[180px] rounded-full bg-background hover:bg-accent/50"
+                    placeholder="Select network"
+                    popoverContentClassName="!w-[320px] rounded-xl overflow-hidden"
+                  />
+                </>
+              )}
+              {activeChain === "solana" && (
+                <>
+                  <CreateSolanaWallet
+                    project={project}
+                    teamSlug={teamSlug}
+                    disabled={solanaPermissionError}
+                  />
+                  <Select
+                    value={selectedSolanaChain}
+                    onValueChange={(value) =>
+                      setSelectedSolanaChain(
+                        value as "solana:mainnet" | "solana:devnet",
+                      )
+                    }
+                  >
+                    <SelectTrigger className="w-fit min-w-[180px] rounded-full bg-background hover:bg-accent/50">
+                      <SelectValue placeholder="Select network" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl">
+                      <SelectItem value="solana:mainnet" className="rounded-lg">
+                        Solana Mainnet
+                      </SelectItem>
+                      <SelectItem value="solana:devnet" className="rounded-lg">
+                        Solana Devnet
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </>
+              )}
+            </div>
+
+            {activeChain === "evm" && (
+              <div className="flex items-center gap-2.5">
+                <Label
+                  className="text-sm text-muted-foreground"
+                  htmlFor="showSmartAccount"
+                >
+                  Show ERC4337 Smart Account
+                </Label>
+                <Switch
+                  id="showSmartAccount"
+                  checked={showSmartAccount}
+                  onCheckedChange={setShowSmartAccount}
+                  size="sm"
+                />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Chain Tabs */}
+        <div className="px-6">
+          <TabButtons
+            tabs={[
+              {
+                name: (
+                  <span className="flex items-center gap-2">
+                    EVM Wallets
+                    <Badge variant="secondary" className="text-xs px-1.5 py-0">
+                      {evmTotalRecords}
+                    </Badge>
+                  </span>
+                ),
+                onClick: () => setActiveChain("evm"),
+                isActive: activeChain === "evm",
+              },
+              {
+                name: (
+                  <span className="flex items-center gap-2">
+                    Solana Wallets
+                    <Badge variant="secondary" className="text-xs px-1.5 py-0">
+                      {solanaTotalRecords}
+                    </Badge>
+                  </span>
+                ),
+                onClick: () => setActiveChain("solana"),
+                isActive: activeChain === "solana",
+              },
+            ]}
+          />
+        </div>
+
+        {/* Table Content */}
+        {activeChain === "solana" && solanaPermissionError ? (
+          <div className="p-6">
+            <UpgradeSolanaPermissions project={project} />
+          </div>
+        ) : (
+          <>
+            <TableContainer className="rounded-none border-x-0 border-b-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Label</TableHead>
+                    <TableHead className="w-[280px]">
+                      {activeChain === "evm"
+                        ? showSmartAccount
+                          ? "Smart Account Address"
+                          : "Wallet Address"
+                        : "Public Key"}
+                    </TableHead>
+                    <TableHead className="min-w-[80px]">
+                      <div className="flex w-[180px] items-center gap-1.5">
+                        Balance
+                        {wallets.length > 0 && (
+                          <ToolTipLabel
+                            contentClassName="capitalize font-normal tracking-normal leading-normal"
+                            label="Refresh Balance"
+                          >
+                            <Button
+                              className="z-20 h-auto p-1.5 [&[data-pending='true']_svg]:animate-spin"
+                              onClick={async (e) => {
+                                const buttonEl = e.currentTarget;
+                                buttonEl.setAttribute("data-pending", "true");
+                                await queryClient.invalidateQueries({
+                                  queryKey:
+                                    activeChain === "evm"
+                                      ? ["walletBalance", selectedChainId]
+                                      : ["solanaWalletBalance"],
+                                });
+                                buttonEl.setAttribute("data-pending", "false");
+                              }}
+                              size="sm"
+                              variant="ghost"
+                            >
+                              <RefreshCcwIcon className="size-4" />
+                            </Button>
+                          </ToolTipLabel>
+                        )}
+                      </div>
+                    </TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {activeChain === "evm" &&
+                    evmWallets.map((wallet) => (
+                      <EVMWalletRow
+                        key={wallet.id}
+                        wallet={wallet}
+                        project={project}
+                        teamSlug={teamSlug}
+                        client={client}
+                        chainId={selectedChainId}
+                        showSmartAccount={showSmartAccount}
+                      />
+                    ))}
+                  {activeChain === "solana" &&
+                    solanaWallets.map((wallet) => (
+                      <SolanaWalletRow
+                        key={wallet.id}
+                        wallet={wallet}
+                        project={project}
+                        teamSlug={teamSlug}
+                        client={client}
+                        authToken={authToken}
+                        chainId={selectedSolanaChain}
+                      />
+                    ))}
+                </TableBody>
+              </Table>
+
+              {wallets.length === 0 && (
+                <div className="py-24 flex flex-col items-center justify-center px-4 text-center gap-4">
+                  <div className="p-2 rounded-full bg-background border border-border">
+                    <XIcon className="size-5 text-muted-foreground" />
+                  </div>
+                  <p className="text-muted-foreground">
+                    No {activeChain === "evm" ? "EVM" : "Solana"} wallets found
+                  </p>
+                </div>
+              )}
+            </TableContainer>
+
+            {totalPages > 1 && (
+              <ServerWalletsPagination
+                activeChain={activeChain}
+                currentPage={currentPage}
+                currentCount={wallets.length}
+                pageSize={pageSize}
+                totalPages={totalPages}
+                totalRecords={totalRecords}
+              />
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ServerWalletsPagination({
+  activeChain,
+  currentPage,
+  currentCount,
+  pageSize,
+  totalPages,
+  totalRecords,
+}: {
+  activeChain: WalletChain;
+  currentPage: number;
+  currentCount: number;
+  pageSize: number;
+  totalPages: number;
+  totalRecords: number;
+}) {
+  const router = useDashboardRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const pageParam = activeChain === "evm" ? "page" : "solana_page";
+
+  const effectivePageSize = pageSize > 0 ? pageSize : currentCount;
+  const rangeStart =
+    totalRecords && effectivePageSize
+      ? Math.min((currentPage - 1) * effectivePageSize + 1, totalRecords)
+      : 0;
+  const computedCount = currentCount
+    ? currentCount
+    : totalRecords && effectivePageSize
+      ? Math.min(effectivePageSize, totalRecords - rangeStart + 1)
+      : 0;
+  const rangeEnd = totalRecords
+    ? Math.min(rangeStart + Math.max(computedCount - 1, 0), totalRecords)
+    : 0;
+
+  const handlePageChange = (page: number) => {
+    const params = new URLSearchParams(searchParams?.toString() ?? "");
+    if (page <= 1) {
+      params.delete(pageParam);
+    } else {
+      params.set(pageParam, page.toString());
+    }
+
+    const queryString = params.toString();
+    router.push(queryString ? `${pathname}?${queryString}` : pathname);
+  };
+
+  return (
+    <div className="border-t px-6 py-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <span className="text-sm text-muted-foreground">
+          {totalRecords
+            ? `Showing ${rangeStart.toLocaleString()}-${rangeEnd.toLocaleString()} of ${totalRecords.toLocaleString()} ` +
+              (activeChain === "evm" ? "EVM" : "Solana") +
+              " wallets"
+            : `No ${activeChain === "evm" ? "EVM" : "Solana"} wallets found`}
+        </span>
+        <PaginationButtons
+          activePage={currentPage}
+          className="justify-start lg:justify-end"
+          onPageClick={handlePageChange}
+          totalPages={totalPages}
+        />
+      </div>
+    </div>
+  );
+}
+
+// EVM Wallet Row Component
+function EVMWalletRow({
+  wallet,
+  project,
+  teamSlug,
+  client,
+  chainId,
+  showSmartAccount,
+}: {
+  wallet: EVMWallet;
+  project: Project;
+  teamSlug: string;
+  client: ThirdwebClient;
+  chainId: number;
+  showSmartAccount: boolean;
+}) {
+  const chain = useV5DashboardChain(chainId);
+
+  const smartAccountQuery = useQuery({
+    queryFn: async () => {
+      return await predictSmartAccountAddress({
+        adminAddress: wallet.address,
+        chain: chain,
+        client: client,
+        factoryAddress: DEFAULT_ACCOUNT_FACTORY_V0_7,
+      });
+    },
+    enabled: showSmartAccount,
+    queryKey: ["smart-account-address", wallet.address, chainId],
+  });
+
+  const engineService = project.services.find((s) => s.name === "engineCloud");
+  const isDefault =
+    engineService?.projectWalletAddress &&
+    wallet.address.toLowerCase() ===
+      engineService.projectWalletAddress.toLowerCase();
+
+  return (
+    <TableRow>
+      <TableCell>
+        <div className="flex items-center gap-2">
+          <span
+            className={cn(
+              "text-sm text-foreground",
+              !wallet.metadata.label && "text-muted-foreground",
+            )}
+          >
+            {wallet.metadata.label || "N/A"}
+          </span>
+          {isDefault && (
+            <Badge variant="success" className="text-xs">
+              default
+            </Badge>
+          )}
+        </div>
+      </TableCell>
+
+      <TableCell>
+        {showSmartAccount ? (
+          smartAccountQuery.isPending ? (
+            <Skeleton className="h-7 w-24" />
+          ) : smartAccountQuery.data ? (
+            <WalletAddress address={smartAccountQuery.data} client={client} />
+          ) : (
+            <span className="text-muted-foreground">N/A</span>
+          )
+        ) : (
+          <WalletAddress address={wallet.address} client={client} />
+        )}
+      </TableCell>
+
+      <TableCell>
+        {showSmartAccount ? (
+          smartAccountQuery.isPending ? (
+            <Skeleton className="h-5 w-16" />
+          ) : smartAccountQuery.data ? (
+            <WalletBalance
+              address={smartAccountQuery.data}
+              chainId={chainId}
+              client={client}
+            />
+          ) : (
+            <span className="text-muted-foreground">N/A</span>
+          )
+        ) : (
+          <WalletBalance
+            address={wallet.address}
+            chainId={chainId}
+            client={client}
+          />
+        )}
+      </TableCell>
+
+      <TableCell>
+        <DateCell date={wallet.createdAt} />
+      </TableCell>
+
+      <TableCell>
+        <EVMWalletActions
+          project={project}
+          teamSlug={teamSlug}
+          wallet={wallet}
+          client={client}
+          chainId={chainId}
+          fundAddress={
+            showSmartAccount ? smartAccountQuery.data : wallet.address
+          }
+        />
+      </TableCell>
+    </TableRow>
+  );
+}
+
+// Solana Wallet Row Component
+function SolanaWalletRow({
+  wallet,
+  project,
+  teamSlug,
+  client,
+  authToken,
+  chainId,
+}: {
+  wallet: SolanaWallet;
+  project: Project;
+  teamSlug: string;
+  client: ThirdwebClient;
+  authToken: string;
+  chainId: "solana:mainnet" | "solana:devnet";
+}) {
+  const engineService = project.services.find(
+    (s) => s.name === "engineCloud",
+  ) as { projectSolanaWalletPublicKey?: string } | undefined;
+
+  const isDefault =
+    engineService?.projectSolanaWalletPublicKey &&
+    wallet.publicKey.toLowerCase() ===
+      engineService.projectSolanaWalletPublicKey.toLowerCase();
+
+  return (
+    <TableRow>
+      <TableCell>
+        <div className="flex items-center gap-2">
+          <span
+            className={cn(
+              "text-sm text-foreground",
+              !wallet.metadata.label && "text-muted-foreground",
+            )}
+          >
+            {wallet.metadata.label || "N/A"}
+          </span>
+          {isDefault && (
+            <Badge variant="success" className="text-xs">
+              default
+            </Badge>
+          )}
+        </div>
+      </TableCell>
+
+      <TableCell>
+        <SolanaAddress address={wallet.publicKey} shortenAddress={true} />
+      </TableCell>
+
+      <TableCell>
+        <SolanaWalletBalance
+          publicKey={wallet.publicKey}
+          authToken={authToken}
+          clientId={project.publishableKey}
+          chainId={chainId}
+        />
+      </TableCell>
+
+      <TableCell>
+        <DateCell date={wallet.createdAt} />
+      </TableCell>
+
+      <TableCell>
+        <SolanaWalletActions
+          project={project}
+          teamSlug={teamSlug}
+          wallet={wallet}
+          client={client}
+        />
+      </TableCell>
+    </TableRow>
+  );
+}
+
+// Shared Components
+function DateCell({ date }: { date: string }) {
+  if (!date) {
+    return "N/A";
+  }
+
+  const dateObj = new Date(date);
+  return (
+    <ToolTipLabel label={format(dateObj, "PP pp z")}>
+      <p>{formatDistanceToNowStrict(dateObj, { addSuffix: true })}</p>
+    </ToolTipLabel>
+  );
+}
+
+function EVMWalletActions({
+  wallet,
+  project,
+  teamSlug,
+  client,
+  chainId,
+  fundAddress,
+}: {
+  wallet: EVMWallet;
+  project: Project;
+  teamSlug: string;
+  client: ThirdwebClient;
+  chainId: number;
+  fundAddress: string | undefined;
+}) {
+  const [showFundModal, setShowFundModal] = useState(false);
+  const router = useDashboardRouter();
+
+  const setDefaultMutation = useMutation({
+    mutationFn: async () => {
+      await updateDefaultProjectWallet({
+        project,
+        projectWalletAddress: wallet.address,
+      });
+    },
+    onSuccess: () => {
+      toast.success("Wallet set as project wallet");
+      router.refresh();
+    },
+    onError: (error) => {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to set default wallet",
+      );
+    },
+  });
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="sm">
+            <MoreVerticalIcon className="size-4" />
+            <span className="sr-only">Open menu</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="rounded-xl">
+          <DropdownMenuItem asChild>
+            <Link
+              href={`/team/${teamSlug}/${project.slug}/transactions?testTxWithWallet=${wallet.id}`}
+              className="flex items-center gap-2 h-9 rounded-lg"
+            >
+              <SendIcon className="size-4 text-muted-foreground" />
+              Send test transaction
+            </Link>
+          </DropdownMenuItem>
+          {fundAddress && (
+            <DropdownMenuItem
+              onClick={() => setShowFundModal(true)}
+              className="flex items-center gap-2 h-9 rounded-lg"
+            >
+              <WalletProductIcon className="size-4 text-muted-foreground" />
+              Fund wallet
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuItem
+            onClick={() => setDefaultMutation.mutate()}
+            disabled={setDefaultMutation.isPending}
+            className="flex items-center gap-2 h-9 rounded-lg"
+          >
+            <CheckIcon className="size-4 text-muted-foreground" />
+            Set as default
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {fundAddress && (
+        <FundWalletModal
+          open={showFundModal}
+          onOpenChange={setShowFundModal}
+          title="Fund server wallet"
+          description="Send funds to the server wallet"
+          recipientAddress={fundAddress}
+          client={client}
+          defaultChainId={chainId}
+          checkoutWidgetTitle={
+            wallet.metadata.label
+              ? `Fund ${wallet.metadata.label}`
+              : "Fund server wallet"
+          }
+        />
+      )}
+    </>
+  );
+}
+
+function SolanaWalletActions({
+  wallet,
+  project,
+  teamSlug,
+}: {
+  wallet: SolanaWallet;
+  project: Project;
+  teamSlug: string;
+  client: ThirdwebClient;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="sm">
+          <MoreVerticalIcon className="size-4" />
+          <span className="sr-only">Open menu</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="rounded-xl">
+        <DropdownMenuItem asChild>
+          <Link
+            href={`/team/${teamSlug}/${project.slug}/transactions?testSolanaTxWithWallet=${wallet.id}`}
+            className="flex items-center gap-2 h-9 rounded-lg"
+          >
+            <SendIcon className="size-4 text-muted-foreground" />
+            Send test transaction
+          </Link>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function WalletBalance({
+  address,
+  chainId,
+  client,
+}: {
+  address: string;
+  chainId: number;
+  client: ThirdwebClient;
+}) {
+  const chain = useV5DashboardChain(chainId);
+  const balance = useWalletBalance({
+    address,
+    chain,
+    client,
+  });
+
+  if (balance.isFetching) {
+    return <Skeleton className="h-5 w-16" />;
+  }
+
+  if (!balance.data) {
+    return <span className="text-muted-foreground">N/A</span>;
+  }
+
+  return (
+    <span className="text-sm text-foreground">
+      {balance.data.displayValue} {balance.data.symbol}
+    </span>
+  );
+}
+
+function SolanaWalletBalance({
+  publicKey,
+  authToken,
+  clientId,
+  chainId,
+}: {
+  publicKey: string;
+  authToken: string;
+  clientId: string;
+  chainId: "solana:mainnet" | "solana:devnet";
+}) {
+  const balance = useQuery({
+    queryFn: async () => {
+      return await fetchSolanaBalance({
+        publicKey,
+        authToken,
+        clientId,
+        chainId,
+      });
+    },
+    queryKey: ["solanaWalletBalance", publicKey, chainId],
+  });
+
+  if (balance.isFetching) {
+    return <Skeleton className="h-5 w-16" />;
+  }
+
+  if (!balance.data) {
+    return <span className="text-muted-foreground">N/A</span>;
+  }
+
+  return (
+    <span className="text-sm text-foreground">
+      {balance.data.displayValue} {balance.data.symbol}
+    </span>
+  );
+}

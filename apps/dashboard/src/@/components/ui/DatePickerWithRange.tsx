@@ -1,5 +1,8 @@
 "use client";
 
+import { format, isBefore } from "date-fns";
+import { CalendarIcon, CalendarX2Icon, ChevronDownIcon } from "lucide-react";
+import React from "react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -8,13 +11,6 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { format, isBefore } from "date-fns";
-import {
-  Calendar as CalendarIcon,
-  CalendarX2Icon,
-  ChevronDownIcon,
-} from "lucide-react";
-import React from "react";
 import { DynamicHeight } from "./DynamicHeight";
 import { TabButtons } from "./tabs";
 
@@ -27,6 +23,7 @@ export function DatePickerWithRange(props: {
   header?: React.ReactNode;
   footer?: React.ReactNode;
   labelOverride?: string;
+  popoverAlign?: "start" | "end" | "center";
 }) {
   const [screen, setScreen] = React.useState<"from" | "to">("from");
   const { from, to, setFrom, setTo } = props;
@@ -36,23 +33,22 @@ export function DatePickerWithRange(props: {
 
   return (
     <Popover
-      open={isOpen}
       onOpenChange={(v) => {
         if (!v) {
           setScreen("from");
         }
         setIsOpen(v);
       }}
+      open={isOpen}
     >
       {/* Button */}
       <PopoverTrigger asChild>
         <Button
-          id="date"
-          variant="outline"
           className={cn(
             "justify-start gap-2 text-left font-normal",
             props.className,
           )}
+          variant="outline"
         >
           <CalendarIcon className="h-4 w-4" />
           {props.labelOverride || (
@@ -65,7 +61,11 @@ export function DatePickerWithRange(props: {
       </PopoverTrigger>
 
       {/* Popover */}
-      <PopoverContent className="w-auto p-0" align="start">
+      <PopoverContent
+        align={props.popoverAlign || "start"}
+        className="w-auto p-0"
+        sideOffset={10}
+      >
         <DynamicHeight>
           <div>
             {!isValid && (
@@ -78,21 +78,18 @@ export function DatePickerWithRange(props: {
 
             <div className={cn("px-4", !props.header && "py-4")}>
               <TabButtons
-                tabClassName="!text-sm"
                 activeTabClassName="!bg-inverted !text-inverted-foreground"
                 tabContainerClassName="gap-2"
                 tabs={[
                   {
+                    isActive: screen === "from",
                     name: "From",
                     onClick: () => setScreen("from"),
-                    isActive: screen === "from",
-                    isEnabled: true,
                   },
                   {
+                    isActive: screen === "to",
                     name: "To",
                     onClick: () => setScreen("to"),
-                    isActive: screen === "to",
-                    isEnabled: true,
                   },
                 ]}
               />
@@ -100,44 +97,44 @@ export function DatePickerWithRange(props: {
 
             {screen === "from" && (
               <Calendar
-                key={from.toString()}
-                mode="range"
-                selected={{
-                  from,
-                  to,
+                classNames={{
+                  day_range_end:
+                    "!bg-inverted/50 !text-inverted-foreground pointer-events-none",
+                  day_range_start: "!bg-inverted !text-inverted-foreground",
                 }}
                 defaultMonth={from}
+                key={from.toString()}
+                mode="range"
                 onDayClick={(newFrom) => {
                   if (isBefore(newFrom, to)) {
                     setFrom(newFrom);
                   }
                 }}
-                classNames={{
-                  day_range_start: "!bg-inverted !text-inverted-foreground",
-                  day_range_end:
-                    "!bg-inverted/50 !text-inverted-foreground pointer-events-none",
+                selected={{
+                  from,
+                  to,
                 }}
               />
             )}
 
             {screen === "to" && (
               <Calendar
-                key={to.toString()}
-                mode="range"
-                selected={{
-                  from,
-                  to,
+                classNames={{
+                  day_range_end: "!bg-inverted !text-inverted-foreground",
+                  day_range_start:
+                    "!bg-inverted/50 !text-inverted-foreground pointer-events-none",
                 }}
                 defaultMonth={to}
+                key={to.toString()}
+                mode="range"
                 onDayClick={(newTo) => {
                   if (isBefore(from, newTo)) {
                     setTo(newTo);
                   }
                 }}
-                classNames={{
-                  day_range_end: "!bg-inverted !text-inverted-foreground",
-                  day_range_start:
-                    "!bg-inverted/50 !text-inverted-foreground pointer-events-none",
+                selected={{
+                  from,
+                  to,
                 }}
               />
             )}

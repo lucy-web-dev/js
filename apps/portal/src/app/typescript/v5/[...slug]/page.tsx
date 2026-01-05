@@ -1,12 +1,12 @@
 import notFound from "../../../not-found";
-import { RootTDoc } from "../../../references/components/TDoc/Root";
 import { fetchTypeScriptDoc } from "../../../references/components/TDoc/fetchDocs/fetchTypeScriptDoc";
+import { RootTDoc } from "../../../references/components/TDoc/Root";
 import { getSlugToDocMap } from "../../../references/components/TDoc/utils/slugs";
 
 type PageProps = { params: Promise<{ slug: string[] }> };
 
 export default async function Page(props: PageProps) {
-  const doc = await fetchTypeScriptDoc("v5");
+  const doc = await fetchTypeScriptDoc();
   const slugToDoc = getSlugToDocMap(doc);
   const docSlug = (await props.params).slug?.join("/");
 
@@ -15,7 +15,8 @@ export default async function Page(props: PageProps) {
   }
 
   // API page
-  const selectedDoc = docSlug && slugToDoc[docSlug];
+  const selectedDoc =
+    docSlug && (slugToDoc[docSlug] || slugToDoc[`common/${docSlug}`]);
 
   if (selectedDoc) {
     return (
@@ -27,3 +28,5 @@ export default async function Page(props: PageProps) {
 
   notFound();
 }
+
+export const revalidate = 86400; // revalidate every day

@@ -1,5 +1,8 @@
 import { upload } from "../../../storage/upload.js";
-import type { BaseTransactionOptions } from "../../../transaction/types.js";
+import type {
+  BaseTransactionOptions,
+  WithOverrides,
+} from "../../../transaction/types.js";
 import type { NFTInput } from "../../../utils/nft/parseNft.js";
 import {
   type SetTokenURIParams,
@@ -10,16 +13,17 @@ export { isSetTokenURISupported as isUpdateTokenURISupported } from "../../erc11
 /**
  * @extension ERC1155
  */
-export type UpdateTokenURIParams = {
+export type UpdateTokenURIParams = WithOverrides<{
   tokenId: bigint;
   newMetadata: NFTInput;
-};
+}>;
 
 /**
  * This function is an abstracted layer of the [`setTokenURI` extension](https://portal.thirdweb.com/references/typescript/v5/erc1155/setTokenURI),
  * which means it uses `setTokenURI` under the hood.
  * While the `setTokenURI` method only takes in a uri string, this extension takes in a user-friendly [`NFTInput`](https://portal.thirdweb.com/references/typescript/v5/NFTInput),
  * upload that content to IPFS and pass the IPFS URI (of said `NFTInput`) to the underlying `setTokenURI` method.
+ * This method is only available on the `TokenERC1155` contract.
  *
  * This extension does not validate the NFTInput so make sure you are passing the proper content that you want to update.
  *
@@ -44,8 +48,9 @@ export function updateTokenURI(
 ) {
   const { contract } = options;
   return setTokenURI({
-    contract,
     asyncParams: async () => getUpdateTokenParams(options),
+    contract,
+    overrides: options.overrides,
   });
 }
 

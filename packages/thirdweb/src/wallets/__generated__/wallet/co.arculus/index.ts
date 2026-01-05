@@ -5,7 +5,7 @@ export const wallet = {
   id: "co.arculus",
   name: "Arculus Wallet",
   homepage: "https://www.arculus.co",
-  image_id: "f78dab27-7165-4a3d-fdb1-fcff06c0a700",
+  image_id: "3882c5aa-61f8-4ef6-a628-97cdc4494000",
   app: {
     browser: null,
     ios: "https://apps.apple.com/us/app/arculus-wallet/id1575425801",
@@ -23,7 +23,7 @@ export const wallet = {
   rdns: null,
   mobile: {
     native: "arculuswc://",
-    universal: "https://gw.arculus.co/app",
+    universal: "https://gw.arculus.co/app/wc",
   },
   desktop: {
     native: null,

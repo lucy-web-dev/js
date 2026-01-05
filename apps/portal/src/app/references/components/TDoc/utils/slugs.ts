@@ -1,5 +1,5 @@
-import type { SomeDoc } from "@/app/references/components/TDoc/types";
 import type { TransformedDoc } from "typedoc-better-json";
+import type { SomeDoc } from "@/app/references/components/TDoc/types";
 import { getExtensionName } from "./getSidebarLinkgroups";
 import { subgroups } from "./subgroups";
 import { uniqueSlugger } from "./uniqueSlugger";
@@ -36,11 +36,17 @@ export function getSlugToDocMap(doc: TransformedDoc) {
           const extensionBlockTag = v.signatures
             ?.find((s) =>
               s.blockTags?.some(
-                (tag) => tag.tag === "@extension" || tag.tag === "@modules",
+                (tag) =>
+                  tag.tag === "@extension" ||
+                  tag.tag === "@modules" ||
+                  tag.tag === "@bridge",
               ),
             )
             ?.blockTags?.find(
-              (tag) => tag.tag === "@extension" || tag.tag === "@modules",
+              (tag) =>
+                tag.tag === "@extension" ||
+                tag.tag === "@modules" ||
+                tag.tag === "@bridge",
             );
 
           if (extensionBlockTag) {
@@ -62,18 +68,4 @@ export function getSlugToDocMap(doc: TransformedDoc) {
   }
 
   return slugToDocMap;
-}
-
-export function getLinkMap(doc: TransformedDoc, path: string) {
-  const linkMap: Map<string, string> = new Map();
-  for (const key in doc) {
-    const value = doc[key as keyof TransformedDoc];
-    if (Array.isArray(value)) {
-      for (const v of value) {
-        linkMap.set(v.name, `${path}/${v.name}`);
-      }
-    }
-  }
-
-  return linkMap;
 }

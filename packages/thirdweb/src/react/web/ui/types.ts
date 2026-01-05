@@ -8,4 +8,6 @@ export type LocaleId =
   | "vi_VN"
   | "de_DE"
   | "fr_FR"
-  | "pt_BR";
+  | "ru_RU"
+  | "pt_BR"
+  | "zh_CN";

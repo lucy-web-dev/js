@@ -11,8 +11,7 @@ import {
 import { getSocialProfiles } from "../../../../../social/profiles.js";
 import type { SocialProfile } from "../../../../../social/types.js";
 import { parseAvatarRecord } from "../../../../../utils/ens/avatar.js";
-import { useAccountContext } from "./provider.js";
-
+import { useAccountContext } from "../../../../core/account/provider.js";
 /**
  * Props for the AccountAvatar component
  * @component
@@ -164,18 +163,12 @@ export function AccountAvatar({
 }: AccountAvatarProps) {
   const { address, client } = useAccountContext();
   const avatarQuery = useQuery({
-    queryKey: [
-      "account-avatar",
-      address,
-      { socialType },
-      { resolverAddress, resolverChain },
-    ],
     queryFn: async (): Promise<string> => {
       const [socialData, ensName] = await Promise.all([
         getSocialProfiles({ address, client }),
         resolveName({
-          client,
           address: address || "",
+          client,
           resolverAddress,
           resolverChain,
         }),
@@ -211,6 +204,12 @@ export function AccountAvatar({
 
       throw new Error("Failed to resolve social + ens avatar");
     },
+    queryKey: [
+      "account-avatar",
+      address,
+      { socialType },
+      { resolverAddress, resolverChain },
+    ],
     retry: false,
     ...queryOptions,
   });

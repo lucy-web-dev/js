@@ -7,8 +7,7 @@ import { resolveName } from "../../../extensions/ens/resolve-name.js";
 import { shortenAddress } from "../../../utils/address.js";
 import { parseAvatarRecord } from "../../../utils/ens/avatar.js";
 import { getWalletInfo } from "../../../wallets/__generated__/getWalletInfo.js";
-import { isEcosystemWallet } from "../../../wallets/ecosystem/is-ecosystem-wallet.js";
-import type { Account, Wallet } from "../../../wallets/interfaces/wallet.js";
+import type { Account } from "../../../wallets/interfaces/wallet.js";
 import type { WalletInfo } from "../../../wallets/wallet-info.js";
 import type { WalletId } from "../../../wallets/wallet-types.js";
 import { useWalletBalance } from "../hooks/others/useWalletBalance.js";
@@ -35,14 +34,14 @@ export function useEnsName(options: {
 }) {
   const { client, address } = options;
   return useQuery({
-    queryKey: ["ens-name", address],
     enabled: !!address,
     queryFn: () =>
       resolveName({
-        client,
         address: address || "",
+        client,
         resolverChain: ethereum,
       }),
+    queryKey: ["ens-name", address],
   });
 }
 
@@ -67,13 +66,13 @@ export function useEnsAvatar(options: {
 }) {
   const { client, ensName } = options;
   return useQuery({
-    queryKey: ["ens-avatar", ensName],
     enabled: !!ensName,
     queryFn: async () =>
       resolveAvatar({
         client,
         name: ensName || "",
       }),
+    queryKey: ["ens-avatar", ensName],
   });
 }
 
@@ -93,8 +92,8 @@ export function useConnectedWalletDetails(
       : undefined;
 
   const ensNameQuery = useEnsName({
-    client,
     address: activeAccount?.address,
+    client,
   });
 
   const ensAvatarQuery = useEnsAvatar({
@@ -103,8 +102,8 @@ export function useConnectedWalletDetails(
   });
 
   const socialProfileQuery = useSocialProfiles({
-    client,
     address: activeAccount?.address,
+    client,
   });
 
   const shortAddress = activeAccount?.address
@@ -112,10 +111,10 @@ export function useConnectedWalletDetails(
     : "";
 
   const balanceQuery = useWalletBalance({
-    chain: walletChain ? walletChain : undefined,
-    tokenAddress,
     address: activeAccount?.address,
+    chain: walletChain ? walletChain : undefined,
     client,
+    tokenAddress,
   });
 
   const addressOrENS = ensNameQuery.data || shortAddress;
@@ -123,29 +122,29 @@ export function useConnectedWalletDetails(
     ?.avatar;
 
   const { data: pfp } = useQuery({
-    queryKey: ["ens-avatar", pfpUnresolved],
+    enabled: !!pfpUnresolved,
     queryFn: async () => {
       if (!pfpUnresolved) {
         return undefined;
       }
       return parseAvatarRecord({ client, uri: pfpUnresolved });
     },
-    enabled: !!pfpUnresolved,
-    refetchOnWindowFocus: false,
+    queryKey: ["ens-avatar", pfpUnresolved],
     refetchOnMount: false,
+    refetchOnWindowFocus: false,
   });
   const name =
     socialProfileQuery.data?.filter((p) => p.name)[0]?.name || addressOrENS;
 
   return {
-    socialProfileQuery,
-    ensNameQuery,
-    ensAvatarQuery,
     addressOrENS,
-    pfp,
-    name,
-    shortAddress,
     balanceQuery,
+    ensAvatarQuery,
+    ensNameQuery,
+    name,
+    pfp,
+    shortAddress,
+    socialProfileQuery,
   };
 }
 
@@ -157,23 +156,23 @@ export function useConnectedWalletDetails(
  * import { useWalletInfo } from "thirdweb/react";
  *
  * const { data: walletInfo } = useWalletInfo("io.metamask");
- * console.log("Walelt name", walletInfo?.name);
+ * console.log("wallet name", walletInfo?.name);
  * ```
  * @wallet
  */
 export function useWalletInfo(id: WalletId | undefined) {
   return useQuery<WalletInfo>({
-    queryKey: ["wallet-info", id],
+    enabled: !!id,
     queryFn: () => {
       if (!id) {
         throw new Error("Wallet id is required");
       }
       return getWalletInfo(id, false);
     },
-    retry: false,
-    refetchOnWindowFocus: false,
+    queryKey: ["wallet-info", id],
     refetchOnMount: false,
-    enabled: !!id,
+    refetchOnWindowFocus: false,
+    retry: false,
   });
 }
 
@@ -193,48 +192,25 @@ export function useWalletInfo(id: WalletId | undefined) {
  */
 export function useWalletImage(id: WalletId | undefined) {
   return useQuery({
-    queryKey: ["wallet-image", id],
-    queryFn: () => {
+    enabled: !!id,
+    queryFn: async () => {
       if (!id) {
         throw new Error("Wallet id is required");
       }
+      const { getInstalledWalletProviders } = await import(
+        "../../../wallets/injected/mipdStore.js"
+      );
+      const mipdImage = getInstalledWalletProviders().find(
+        (x) => x.info.rdns === id,
+      )?.info.icon;
+      if (mipdImage) {
+        return mipdImage;
+      }
       return getWalletInfo(id, true);
     },
-    retry: false,
-    refetchOnWindowFocus: false,
+    queryKey: ["wallet-image", id],
     refetchOnMount: false,
-    enabled: !!id,
+    refetchOnWindowFocus: false,
+    retry: false,
   });
-}
-
-/**
- * @internal
- */
-export function hasSponsoredTransactionsEnabled(wallet: Wallet | undefined) {
-  if (!wallet) {
-    return false;
-  }
-  let sponsoredTransactionsEnabled = false;
-  if (wallet && wallet.id === "smart") {
-    const options = (wallet as Wallet<"smart">).getConfig();
-    if ("sponsorGas" in options) {
-      sponsoredTransactionsEnabled = options.sponsorGas;
-    }
-    if ("gasless" in options) {
-      sponsoredTransactionsEnabled = options.gasless;
-    }
-  }
-  if (wallet && (wallet.id === "inApp" || isEcosystemWallet(wallet))) {
-    const options = (wallet as Wallet<"inApp">).getConfig();
-    if (options && "smartAccount" in options && options.smartAccount) {
-      const smartOptions = options.smartAccount;
-      if ("sponsorGas" in smartOptions) {
-        sponsoredTransactionsEnabled = smartOptions.sponsorGas;
-      }
-      if ("gasless" in smartOptions) {
-        sponsoredTransactionsEnabled = smartOptions.gasless;
-      }
-    }
-  }
-  return sponsoredTransactionsEnabled;
 }

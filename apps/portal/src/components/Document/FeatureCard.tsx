@@ -1,6 +1,6 @@
 import Image from "next/image";
 
-export type FeatureCardItem = {
+type FeatureCardItem = {
   title: string;
   description: string;
   iconUrl: string | React.ReactNode;
@@ -9,18 +9,24 @@ export type FeatureCardItem = {
 export function FeatureCard(props: FeatureCardItem) {
   const { title, description, iconUrl } = props;
   return (
-    <div className="flex flex-row gap-4 rounded-lg px-4 py-3">
-      <div>
-        {typeof iconUrl === "string" ? (
-          <Image src={iconUrl} alt="" width={40} height={40} />
-        ) : (
-          iconUrl
-        )}
+    <div className="bg-card rounded-xl p-4 border">
+      <div className="flex mb-3">
+        <div className="p-2 rounded-full border bg-background [&_svg]:size-4 [&_svg]:text-muted-foreground">
+          {typeof iconUrl === "string" ? (
+            <Image
+              alt=""
+              className="size-4 text-muted-foreground"
+              height={16}
+              src={iconUrl}
+              width={16}
+            />
+          ) : (
+            iconUrl
+          )}
+        </div>
       </div>
-      <div>
-        <div className="font-semibold text-lg">{title}</div>
-        <div className="max-w-[300px] text-sm">{description}</div>
-      </div>
+      <h4 className="mb-1 font-medium text-base">{title}</h4>
+      <p className="text-muted-foreground text-sm text-pretty">{description}</p>
     </div>
   );
 }

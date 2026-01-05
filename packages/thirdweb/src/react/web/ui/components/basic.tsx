@@ -1,7 +1,8 @@
 "use client";
 import type { CSSObject } from "@emotion/react";
 import { useCustomTheme } from "../../../core/design-system/CustomThemeProvider.js";
-import { type Theme, spacing } from "../../../core/design-system/index.js";
+import { spacing, type Theme } from "../../../core/design-system/index.js";
+import { cls } from "../../utils/cls.js";
 import {
   fadeInAnimation,
   floatDownAnimation,
@@ -16,17 +17,17 @@ export const ScreenBottomContainer = /* @__PURE__ */ StyledDiv((_) => {
     borderTop: `1px solid ${theme.colors.separatorLine}`,
     display: "flex",
     flexDirection: "column",
-    gap: spacing.lg,
+    gap: spacing.md,
     padding: spacing.lg,
   };
 });
 
 export const noScrollBar = /* @__PURE__ */ {
-  scrollbarWidth: "none",
   "&::-webkit-scrollbar": {
-    width: 0,
     display: "none",
+    width: 0,
   },
+  scrollbarWidth: "none",
 } satisfies CSSObject;
 
 /**
@@ -36,13 +37,15 @@ export function ModalHeader(props: {
   onBack?: () => void;
   title: React.ReactNode;
   leftAligned?: boolean;
+  className?: string;
 }) {
   const { onBack, title } = props;
   return (
     <div
+      className={cls("tw-header", props.className)}
       style={{
-        display: "flex",
         alignItems: "center",
+        display: "flex",
         justifyContent: props.leftAligned ? "flex-start" : "center",
         position: "relative",
       }}
@@ -51,24 +54,23 @@ export function ModalHeader(props: {
         <BackButton
           onClick={onBack}
           style={{
-            position: "absolute",
             left: 0,
+            position: "absolute",
             top: 0,
           }}
         />
       )}
-      <Container flex="row" gap="xs" center="both">
+      <Container center="both" flex="row" gap="xs">
         {typeof title === "string" ? <ModalTitle>{title}</ModalTitle> : title}
       </Container>
     </div>
   );
 }
 
-export const Line = /* @__PURE__ */ StyledDiv(() => {
+export const Line = /* @__PURE__ */ StyledDiv((props: { dashed?: boolean }) => {
   const theme = useCustomTheme();
   return {
-    height: "1px",
-    background: theme.colors.separatorLine,
+    borderTop: `1px ${props.dashed ? "dashed" : "solid"} ${theme.colors.separatorLine}`,
   };
 });
 
@@ -82,17 +84,20 @@ export function Container(props: {
   expand?: boolean;
   center?: "x" | "y" | "both";
   gap?: keyof typeof spacing;
-  children: React.ReactNode;
+  children?: React.ReactNode;
   style?: React.CSSProperties;
   p?: keyof typeof spacing;
   px?: keyof typeof spacing;
   py?: keyof typeof spacing;
+  pb?: keyof typeof spacing;
+  pt?: keyof typeof spacing;
   relative?: boolean;
   scrollY?: boolean;
   color?: keyof Theme["colors"];
   debug?: boolean;
   bg?: keyof Theme["colors"];
   borderColor?: keyof Theme["colors"];
+  className?: string;
 }) {
   const styles: React.CSSProperties = {};
 
@@ -156,6 +161,14 @@ export function Container(props: {
     styles.paddingBottom = spacing[props.py];
   }
 
+  if (props.pb) {
+    styles.paddingBottom = spacing[props.pb];
+  }
+
+  if (props.pt) {
+    styles.paddingTop = spacing[props.pt];
+  }
+
   if (props.debug) {
     styles.outline = "1px solid red";
     styles.outlineOffset = "-1px";
@@ -163,11 +176,12 @@ export function Container(props: {
 
   return (
     <Box
-      data-scrolly={props.scrollY}
-      data-animate={props.animate}
       bg={props.bg}
-      color={props.color}
       borderColor={props.borderColor}
+      color={props.color}
+      data-animate={props.animate}
+      data-scrolly={props.scrollY}
+      className={props.className}
       style={{
         ...styles,
         ...props.style,
@@ -187,26 +201,26 @@ type BoxProps = {
 const Box = /* @__PURE__ */ StyledDiv<BoxProps>((props) => {
   const theme = useCustomTheme();
   return {
-    color: props.color ? theme.colors[props.color] : "inherit",
-    background: props.bg ? theme.colors[props.bg] : undefined,
-    borderColor: props.borderColor
-      ? theme.colors[props.borderColor]
-      : undefined,
     "&[data-animate='fadein']": {
-      opacity: 0,
       animation: `${fadeInAnimation} 350ms ease forwards`,
-    },
-    "&[data-animate='floatup']": {
       opacity: 0,
-      animation: `${floatUpAnimation} 350ms ease forwards`,
     },
     "&[data-animate='floatdown']": {
-      opacity: 0,
       animation: `${floatDownAnimation} 350ms ease forwards`,
+      opacity: 0,
+    },
+    "&[data-animate='floatup']": {
+      animation: `${floatUpAnimation} 350ms ease forwards`,
+      opacity: 0,
     },
     "&[data-scrolly='true']": {
       overflowY: "auto",
       ...noScrollBar,
     },
+    background: props.bg ? theme.colors[props.bg] : undefined,
+    borderColor: props.borderColor
+      ? theme.colors[props.borderColor]
+      : undefined,
+    color: props.color ? theme.colors[props.color] : "inherit",
   };
 });

@@ -1,9 +1,8 @@
 import { webLocalStorage } from "../../../../utils/storage/webStorage.js";
+import type { AutoConnectProps } from "../../../../wallets/connection/types.js";
 import { createWallet } from "../../../../wallets/create-wallet.js";
-import { getInstalledWalletProviders } from "../../../../wallets/injected/mipdStore.js";
-import type { AutoConnectProps } from "../../../core/hooks/connection/types.js";
+import { getDefaultWallets } from "../../../../wallets/defaultWallets.js";
 import { useAutoConnectCore } from "../../../core/hooks/wallets/useAutoConnect.js";
-import { getDefaultWallets } from "../../wallets/defaultWallets.js";
 
 /**
  * Autoconnect the last previously connected wallet.
@@ -34,15 +33,5 @@ export function useAutoConnect(props: AutoConnectProps) {
       wallets,
     },
     createWallet,
-    () => {
-      const specifiedWalletIds = new Set(wallets.map((x) => x.id));
-
-      // pass the wallets that are not already specified but are installed by the user
-      const installedWallets = getInstalledWalletProviders()
-        .filter((x) => !specifiedWalletIds.has(x.info.rdns))
-        .map((x) => createWallet(x.info.rdns));
-
-      return installedWallets;
-    },
   );
 }

@@ -21,6 +21,7 @@ import { useActiveWallet } from "./useActiveWallet.js";
  * @extension EIP5792
  */
 export function useCapabilities(options?: {
+  chainId?: number;
   queryOptions?: {
     enabled?: boolean;
     retry?: number;
@@ -28,19 +29,18 @@ export function useCapabilities(options?: {
 }): UseQueryResult<GetCapabilitiesResult> {
   const wallet = useActiveWallet();
   return useQuery({
-    queryKey: [
-      "getCapabilities",
-      wallet?.getChain()?.id || -1,
-      wallet?.id,
-    ] as const,
     queryFn: async () => {
       if (!wallet) {
         return {
           message: "Can't get capabilities, no wallet connected",
         } as const;
       }
-      return getCapabilities({ wallet });
+      return getCapabilities({
+        chainId: options?.chainId,
+        wallet,
+      });
     },
+    queryKey: ["getCapabilities", wallet?.id, options?.chainId] as const,
     retry: false,
     ...options?.queryOptions,
   });

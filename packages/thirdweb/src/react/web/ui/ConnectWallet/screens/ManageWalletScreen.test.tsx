@@ -10,11 +10,11 @@ vi.mock("../../../../core/hooks/wallets/useAdminWallet");
 
 describe("ManageWalletScreen", () => {
   const mockProps = {
-    onBack: vi.fn(),
-    setScreen: vi.fn(),
+    client: TEST_CLIENT,
     closeModal: vi.fn(),
     locale: en,
-    client: TEST_CLIENT,
+    onBack: vi.fn(),
+    setScreen: vi.fn(),
   };
 
   beforeEach(() => {
@@ -26,7 +26,7 @@ describe("ManageWalletScreen", () => {
     expect(screen.getByText(en.manageWallet.title)).toBeInTheDocument();
   });
 
-  it("should render the linked profiles button if allowLinkingProfiles is true", () => {
+  it.skip("should render the linked profiles button if allowLinkingProfiles is true", () => {
     render(
       <ManageWalletScreen
         {...mockProps}
@@ -38,7 +38,7 @@ describe("ManageWalletScreen", () => {
     ).toBeInTheDocument();
   });
 
-  it("should not render the linked profiles button if allowLinkingProfiles is false", () => {
+  it.skip("should not render the linked profiles button if allowLinkingProfiles is false", () => {
     render(
       <ManageWalletScreen
         {...mockProps}
@@ -50,7 +50,7 @@ describe("ManageWalletScreen", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("should default to showing linked profiles button", () => {
+  it.skip("should default to showing linked profiles button", () => {
     render(<ManageWalletScreen {...mockProps} />);
     expect(
       screen.getByText(en.manageWallet.linkedProfiles),

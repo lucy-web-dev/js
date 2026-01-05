@@ -1,12 +1,12 @@
 import notFound from "../../../not-found";
-import { RootTDoc } from "../../../references/components/TDoc/Root";
 import { fetchTypeScriptDoc } from "../../../references/components/TDoc/fetchDocs/fetchTypeScriptDoc";
+import { RootTDoc } from "../../../references/components/TDoc/Root";
 import { getSlugToDocMap } from "../../../references/components/TDoc/utils/slugs";
 
 type PageProps = { params: Promise<{ slug: string[] }> };
 
 export default async function Page(props: PageProps) {
-  const doc = await fetchTypeScriptDoc("v5");
+  const doc = await fetchTypeScriptDoc();
   const slugToDoc = getSlugToDocMap(doc);
   const docSlug = (await props.params).slug?.join("/");
 

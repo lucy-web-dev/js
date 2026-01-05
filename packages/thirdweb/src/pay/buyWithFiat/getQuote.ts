@@ -1,11 +1,16 @@
+import { prepare as prepareOnramp } from "../../bridge/Onramp.js";
+import { getCachedChain } from "../../chains/utils.js";
 import type { ThirdwebClient } from "../../client/client.js";
-import { getClientFetch } from "../../utils/fetch.js";
-import { stringify } from "../../utils/json.js";
-import type { FiatProvider } from "../utils/commonTypes.js";
-import { getPayBuyWithFiatQuoteEndpoint } from "../utils/definitions.js";
-
+import { NATIVE_TOKEN_ADDRESS } from "../../constants/addresses.js";
+import { getContract } from "../../contract/contract.js";
+import { decimals } from "../../extensions/erc20/read/decimals.js";
+import type { CurrencyMeta } from "../../react/web/ui/ConnectWallet/screens/Buy/fiat/currencies.js";
+import { toTokens, toUnits } from "../../utils/units.js";
+import type { PurchaseData } from "../types.js";
+import type { FiatProvider, PayTokenInfo } from "../utils/commonTypes.js";
 /**
  * Parameters for [`getBuyWithFiatQuote`](https://portal.thirdweb.com/references/typescript/v5/getBuyWithFiatQuote) function
+ * @deprecated
  * @buyCrypto
  */
 export type GetBuyWithFiatQuoteParams = {
@@ -40,7 +45,7 @@ export type GetBuyWithFiatQuoteParams = {
   /**
    * Symbol of the fiat currency to buy the token with.
    */
-  fromCurrencySymbol: "USD" | "CAD" | "GBP" | "EUR" | "JPY";
+  fromCurrencySymbol: CurrencyMeta["shorthand"];
 
   /**
    * The maximum slippage in basis points (bps) allowed for the transaction.
@@ -76,7 +81,7 @@ export type GetBuyWithFiatQuoteParams = {
    *
    * This details will be stored with the purchase and can be retrieved later via the status API or Webhook
    */
-  purchaseData?: object;
+  purchaseData?: PurchaseData;
 
   /**
    * Optional parameter to onramp gas with the purchase
@@ -91,6 +96,14 @@ export type GetBuyWithFiatQuoteParams = {
    * By default, we choose a recommended provider based on the location of the user, KYC status, and currency.
    */
   preferredProvider?: FiatProvider;
+
+  /**
+   * @hidden
+   */
+  paymentLinkId?: string;
+
+  onrampChainId?: number;
+  onrampTokenAddress?: string;
 };
 
 /**
@@ -102,6 +115,7 @@ export type GetBuyWithFiatQuoteParams = {
  * - The on-ramp and destination token information.
  * - Processing fees
  *
+ * @deprecated
  * @buyCrypto
  */
 export type BuyWithFiatQuote = {
@@ -150,14 +164,7 @@ export type BuyWithFiatQuote = {
   /**
    * Token information for the desired token. (token the user wants to buy)
    */
-  toToken: {
-    symbol?: string | undefined;
-    priceUSDCents?: number | undefined;
-    name?: string | undefined;
-    chainId: number;
-    tokenAddress: string;
-    decimals: number;
-  };
+  toToken: PayTokenInfo;
   /**
    * Address of the wallet to which the tokens will be sent.
    */
@@ -196,35 +203,17 @@ export type BuyWithFiatQuote = {
     amount: string;
     amountWei: string;
     amountUSDCents: number;
-    token: {
-      chainId: number;
-      decimals: number;
-      name: string;
-      priceUSDCents: number;
-      symbol: string;
-      tokenAddress: string;
-    };
+    token: PayTokenInfo;
   };
 
   /**
-   * Gas Token that will be sent to the user's wallet address by the on-ramp provider.
-   *
-   * Only used for ERC20 + Gas on-ramp flow. This will hold the details of the gas token and amount sent for gas.
-   *
-   * In Native Currency case, extra for gas will be added to the output amount of the onramp.
+   * Routing token that will be swapped from the on-ramp token, so that it can be bridged to the destination token.
    */
-  gasToken?: {
+  routingToken?: {
     amount: string;
     amountWei: string;
     amountUSDCents: number;
-    token: {
-      chainId: number;
-      decimals: number;
-      name: string;
-      priceUSDCents: number;
-      symbol: string;
-      tokenAddress: string;
-    };
+    token: PayTokenInfo;
   };
 
   /**
@@ -238,6 +227,11 @@ export type BuyWithFiatQuote = {
    *
    */
   onRampLink: string;
+
+  /**
+   * The provider that was used to get the quote.
+   */
+  provider: FiatProvider;
 };
 
 /**
@@ -286,46 +280,198 @@ export type BuyWithFiatQuote = {
  *
  * window.open(quote.onRampLink, "_blank");
  * ```
+ * @deprecated
  * @buyCrypto
  */
 export async function getBuyWithFiatQuote(
   params: GetBuyWithFiatQuoteParams,
 ): Promise<BuyWithFiatQuote> {
   try {
-    const clientFetch = getClientFetch(params.client);
+    // map preferred provider (FiatProvider) → onramp string expected by Onramp.prepare
+    const mapProviderToOnramp = (
+      provider?: FiatProvider,
+    ): "stripe" | "coinbase" | "transak" => {
+      switch (provider) {
+        case "stripe":
+          return "stripe";
+        case "transak":
+          return "transak";
+        default: // default to coinbase when undefined or any other value
+          return "coinbase";
+      }
+    };
 
-    const response = await clientFetch(getPayBuyWithFiatQuoteEndpoint(), {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      body: stringify({
-        toAddress: params.toAddress,
-        fromCurrencySymbol: params.fromCurrencySymbol,
-        toChainId: params.toChainId.toString(),
-        toTokenAddress: params.toTokenAddress,
-        fromAmount: params.fromAmount,
-        toAmount: params.toAmount,
-        maxSlippageBPS: params.maxSlippageBPS,
-        isTestMode: params.isTestMode,
-        purchaseData: params.purchaseData,
-        fromAddress: params.fromAddress,
-        toGasAmountWei: params.toGasAmountWei,
-        preferredProvider: params.preferredProvider,
-      }),
+    // Choose provider or default to STRIPE
+    const onrampProvider = mapProviderToOnramp(params.preferredProvider);
+
+    const d =
+      params.toTokenAddress !== NATIVE_TOKEN_ADDRESS
+        ? await decimals({
+            contract: getContract({
+              address: params.toTokenAddress,
+              chain: getCachedChain(params.toChainId),
+              client: params.client,
+            }),
+          })
+        : 18;
+
+    // Prepare amount in wei if provided
+    const amountWei = params.toAmount ? toUnits(params.toAmount, d) : undefined;
+
+    // Call new Onramp.prepare to get the quote & link
+    const prepared = await prepareOnramp({
+      amount: amountWei,
+      chainId: params.toChainId,
+      client: params.client,
+      currency: params.fromCurrencySymbol,
+      maxSteps: 2,
+      onramp: onrampProvider,
+      onrampChainId: params.onrampChainId,
+      onrampTokenAddress: params.onrampTokenAddress,
+      paymentLinkId: params.paymentLinkId,
+      purchaseData: params.purchaseData,
+      receiver: params.toAddress, // force onramp to native token to avoid missing gas issues
+      sender: params.fromAddress,
+      tokenAddress: params.toTokenAddress,
     });
 
-    // Assuming the response directly matches the SwapResponse interface
-    if (!response.ok) {
-      const errorObj = await response.json();
-      if (errorObj && "error" in errorObj) {
-        throw errorObj;
-      }
-      throw new Error(`HTTP error! status: ${response.status}`);
+    // Determine tokens based on steps rules
+    const hasSteps = prepared.steps.length > 0;
+    const firstStep = hasSteps
+      ? (prepared.steps[0] as (typeof prepared.steps)[number])
+      : undefined;
+
+    // Estimated duration in seconds – sum of all step durations
+    const estimatedDurationSeconds = Math.max(
+      120,
+      Math.ceil(
+        prepared.steps.reduce((acc, s) => acc + s.estimatedExecutionTimeMs, 0) /
+          1000,
+      ),
+    );
+
+    const estimatedToAmountMinWeiBigInt = prepared.destinationAmount;
+
+    const maxSlippageBPS = params.maxSlippageBPS ?? 0;
+    const slippageWei =
+      (estimatedToAmountMinWeiBigInt * BigInt(maxSlippageBPS)) / 10000n;
+    const toAmountMinWeiBigInt = estimatedToAmountMinWeiBigInt - slippageWei;
+
+    const estimatedToAmountMin = toTokens(estimatedToAmountMinWeiBigInt, d);
+    const toAmountMin = toTokens(toAmountMinWeiBigInt, d);
+
+    // Helper to convert a Token → PayTokenInfo
+    const tokenToPayTokenInfo = (token: {
+      chainId: number;
+      address: string;
+      decimals: number;
+      symbol: string;
+      name: string;
+      prices: Record<string, number>;
+    }): PayTokenInfo => ({
+      chainId: token.chainId,
+      decimals: token.decimals,
+      name: token.name,
+      priceUSDCents: Math.round((token.prices.USD || 0) * 100),
+      symbol: token.symbol,
+      tokenAddress: token.address,
+    });
+
+    // Determine the raw token objects using new simplified rules
+    // 1. toToken is always the destination token
+    const toTokenRaw = prepared.destinationToken;
+
+    // 2. onRampToken: if exactly one step -> originToken of that step, else toTokenRaw
+    const onRampTokenRaw =
+      prepared.steps.length > 0 && firstStep
+        ? firstStep.originToken
+        : toTokenRaw;
+
+    // 3. routingToken: if exactly two steps -> originToken of second step, else undefined
+    const routingTokenRaw =
+      prepared.steps.length > 1
+        ? (prepared.steps[1] as (typeof prepared.steps)[number]).originToken
+        : undefined;
+
+    // Amounts for onRampToken/raw
+    const onRampTokenAmountWei: bigint =
+      prepared.steps.length > 0 && firstStep
+        ? firstStep.originAmount
+        : prepared.destinationAmount;
+
+    const onRampTokenAmount = toTokens(
+      onRampTokenAmountWei,
+      onRampTokenRaw.decimals,
+    );
+
+    // Build info objects
+    const onRampTokenObject = {
+      amount: onRampTokenAmount,
+      amountUSDCents: Math.round(
+        Number(onRampTokenAmount) * (onRampTokenRaw.prices.USD || 0) * 100,
+      ),
+      amountWei: onRampTokenAmountWei.toString(),
+      token: tokenToPayTokenInfo(onRampTokenRaw),
+    };
+
+    let routingTokenObject:
+      | {
+          amount: string;
+          amountWei: string;
+          amountUSDCents: number;
+          token: PayTokenInfo;
+        }
+      | undefined;
+
+    if (routingTokenRaw) {
+      const routingAmountWei = (
+        prepared.steps[1] as (typeof prepared.steps)[number]
+      ).originAmount;
+      const routingAmount = toTokens(
+        routingAmountWei,
+        routingTokenRaw.decimals,
+      );
+      routingTokenObject = {
+        amount: routingAmount,
+        amountUSDCents: Math.round(
+          Number(routingAmount) * (routingTokenRaw.prices.USD || 0) * 100,
+        ),
+        amountWei: routingAmountWei.toString(),
+        token: tokenToPayTokenInfo(routingTokenRaw),
+      };
     }
 
-    return (await response.json()).result;
+    const buyWithFiatQuote: BuyWithFiatQuote = {
+      estimatedDurationSeconds,
+      estimatedToAmountMin: estimatedToAmountMin,
+      estimatedToAmountMinWei: estimatedToAmountMinWeiBigInt.toString(),
+      fromAddress: params.fromAddress,
+      fromCurrency: {
+        amount: prepared.currencyAmount.toString(),
+        amountUnits: Number(prepared.currencyAmount).toFixed(2),
+        currencySymbol: prepared.currency,
+        decimals: 2,
+      },
+      fromCurrencyWithFees: {
+        amount: prepared.currencyAmount.toString(),
+        amountUnits: Number(prepared.currencyAmount).toFixed(2),
+        currencySymbol: prepared.currency,
+        decimals: 2,
+      },
+      intentId: prepared.id,
+      maxSlippageBPS: maxSlippageBPS,
+      onRampLink: prepared.link,
+      onRampToken: onRampTokenObject,
+      processingFees: [],
+      provider: (params.preferredProvider ?? "COINBASE") as FiatProvider,
+      routingToken: routingTokenObject,
+      toAddress: params.toAddress,
+      toAmountMin: toAmountMin,
+      toAmountMinWei: toAmountMinWeiBigInt.toString(),
+      toToken: tokenToPayTokenInfo(toTokenRaw),
+    };
+
+    return buyWithFiatQuote;
   } catch (error) {
     console.error("Error getting buy with fiat quote", error);
     throw error;

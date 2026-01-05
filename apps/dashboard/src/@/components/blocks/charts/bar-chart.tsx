@@ -1,7 +1,12 @@
 "use client";
 
+import { format } from "date-fns";
+import { useMemo } from "react";
 import { Bar, BarChart, CartesianGrid, XAxis } from "recharts";
-
+import {
+  EmptyChartState,
+  LoadingChartState,
+} from "@/components/analytics/empty-chart-state";
 import {
   Card,
   CardContent,
@@ -17,17 +22,16 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import { formatDate } from "date-fns";
-import { useMemo } from "react";
-import {
-  EmptyChartState,
-  LoadingChartState,
-} from "../../../../components/analytics/empty-chart-state";
+import { cn } from "@/lib/utils";
 
 type ThirdwebBarChartProps<TConfig extends ChartConfig> = {
   // metadata
-  title: string;
-  description?: string;
+  header?: {
+    title: string;
+    description?: string;
+    titleClassName?: string;
+  };
+  customHeader?: React.ReactNode;
   // chart config
   config: TConfig;
   data: Array<Record<keyof TConfig, number> & { time: number | string | Date }>;
@@ -36,6 +40,14 @@ type ThirdwebBarChartProps<TConfig extends ChartConfig> = {
   // chart className
   chartClassName?: string;
   isPending: boolean;
+  toolTipLabelFormatter?: (label: string, payload: unknown) => React.ReactNode;
+  toolTipValueFormatter?: (value: unknown) => React.ReactNode;
+  hideLabel?: boolean;
+  emptyChartState?: React.ReactElement;
+  className?: string;
+  xAxis?: {
+    showHour?: boolean;
+  };
 };
 
 export function ThirdwebBarChart<TConfig extends ChartConfig>(
@@ -45,53 +57,70 @@ export function ThirdwebBarChart<TConfig extends ChartConfig>(
   // if there are more than 4 keys then we should stack them by default
   const variant =
     props.variant || configKeys.length > 4 ? "stacked" : "grouped";
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="mb-2">{props.title}</CardTitle>
-        {props.description && (
-          <CardDescription>{props.description}</CardDescription>
-        )}
-      </CardHeader>
-      <CardContent>
-        <ChartContainer config={props.config} className={props.chartClassName}>
+    <Card className={cn("overflow-hidden", props.className)}>
+      {props.header && (
+        <CardHeader>
+          <CardTitle className={cn("mb-2", props.header.titleClassName)}>
+            {props.header.title}
+          </CardTitle>
+          {props.header.description && (
+            <CardDescription>{props.header.description}</CardDescription>
+          )}
+        </CardHeader>
+      )}
+
+      {props.customHeader && props.customHeader}
+
+      <CardContent className={cn(!props.header && "pt-6")}>
+        <ChartContainer className={props.chartClassName} config={props.config}>
           {props.isPending ? (
             <LoadingChartState />
           ) : props.data.length === 0 ? (
-            <EmptyChartState />
+            <EmptyChartState content={props.emptyChartState} />
           ) : (
             <BarChart accessibilityLayer data={props.data}>
               <CartesianGrid vertical={false} />
               <XAxis
-                dataKey="time"
-                tickLine={false}
                 axisLine={false}
+                dataKey="time"
+                tickFormatter={(value) =>
+                  format(
+                    new Date(value),
+                    props.xAxis?.showHour ? "MMM dd, HH:mm" : "MMM dd",
+                  )
+                }
+                tickLine={false}
                 tickMargin={10}
-                tickFormatter={(value) => formatDate(new Date(value), "MMM d")}
               />
-              <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+              <ChartTooltip
+                content={
+                  <ChartTooltipContent
+                    hideLabel={
+                      props.hideLabel !== undefined ? props.hideLabel : true
+                    }
+                    labelFormatter={props.toolTipLabelFormatter}
+                    valueFormatter={props.toolTipValueFormatter}
+                  />
+                }
+              />
               {props.showLegend && (
-                <ChartLegend content={<ChartLegendContent />} />
+                <ChartLegend
+                  content={<ChartLegendContent className="pt-5" />}
+                />
               )}
-              {configKeys.map((key, idx) => (
+              {configKeys.map((key) => (
                 <Bar
-                  key={key}
+                  className="stroke-background"
                   dataKey={key}
                   // if stacked then they should all be the same stackId
                   // if grouped then they should all be unique stackId (so the key works great)
+                  fill={props.config[key]?.color}
+                  key={key}
+                  radius={[4, 4, 4, 4]}
                   stackId={variant === "stacked" ? "a" : key}
-                  fill={`var(--color-${key})`}
-                  // if stacked then we need to figure out the radius based on the index in the array
-                  // if grouped then we can just use the same radius for all
-                  radius={
-                    variant === "stacked"
-                      ? idx === 0
-                        ? [0, 0, 4, 4]
-                        : idx === configKeys.length - 1
-                          ? [4, 4, 0, 0]
-                          : [0, 0, 0, 0]
-                      : [4, 4, 4, 4]
-                  }
+                  strokeWidth={1}
                 />
               ))}
             </BarChart>

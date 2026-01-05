@@ -1,4 +1,4 @@
-import { maxUint256 } from "viem";
+import { maxUint256 } from "ox/Solidity";
 import type {
   BaseTransactionOptions,
   WithOverrides,
@@ -19,6 +19,7 @@ export type MintToParams = WithOverrides<{
 
 /**
  * Mints a "supply" number of new ERC1155 tokens to the specified "to" address.
+ * This method is only available on the `TokenERC1155` contract.
  * If the `nft` parameter is a string, it will be used as the token URI.
  * If the `nft` parameter is a file, it will be uploaded to the storage server and the resulting URI will be used as the token URI.
  * @param options - The transaction options.
@@ -45,7 +46,6 @@ export type MintToParams = WithOverrides<{
  */
 export function mintTo(options: BaseTransactionOptions<MintToParams>) {
   return generatedMintTo({
-    contract: options.contract,
     asyncParams: async () => {
       let tokenUri: string;
 
@@ -63,13 +63,14 @@ export function mintTo(options: BaseTransactionOptions<MintToParams>) {
         });
       }
       return {
+        amount: options.supply,
+        overrides: options.overrides,
         to: options.to,
         // maxUint256 is used to indicate that this is a NEW token!
         tokenId: maxUint256,
         uri: tokenUri,
-        amount: options.supply,
-        overrides: options.overrides,
       };
     },
+    contract: options.contract,
   });
 }

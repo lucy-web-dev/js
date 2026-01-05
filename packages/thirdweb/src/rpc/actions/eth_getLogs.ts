@@ -1,14 +1,14 @@
-import type { Address } from "abitype";
 import {
   type BlockNumber,
   type BlockTag,
   type EIP1193RequestFn,
   type EIP1474Methods,
+  formatLog,
   type Hash,
   type LogTopic,
   type RpcLog,
-  formatLog,
 } from "viem";
+import { type Address, getAddress } from "../../utils/address.js";
 import { numberToHex } from "../../utils/encoding/hex.js";
 
 export type GetLogsBlockParams =
@@ -75,15 +75,15 @@ export async function eth_getLogs(
   // in the case we have a blockHash
   if (params.blockHash) {
     const param: {
-      address?: string | string[];
+      address?: Address | Address[];
       topics: LogTopic[];
       blockHash: `0x${string}`;
     } = {
-      topics,
       blockHash: params.blockHash,
+      topics,
     };
     if (params.address) {
-      param.address = params.address;
+      param.address = getAddress(params.address);
     }
     logs = await request({
       method: "eth_getLogs",
@@ -93,7 +93,7 @@ export async function eth_getLogs(
   // otherwise
   else {
     const param: {
-      address?: string | string[];
+      address?: Address | Address[];
       topics?: LogTopic[];
     } & (
       | {

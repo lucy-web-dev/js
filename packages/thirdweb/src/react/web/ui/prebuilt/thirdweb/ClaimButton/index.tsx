@@ -1,17 +1,18 @@
 "use client";
 
 import {
-  type ThirdwebContract,
   getContract,
+  type ThirdwebContract,
 } from "../../../../../../contract/contract.js";
 import { getContractMetadata } from "../../../../../../extensions/common/read/getContractMetadata.js";
 import { getNFT } from "../../../../../../extensions/erc1155/read/getNFT.js";
 import type { PreparedTransaction } from "../../../../../../transaction/prepare-transaction.js";
 import type { BaseTransactionOptions } from "../../../../../../transaction/types.js";
+import { isString } from "../../../../../../utils/type-guards.js";
 import type { Account } from "../../../../../../wallets/interfaces/wallet.js";
 import { useReadContract } from "../../../../../core/hooks/contract/useReadContract.js";
-import { useSendAndConfirmTransaction } from "../../../../../core/hooks/transaction/useSendAndConfirmTransaction.js";
 import { useActiveAccount } from "../../../../../core/hooks/wallets/useActiveAccount.js";
+import { useSendAndConfirmTransaction } from "../../../../hooks/transaction/useSendAndConfirmTransaction.js";
 import { TransactionButton } from "../../../TransactionButton/index.js";
 import type {
   ClaimButtonProps,
@@ -114,19 +115,27 @@ export function ClaimButton(props: ClaimButtonProps) {
   const defaultPayModalMetadata = payModal ? payModal.metadata : undefined;
   const contract = getContract({
     address: contractAddress,
-    client,
     chain,
+    client,
   });
 
   const { data: payMetadata } = useReadContract(getPayMetadata, {
     contract,
-    tokenId: claimParams.type === "ERC1155" ? claimParams.tokenId : undefined,
     queryOptions: {
       enabled: !defaultPayModalMetadata,
     },
+    tokenId: claimParams.type === "ERC1155" ? claimParams.tokenId : undefined,
   });
   const account = useActiveAccount();
-  const { mutateAsync } = useSendAndConfirmTransaction();
+  const { mutateAsync } = useSendAndConfirmTransaction({
+    payModal:
+      typeof payModal === "object"
+        ? {
+            ...payModal,
+            metadata: payModal.metadata || payMetadata,
+          }
+        : payModal,
+  });
   return (
     <TransactionButton
       payModal={{
@@ -139,17 +148,17 @@ export function ClaimButton(props: ClaimButtonProps) {
         }
         const [claimTx, { getApprovalForTransaction }] = await Promise.all([
           getClaimTransaction({
-            contract,
             account,
             claimParams,
+            contract,
           }),
           import(
             "../../../../../../extensions/erc20/write/getApprovalForTransaction.js"
           ),
         ]);
         const approveTx = await getApprovalForTransaction({
-          transaction: claimTx,
           account,
+          transaction: claimTx,
         });
         if (approveTx) {
           await mutateAsync(approveTx);
@@ -183,8 +192,10 @@ async function getPayMetadata(
     };
   }
   return {
-    image: contractMetadata?.image,
-    name: contractMetadata?.name,
+    image: isString(contractMetadata?.image)
+      ? contractMetadata.image
+      : undefined,
+    name: isString(contractMetadata?.name) ? contractMetadata.name : undefined,
   };
 }
 
@@ -202,11 +213,11 @@ async function getClaimTransaction({
 }): Promise<PreparedTransaction> {
   switch (claimParams.type) {
     case "ERC721":
-      return await getERC721ClaimTo({ contract, account, claimParams });
+      return await getERC721ClaimTo({ account, claimParams, contract });
     case "ERC1155":
-      return await getERC1155ClaimTo({ contract, account, claimParams });
+      return await getERC1155ClaimTo({ account, claimParams, contract });
     case "ERC20": {
-      return await getERC20ClaimTo({ contract, account, claimParams });
+      return await getERC20ClaimTo({ account, claimParams, contract });
     }
     default:
       throw new Error(
@@ -233,9 +244,9 @@ export async function getERC721ClaimTo({
 
   return claimTo({
     contract,
-    to: claimParams.to || account?.address || "",
-    quantity: claimParams.quantity,
     from: claimParams.from,
+    quantity: claimParams.quantity,
+    to: claimParams.to || account?.address || "",
   });
 }
 
@@ -257,10 +268,10 @@ export async function getERC1155ClaimTo({
 
   return claimTo({
     contract,
-    to: claimParams.to || account?.address || "",
-    quantity: claimParams.quantity,
-    tokenId: claimParams.tokenId,
     from: claimParams.from,
+    quantity: claimParams.quantity,
+    to: claimParams.to || account?.address || "",
+    tokenId: claimParams.tokenId,
   });
 }
 
@@ -285,17 +296,17 @@ export async function getERC20ClaimTo({
   if ("quantity" in claimParams) {
     return claimTo({
       contract,
-      to: claimParams.to || account?.address || "",
-      quantity: claimParams.quantity,
       from: claimParams.from,
+      quantity: claimParams.quantity,
+      to: claimParams.to || account?.address || "",
     });
   }
   if ("quantityInWei" in claimParams) {
     return claimTo({
       contract,
-      to: claimParams.to || account?.address || "",
-      quantityInWei: claimParams.quantityInWei,
       from: claimParams.from,
+      quantityInWei: claimParams.quantityInWei,
+      to: claimParams.to || account?.address || "",
     });
   }
   throw new Error("Missing quantity or quantityInWei");

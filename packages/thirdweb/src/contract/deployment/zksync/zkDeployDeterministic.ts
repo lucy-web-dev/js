@@ -13,7 +13,11 @@ import {
 } from "../../../utils/any-evm/zksync/constants.js";
 import { isContractDeployed } from "../../../utils/bytecode/is-contract-deployed.js";
 import { ensureBytecodePrefix } from "../../../utils/bytecode/prefix.js";
-import { type Hex, uint8ArrayToHex } from "../../../utils/encoding/hex.js";
+import {
+  type Hex,
+  isHex,
+  uint8ArrayToHex,
+} from "../../../utils/encoding/hex.js";
 import type { ClientAndChainAndAccount } from "../../../utils/types.js";
 import { getContract } from "../../contract.js";
 import { zkDeployContract } from "./zkDeployContract.js";
@@ -38,23 +42,25 @@ export async function zkDeployContractDeterministic(
     normalizeFunctionParams(constructorAbi as AbiConstructor, options.params),
   );
   const create2FactoryAddress = await zkDeployCreate2Factory({
-    client: options.client,
-    chain: options.chain,
     account: options.account,
+    chain: options.chain,
+    client: options.client,
   });
   const bytecode = ensureBytecodePrefix(options.bytecode);
   const bytecodeHash = uint8ArrayToHex(hashBytecode(bytecode));
   const predictedAddress = computeDeploymentAddress({
     bytecodeHash,
-    encodedArgs,
     create2FactoryAddress,
+    encodedArgs,
     salt: options.salt,
   });
-  const deployed = await isContractDeployed({
-    address: predictedAddress,
-    chain: options.chain,
-    client: options.client,
-  });
+  const deployed = await isContractDeployed(
+    getContract({
+      address: predictedAddress,
+      chain: options.chain,
+      client: options.client,
+    }),
+  );
   if (!deployed) {
     // check if bytecodehash is known
     const knownCodesStorageContract = getContract({
@@ -70,24 +76,28 @@ export async function zkDeployContractDeterministic(
     // if not known, publish the bytecodehash
     if (marker !== 1n) {
       await zkDeployContract({
-        client: options.client,
-        chain: options.chain,
-        account: options.account,
         abi: options.abi,
+        account: options.account,
         bytecode,
+        chain: options.chain,
+        client: options.client,
         params: options.params,
       });
     }
 
     // deploy with create2 factory
     const factory = getContract({
+      abi: parseAbi(singletonFactoryAbi),
       address: create2FactoryAddress,
       chain: options.chain,
       client: options.client,
-      abi: parseAbi(singletonFactoryAbi),
     });
 
-    const salt = options?.salt ? keccakId(options.salt) : keccakId("thirdweb");
+    const salt = options?.salt
+      ? isHex(options.salt) && options.salt.length === 66
+        ? options.salt
+        : keccakId(options.salt)
+      : keccakId("thirdweb");
 
     await sendAndConfirmTransaction({
       account: options.account,

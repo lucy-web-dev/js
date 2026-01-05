@@ -1,9 +1,9 @@
+import { baseSepolia } from "thirdweb/chains";
 import { describe, expect, test as it } from "vitest";
 import { TEST_ACCOUNT_B } from "~test/test-wallets.js";
 import { TEST_WALLET_A, TEST_WALLET_B } from "../../test/src/addresses.js";
 import { FORKED_ETHEREUM_CHAIN } from "../../test/src/chains.js";
 import { TEST_CLIENT } from "../../test/src/test-clients.js";
-import { defineChain } from "../chains/utils.js";
 import { toWei } from "../utils/units.js";
 import { signAuthorization } from "./actions/eip7702/authorization.js";
 import { estimateGas } from "./actions/estimate-gas.js";
@@ -32,11 +32,11 @@ describe.runIf(process.env.TW_SECRET_KEY)("prepareTransaction", () => {
       },
     });
     const preparedTx = prepareTransaction({
-      chain: defineChain(911867),
+      authorizationList: [authorization],
+      chain: baseSepolia,
       client: TEST_CLIENT,
       to: TEST_WALLET_B,
       value: 0n,
-      authorizationList: [authorization],
     });
 
     const serializableTx = await toSerializableTransaction({
@@ -58,8 +58,8 @@ describe.runIf(process.env.TW_SECRET_KEY)("prepareTransaction", () => {
         value: toWei("0.1"),
       });
       const estimate = await estimateGas({
-        transaction: preparedTx,
         from: TEST_WALLET_A,
+        transaction: preparedTx,
       });
       // TODO: figure out why this is not `21000n`?
       // - a raw transfer SHOULD be 21000gwei always?

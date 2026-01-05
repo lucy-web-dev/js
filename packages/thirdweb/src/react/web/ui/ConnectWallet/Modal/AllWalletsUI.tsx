@@ -1,26 +1,27 @@
 "use client";
 import styled from "@emotion/styled";
-import { MagnifyingGlassIcon } from "@radix-ui/react-icons";
-import { CrossCircledIcon } from "@radix-ui/react-icons";
+import { CrossCircledIcon, MagnifyingGlassIcon } from "@radix-ui/react-icons";
 import Fuse from "fuse.js";
 import { useMemo, useRef, useState } from "react";
 import type { ThirdwebClient } from "../../../../../client/client.js";
 import walletInfos from "../../../../../wallets/__generated__/wallet-infos.js";
+import { NON_SEARCHABLE_WALLETS } from "../../../../../wallets/constants.js";
 import { createWallet } from "../../../../../wallets/create-wallet.js";
 import type { Wallet } from "../../../../../wallets/interfaces/wallet.js";
+import type { WalletId } from "../../../../../wallets/wallet-types.js";
 import { useCustomTheme } from "../../../../core/design-system/CustomThemeProvider.js";
 import { iconSize, spacing } from "../../../../core/design-system/index.js";
 import { useSetSelectionData } from "../../../providers/wallet-ui-states-provider.js";
 import { sortWallets } from "../../../utils/sortWallets.js";
-import { Spacer } from "../../components/Spacer.js";
-import { Spinner } from "../../components/Spinner.js";
 import { Container, ModalHeader } from "../../components/basic.js";
 import { Input } from "../../components/formElements.js";
+import { Spacer } from "../../components/Spacer.js";
+import { Spinner } from "../../components/Spinner.js";
 import { Text } from "../../components/text.js";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue.js";
 import { useShowMore } from "../../hooks/useShowMore.js";
-import { WalletEntryButton } from "../WalletEntryButton.js";
 import type { ConnectLocale } from "../locale/types.js";
+import { WalletEntryButton } from "../WalletEntryButton.js";
 
 /**
  *
@@ -29,31 +30,31 @@ import type { ConnectLocale } from "../locale/types.js";
 function AllWalletsUI(props: {
   onBack: () => void;
   onSelect: (wallet: Wallet) => void;
-  specifiedWallets: Wallet[];
   size: "compact" | "wide";
   client: ThirdwebClient;
   recommendedWallets: Wallet[] | undefined;
   connectLocale: ConnectLocale;
   disableSelectionDataReset?: boolean;
+  walletIdsToHide?: WalletId[];
 }) {
   const { itemsToShow, lastItemRef } = useShowMore<HTMLLIElement>(10, 10);
   const setSelectionData = useSetSelectionData();
 
   const walletList = useMemo(() => {
-    return walletInfos.filter((wallet) => {
-      return props.specifiedWallets.findIndex((x) => x.id === wallet.id) === -1;
-    });
-  }, [props.specifiedWallets]);
+    return walletInfos
+      .filter((info) => !NON_SEARCHABLE_WALLETS.includes(info.id))
+      .filter((info) => !props.walletIdsToHide?.includes(info.id));
+  }, [props.walletIdsToHide]);
 
   const fuseInstance = useMemo(() => {
     return new Fuse(walletList, {
-      threshold: 0.4,
       keys: [
         {
           name: "name",
           weight: 1,
         },
       ],
+      threshold: 0.4,
     });
   }, [walletList]);
 
@@ -70,9 +71,14 @@ function AllWalletsUI(props: {
   }, [searchResults, itemsToShow]);
 
   return (
-    <Container fullHeight flex="column" animate="fadein">
+    <Container
+      animate="fadein"
+      flex="column"
+      fullHeight
+      className="tw-all-wallets-screen"
+    >
       <Container p="lg">
-        <ModalHeader title="Select Wallet" onBack={props.onBack} />
+        <ModalHeader onBack={props.onBack} title="Select Wallet" />
       </Container>
 
       <Spacer y="xs" />
@@ -81,27 +87,27 @@ function AllWalletsUI(props: {
         {/* Search */}
         <div
           style={{
-            display: "flex",
             alignItems: "center",
+            display: "flex",
             position: "relative",
           }}
         >
-          <StyledMagnifyingGlassIcon width={iconSize.md} height={iconSize.md} />
+          <StyledMagnifyingGlassIcon height={iconSize.md} width={iconSize.md} />
 
           <Input
-            style={{
-              padding: `${spacing.sm} ${spacing.sm} ${spacing.sm} ${spacing.xxl}`,
-            }}
-            tabIndex={-1}
-            variant="outline"
-            placeholder="Search Wallet"
-            value={searchTerm}
             onChange={(e) => {
               listContainer.current?.parentElement?.scroll({
                 top: 0,
               });
               setSearchTerm(e.target.value);
             }}
+            placeholder="Search Wallet"
+            style={{
+              padding: `${spacing.sm} ${spacing.sm} ${spacing.sm} ${spacing.xxl}`,
+            }}
+            tabIndex={-1}
+            value={searchTerm}
+            variant="outline"
           />
           {/* Searching Spinner */}
           {deferredSearchTerm !== searchTerm && (
@@ -111,7 +117,7 @@ function AllWalletsUI(props: {
                 right: spacing.md,
               }}
             >
-              <Spinner size="md" color="accentText" />
+              <Spinner color="accentText" size="md" />
             </div>
           )}
         </div>
@@ -130,29 +136,30 @@ function AllWalletsUI(props: {
             >
               {walletInfosToShow.map((walletInfo, i) => {
                 const isLast = i === walletInfosToShow.length - 1;
+                const wallet = createWallet(walletInfo.id);
 
                 return (
                   <li
-                    ref={isLast ? lastItemRef : undefined}
                     key={walletInfo.id}
+                    ref={isLast ? lastItemRef : undefined}
                     style={{
                       listStyle: "none",
                     }}
                   >
                     <WalletEntryButton
-                      walletId={walletInfo.id}
+                      className="tw-select-wallet-button"
+                      badge={undefined}
+                      client={props.client}
+                      connectLocale={props.connectLocale}
+                      isActive={false}
+                      recommendedWallets={props.recommendedWallets}
                       selectWallet={() => {
-                        const wallet = createWallet(walletInfo.id);
                         props.onSelect(wallet);
                         if (!props.disableSelectionDataReset) {
                           setSelectionData({});
                         }
                       }}
-                      client={props.client}
-                      recommendedWallets={props.recommendedWallets}
-                      connectLocale={props.connectLocale}
-                      isActive={false}
-                      badge={undefined}
+                      wallet={wallet}
                     />
                   </li>
                 );
@@ -166,17 +173,17 @@ function AllWalletsUI(props: {
 
       {walletInfosToShow.length === 0 && (
         <Container
-          flex="column"
-          gap="md"
+          animate="fadein"
           center="both"
           color="secondaryText"
-          animate="fadein"
           expand
+          flex="column"
+          gap="md"
           style={{
             minHeight: "250px",
           }}
         >
-          <CrossCircledIcon width={iconSize.xl} height={iconSize.xl} />
+          <CrossCircledIcon height={iconSize.xl} width={iconSize.xl} />
           <Text> No Results </Text>
         </Container>
       )}
@@ -189,8 +196,8 @@ const StyledMagnifyingGlassIcon = /* @__PURE__ */ styled(MagnifyingGlassIcon)(
     const theme = useCustomTheme();
     return {
       color: theme.colors.secondaryText,
-      position: "absolute",
       left: spacing.sm,
+      position: "absolute",
     };
   },
 );

@@ -1,12 +1,13 @@
-import { Spinner } from "@/components/ui/Spinner/Spinner";
-import { Button } from "@/components/ui/button";
 import { useMutation } from "@tanstack/react-query";
 import { DownloadIcon } from "lucide-react";
+import Papa from "papaparse";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/Spinner";
 import { cn } from "../../lib/utils";
 
 export function ExportToCSVButton(props: {
-  getData: () => Promise<{ header: string[]; rows: string[][] }>;
+  getData: () => Promise<{ header: string[]; rows: string[][] } | string>;
   fileName: string;
   disabled?: boolean;
   className?: string;
@@ -14,7 +15,12 @@ export function ExportToCSVButton(props: {
   const exportMutation = useMutation({
     mutationFn: async () => {
       const data = await props.getData();
-      exportToCSV(props.fileName, data);
+      if (typeof data === "string") {
+        exportToCSV(props.fileName, data);
+      } else {
+        const fileContent = convertToCSVFormat(data);
+        exportToCSV(props.fileName, fileContent);
+      }
     },
     onError: () => {
       toast.error("Failed to download CSV");
@@ -28,37 +34,33 @@ export function ExportToCSVButton(props: {
 
   return (
     <Button
-      variant="outline"
-      disabled={props.disabled}
-      className={cn("flex items-center gap-2 border text-xs", props.className)}
+      className={cn("gap-2 rounded-full", props.className)}
+      size="sm"
+      disabled={props.disabled || exportMutation.isPending}
       onClick={async () => {
         exportMutation.mutate();
       }}
+      variant="outline"
     >
       {exportMutation.isPending ? (
-        <>
-          Downloading
-          <Spinner className="size-3" />
-        </>
+        <Spinner className="size-3.5 text-muted-foreground" />
       ) : (
-        <>
-          <DownloadIcon className="size-3" />
-          Export as CSV
-        </>
+        <DownloadIcon className="size-3.5 text-muted-foreground" />
       )}
+      Export
     </Button>
   );
 }
 
-function exportToCSV(
-  fileName: string,
-  data: { header: string[]; rows: string[][] },
-) {
-  const { header, rows } = data;
-  const csvContent = `data:text/csv;charset=utf-8,${header.join(",")}\n${rows
-    .map((e) => e.join(","))
-    .join("\n")}`;
+function convertToCSVFormat(data: { header: string[]; rows: string[][] }) {
+  return Papa.unparse({
+    data: data.rows,
+    fields: data.header,
+  });
+}
 
+function exportToCSV(fileName: string, fileContent: string) {
+  const csvContent = `data:text/csv;charset=utf-8,${fileContent}`;
   const encodedUri = encodeURI(csvContent);
   const link = document.createElement("a");
   link.setAttribute("href", encodedUri);

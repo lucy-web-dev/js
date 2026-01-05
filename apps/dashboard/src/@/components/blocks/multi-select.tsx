@@ -1,26 +1,19 @@
-/* eslint-disable no-restricted-syntax */
+/** biome-ignore-all lint/a11y/useSemanticElements: FIXME */
 "use client";
 
+import { CheckIcon, ChevronDownIcon, SearchIcon, XIcon } from "lucide-react";
+import { forwardRef, useCallback, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { ScrollShadow } from "@/components/ui/ScrollShadow";
 import { Separator } from "@/components/ui/separator";
+import { useShowMore } from "@/hooks/useShowMore";
 import { cn } from "@/lib/utils";
-import { CheckIcon, ChevronDown, SearchIcon, XIcon } from "lucide-react";
-import {
-  forwardRef,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import { useShowMore } from "../../lib/useShowMore";
-import { ScrollShadow } from "../ui/ScrollShadow/ScrollShadow";
-import { Input } from "../ui/input";
 
 interface MultiSelectProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -47,7 +40,13 @@ interface MultiSelectProps
     searchTerm: string,
   ) => boolean;
 
+  popoverContentClassName?: string;
+  customTrigger?: React.ReactNode;
   renderOption?: (option: { value: string; label: string }) => React.ReactNode;
+  align?: "center" | "start" | "end";
+  side?: "left" | "right" | "top" | "bottom";
+  showSelectedValuesInModal?: boolean;
+  customSearchInput?: React.ReactNode;
 }
 
 export const MultiSelect = forwardRef<HTMLButtonElement, MultiSelectProps>(
@@ -62,6 +61,10 @@ export const MultiSelect = forwardRef<HTMLButtonElement, MultiSelectProps>(
       overrideSearchFn,
       renderOption,
       searchPlaceholder,
+      popoverContentClassName,
+      showSelectedValuesInModal = false,
+      customSearchInput,
+      customTrigger,
       ...props
     },
     ref,
@@ -141,138 +144,137 @@ export const MultiSelect = forwardRef<HTMLButtonElement, MultiSelectProps>(
 
     // scroll to top when options change
     const popoverElRef = useRef<HTMLDivElement>(null);
-    // biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
-    useEffect(() => {
-      const scrollContainer =
-        popoverElRef.current?.querySelector("[data-scrollable]");
-      if (scrollContainer) {
-        scrollContainer.scrollTo({
-          top: 0,
-        });
-      }
-    }, [searchValue]);
+
+    // Filter out customTrigger from props to avoid passing it to Button
+    const buttonProps = Object.fromEntries(
+      Object.entries(props).filter(([key]) => key !== "customTrigger"),
+    ) as React.ButtonHTMLAttributes<HTMLButtonElement>;
 
     return (
-      <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen} modal>
+      <Popover modal onOpenChange={setIsPopoverOpen} open={isPopoverOpen}>
         <PopoverTrigger asChild>
-          <Button
-            ref={ref}
-            {...props}
-            onClick={handleTogglePopover}
-            className={cn(
-              "flex h-auto min-h-10 w-full items-center justify-between rounded-md border border-border bg-inherit p-3 hover:bg-inherit",
-              className,
-            )}
-          >
-            {selectedValues.length > 0 ? (
-              <div className="flex w-full justify-between">
-                {/* badges */}
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {selectedValues.slice(0, maxCount).map((value) => {
-                    const option = options.find((o) => o.value === value);
-                    if (!option) {
-                      return null;
-                    }
-
-                    return (
-                      <ClosableBadge
-                        key={value}
-                        label={option.label}
-                        onClose={() => toggleOption(value)}
-                      />
-                    );
-                  })}
-
-                  {/* +X more */}
-                  {selectedValues.length > maxCount && (
-                    <ClosableBadge
-                      label={`+ ${selectedValues.length - maxCount} more`}
-                      onClose={clearExtraOptions}
-                    />
-                  )}
-                </div>
-
-                <div className="flex items-center justify-between gap-2">
-                  {/* Clear All */}
-                  {/* biome-ignore lint/a11y/useKeyWithClickEvents: <explanation> */}
-                  {/* biome-ignore lint/a11y/useFocusableInteractive: <explanation> */}
-                  <div
-                    role="button"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      handleClear();
-                    }}
-                    className="rounded p-1 hover:bg-muted"
-                  >
-                    <XIcon className="h-4 cursor-pointer text-muted-foreground" />
-                  </div>
-
-                  <Separator
-                    orientation="vertical"
-                    className="flex h-full min-h-6"
+          {customTrigger || (
+            <Button
+              ref={ref}
+              {...buttonProps}
+              className={cn(
+                "flex h-auto min-h-10 w-full items-center justify-between rounded-md border border-border bg-inherit p-3 hover:bg-inherit",
+                className,
+              )}
+              onClick={handleTogglePopover}
+            >
+              {selectedValues.length > 0 ? (
+                <div className="flex w-full items-center justify-between">
+                  <SelectedChainsBadges
+                    clearExtraOptions={clearExtraOptions}
+                    maxCount={maxCount}
+                    onClose={handleClear}
+                    options={options}
+                    selectedValues={selectedValues}
+                    toggleOption={toggleOption}
                   />
-                  <ChevronDown className="h-4 cursor-pointer text-muted-foreground" />
+                  <div className="flex items-center justify-between gap-2">
+                    {/* Clear All */}
+                    {/* biome-ignore lint/a11y/useKeyWithClickEvents: FIXME */}
+                    {/* biome-ignore lint/a11y/useFocusableInteractive: FIXME */}
+                    <div
+                      className="rounded p-1 hover:bg-accent"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleClear();
+                      }}
+                      role="button"
+                    >
+                      <XIcon className="h-4 cursor-pointer text-muted-foreground" />
+                    </div>
+
+                    <Separator
+                      className="flex h-full min-h-6"
+                      orientation="vertical"
+                    />
+                    <ChevronDownIcon className="h-4 cursor-pointer text-muted-foreground" />
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <div className="flex w-full items-center justify-between">
-                <span className="text-muted-foreground text-sm">
-                  {placeholder}
-                </span>
-                <ChevronDown className="h-4 cursor-pointer text-muted-foreground" />
-              </div>
-            )}
-          </Button>
+              ) : (
+                <div className="flex w-full items-center justify-between">
+                  <span className="text-muted-foreground text-sm">
+                    {placeholder}
+                  </span>
+                  <ChevronDownIcon className="h-4 cursor-pointer text-muted-foreground" />
+                </div>
+              )}
+            </Button>
+          )}
         </PopoverTrigger>
         <PopoverContent
-          className="z-[10001] p-0"
-          align="center"
-          sideOffset={10}
+          align={props.align}
+          className={cn(
+            "flex max-h-[500px] flex-col p-0",
+            popoverContentClassName,
+          )}
           onEscapeKeyDown={() => setIsPopoverOpen(false)}
-          style={{
-            width: "var(--radix-popover-trigger-width)",
-            maxHeight: "var(--radix-popover-content-available-height)",
-          }}
           ref={popoverElRef}
+          side={props.side}
+          sideOffset={10}
+          style={{
+            height:
+              "calc(var(--radix-popover-content-available-height) - 40px)",
+            width: "var(--radix-popover-trigger-width)",
+          }}
         >
-          <div>
-            {/* Search */}
-            <div className="relative">
+          {/* Search */}
+          <div className="relative">
+            {customSearchInput ? (
+              customSearchInput
+            ) : (
               <Input
-                placeholder={searchPlaceholder || "Search"}
-                value={searchValue}
-                onChange={(e) => setSearchValue(e.target.value)}
                 className="!h-auto rounded-b-none border-0 border-border border-b py-4 pl-10 focus-visible:ring-0 focus-visible:ring-offset-0"
+                onChange={(e) => {
+                  setSearchValue(e.target.value);
+                  const scrollContainer =
+                    popoverElRef.current?.querySelector("[data-scrollable]");
+                  if (scrollContainer) {
+                    scrollContainer.scrollTo({
+                      top: 0,
+                    });
+                  }
+                }}
+                // do not focus on the input when the popover opens to avoid opening the keyboard
                 onKeyDown={handleInputKeyDown}
+                placeholder={searchPlaceholder || "Search"}
+                tabIndex={-1}
+                value={searchValue}
               />
-              <SearchIcon className="-translate-y-1/2 absolute top-1/2 left-4 size-4 text-muted-foreground" />
-            </div>
+            )}
+            <SearchIcon className="-translate-y-1/2 absolute top-1/2 left-4 size-4 text-muted-foreground" />
+          </div>
 
+          {optionsToShow.length === 0 && (
+            <div className="flex flex-1 flex-col items-center justify-center py-10 text-sm">
+              No results found
+            </div>
+          )}
+
+          {optionsToShow.length > 0 && (
             <ScrollShadow
-              scrollableClassName="max-h-[min(calc(var(--radix-popover-content-available-height)-60px),350px)] p-1"
-              className="rounded"
+              className="flex-1 rounded"
+              scrollableClassName="p-1 h-full"
             >
               {/* List */}
               <div>
-                {optionsToShow.length === 0 && (
-                  <div className="flex justify-center py-10">
-                    No results found
-                  </div>
-                )}
-
                 {optionsToShow.map((option, i) => {
                   const isSelected = selectedValues.includes(option.value);
                   return (
                     <Button
-                      key={option.value}
-                      role="option"
                       aria-selected={isSelected}
-                      onClick={() => toggleOption(option.value)}
-                      variant="ghost"
                       className="flex w-full cursor-pointer justify-start gap-3 rounded-sm px-3 py-2 text-left"
+                      key={option.value}
+                      onClick={() => toggleOption(option.value)}
                       ref={
                         i === optionsToShow.length - 1 ? lastItemRef : undefined
                       }
+                      role="option"
+                      variant="ghost"
                     >
                       <div
                         className={cn(
@@ -293,17 +295,27 @@ export const MultiSelect = forwardRef<HTMLButtonElement, MultiSelectProps>(
                 })}
               </div>
             </ScrollShadow>
-          </div>
+          )}
+
+          {showSelectedValuesInModal && selectedValues.length > 0 && (
+            <div className="border-t px-3 py-3">
+              <SelectedChainsBadges
+                clearExtraOptions={clearExtraOptions}
+                maxCount={maxCount}
+                onClose={handleClear}
+                options={options}
+                selectedValues={selectedValues}
+                toggleOption={toggleOption}
+              />
+            </div>
+          )}
         </PopoverContent>
       </Popover>
     );
   },
 );
 
-function ClosableBadge(props: {
-  label: string;
-  onClose: () => void;
-}) {
+function ClosableBadge(props: { label: string; onClose: () => void }) {
   return (
     <span className="flex items-center gap-3 rounded-xl border border-border bg-muted px-2 py-1 text-foreground text-xs">
       {props.label}
@@ -319,3 +331,44 @@ function ClosableBadge(props: {
 }
 
 MultiSelect.displayName = "MultiSelect";
+
+function SelectedChainsBadges(props: {
+  selectedValues: string[];
+  options: {
+    label: string;
+    value: string;
+  }[];
+  maxCount: number;
+  onClose: () => void;
+  toggleOption: (value: string) => void;
+  clearExtraOptions: () => void;
+}) {
+  const { selectedValues, options, maxCount, toggleOption, clearExtraOptions } =
+    props;
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {selectedValues.slice(0, maxCount).map((value) => {
+        const option = options.find((o) => o.value === value);
+        if (!option) {
+          return null;
+        }
+
+        return (
+          <ClosableBadge
+            key={value}
+            label={option.label}
+            onClose={() => toggleOption(value)}
+          />
+        );
+      })}
+
+      {/* +X more */}
+      {selectedValues.length > maxCount && (
+        <ClosableBadge
+          label={`+ ${selectedValues.length - maxCount} more`}
+          onClose={clearExtraOptions}
+        />
+      )}
+    </div>
+  );
+}

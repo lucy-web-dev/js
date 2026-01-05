@@ -1,5 +1,364 @@
 # @thirdweb-dev/service-utils
 
+## 0.10.10
+
+### Patch Changes
+
+- [#8479](https://github.com/thirdweb-dev/js/pull/8479) [`7967d7f`](https://github.com/thirdweb-dev/js/commit/7967d7f17ea1e906a0c4adf0cd838ddc36b71162) Thanks [@0xFirekeeper](https://github.com/0xFirekeeper)! - add dedicated relayer to service utils
+
+## 0.10.9
+
+### Patch Changes
+
+- [#8434](https://github.com/thirdweb-dev/js/pull/8434) [`c11fe95`](https://github.com/thirdweb-dev/js/commit/c11fe954160a544069a9518bd2364a1d7b60cc94) Thanks [@joaquim-verges](https://github.com/joaquim-verges)! - Update engineCloud service config
+
+## 0.10.8
+
+### Patch Changes
+
+- [#7921](https://github.com/thirdweb-dev/js/pull/7921) [`d4a44f5`](https://github.com/thirdweb-dev/js/commit/d4a44f5b5f6ec3594a9f521aee5e73f3a5cdc031) Thanks [@jnsdls](https://github.com/jnsdls)! - add reason code type into team capabilities response
+
+## 0.10.7
+
+### Patch Changes
+
+- [#7718](https://github.com/thirdweb-dev/js/pull/7718) [`80c6b6a`](https://github.com/thirdweb-dev/js/commit/80c6b6a79371d345c2ea95d2a904e1e85e766b99) Thanks [@jnsdls](https://github.com/jnsdls)! - add `gateway` team capabilities
+
+## 0.10.6
+
+### Patch Changes
+
+- [#7700](https://github.com/thirdweb-dev/js/pull/7700) [`9d8c7f1`](https://github.com/thirdweb-dev/js/commit/9d8c7f1f7d14329d2eab49d4af7e37086924f40e) Thanks [@jnsdls](https://github.com/jnsdls)! - add `gateway` to possible usage sources
+
+## 0.10.5
+
+### Patch Changes
+
+- [#7636](https://github.com/thirdweb-dev/js/pull/7636) [`746b0c9`](https://github.com/thirdweb-dev/js/commit/746b0c9d8b597517898bed5fd93ac6717f5bf8dd) Thanks [@jnsdls](https://github.com/jnsdls)! - add `mcp` to team capabilities
+
+## 0.10.4
+
+### Patch Changes
+
+- [#7614](https://github.com/thirdweb-dev/js/pull/7614) [`f82f885`](https://github.com/thirdweb-dev/js/commit/f82f885dad9a0eaecd64f365adbd1f49517b4fd9) Thanks [@jnsdls](https://github.com/jnsdls)! - update nebula ratelimit type
+
+- [#7613](https://github.com/thirdweb-dev/js/pull/7613) [`34d2fdd`](https://github.com/thirdweb-dev/js/commit/34d2fddf49291eb31d03fef98460ee719aef1044) Thanks [@jnsdls](https://github.com/jnsdls)! - update error response url
+
+## 0.10.3
+
+### Patch Changes
+
+- [#7570](https://github.com/thirdweb-dev/js/pull/7570) [`585eac2`](https://github.com/thirdweb-dev/js/commit/585eac2a6f49877318cb275f6fff5910ceabdbfb) Thanks [@joaquim-verges](https://github.com/joaquim-verges)! - Add encryption utilities
+
+## 0.10.2
+
+### Patch Changes
+
+- [#7461](https://github.com/thirdweb-dev/js/pull/7461) [`c7f7f48`](https://github.com/thirdweb-dev/js/commit/c7f7f4822283a4d85aa36a0f255bc147c87864dc) Thanks [@arcoraven](https://github.com/arcoraven)! - chore: data in webhook payload is an object
+
+## 0.10.1
+
+### Patch Changes
+
+- [#7444](https://github.com/thirdweb-dev/js/pull/7444) [`472e737`](https://github.com/thirdweb-dev/js/commit/472e737616312694f6c7df4876c90861d2edad94) Thanks [@arcoraven](https://github.com/arcoraven)! - chore: require webhook payload to be an array
+
+## 0.10.0
+
+### Minor Changes
+
+- [#7439](https://github.com/thirdweb-dev/js/pull/7439) [`c5f9921`](https://github.com/thirdweb-dev/js/commit/c5f9921dc9cf6c62d754f12ce6171d95bd87a590) Thanks [@arcoraven](https://github.com/arcoraven)! - feat: Add webhook producer to service-utils
+
+### Patch Changes
+
+- [#7440](https://github.com/thirdweb-dev/js/pull/7440) [`a2b737e`](https://github.com/thirdweb-dev/js/commit/a2b737e14493956dc888d94057e806bff77bacd2) Thanks [@arcoraven](https://github.com/arcoraven)! - fix: wrong casing on a field in webhook event helper
+
+## 0.9.14
+
+### Patch Changes
+
+- [#7382](https://github.com/thirdweb-dev/js/pull/7382) [`4c29886`](https://github.com/thirdweb-dev/js/commit/4c2988623fa58311ca854e849ae1872e9e48846d) Thanks [@arcoraven](https://github.com/arcoraven)! - chore: add dedicatedSupportChannel to TeamResponse
+
+## 0.9.13
+
+### Patch Changes
+
+- [#7303](https://github.com/thirdweb-dev/js/pull/7303) [`6378f37`](https://github.com/thirdweb-dev/js/commit/6378f371c50b11052f7bfbb6aeefe3fb19ea26f0) Thanks [@arcoraven](https://github.com/arcoraven)! - chore: pass allowImpersonation to auth server
+
+## 0.9.12
+
+### Patch Changes
+
+- [#7276](https://github.com/thirdweb-dev/js/pull/7276) [`42236d4`](https://github.com/thirdweb-dev/js/commit/42236d43a860e1d8b6b1f518bf6aa12bcf56b0ac) Thanks [@jnsdls](https://github.com/jnsdls)! - remove:
+  - `starter_legacy` plan type
+  - `billingPlanVersion` field
+  - `growthTrialEligible` field
+
+## 0.9.11
+
+### Patch Changes
+
+- [#7210](https://github.com/thirdweb-dev/js/pull/7210) [`86fd445`](https://github.com/thirdweb-dev/js/commit/86fd445276f3061a71bd97c53359b3a6ec9f01e3) Thanks [@jnsdls](https://github.com/jnsdls)! - add new capabilities to the type
+
+- [#7215](https://github.com/thirdweb-dev/js/pull/7215) [`55fba51`](https://github.com/thirdweb-dev/js/commit/55fba51dabac300f8789db8936f68ddffb11a46d) Thanks [@joaquim-verges](https://github.com/joaquim-verges)! - Update service descriptions
+
+## 0.9.10
+
+### Patch Changes
+
+- [#7114](https://github.com/thirdweb-dev/js/pull/7114) [`4b9a506`](https://github.com/thirdweb-dev/js/commit/4b9a506fdfaf8d8be5767d3c719f0b77f86131e9) Thanks [@joaquim-verges](https://github.com/joaquim-verges)! - Better error messages for 403 responses
+
+## 0.9.9
+
+### Patch Changes
+
+- [#7020](https://github.com/thirdweb-dev/js/pull/7020) [`feae304`](https://github.com/thirdweb-dev/js/commit/feae304da2c428ca33b1b0b4a9b08dafe8c7bfc1) Thanks [@jnsdls](https://github.com/jnsdls)! - Prioritize JWT over service API keys in authentication
+
+## 0.9.8
+
+### Patch Changes
+
+- [#6984](https://github.com/thirdweb-dev/js/pull/6984) [`bc75ae6`](https://github.com/thirdweb-dev/js/commit/bc75ae68265cbfbac50df0704b45117b812bbf10) Thanks [@jnsdls](https://github.com/jnsdls)! - handle jwt auth method explicitly
+
+## 0.9.7
+
+### Patch Changes
+
+- [#6960](https://github.com/thirdweb-dev/js/pull/6960) [`928113b`](https://github.com/thirdweb-dev/js/commit/928113bb0bc7d6237148857320563e1e98cf51e1) Thanks [@arcoraven](https://github.com/arcoraven)! - chore: Support Engine Core and Webhook usage events
+
+## 0.9.6
+
+### Patch Changes
+
+- [#6837](https://github.com/thirdweb-dev/js/pull/6837) [`d95b3d3`](https://github.com/thirdweb-dev/js/commit/d95b3d38c721797e7470c198abb44edf1a1f6495) Thanks [@arcoraven](https://github.com/arcoraven)! - chore: Add unthreadCustomerId to TeamResponse
+
+- [#6842](https://github.com/thirdweb-dev/js/pull/6842) [`f2d0f11`](https://github.com/thirdweb-dev/js/commit/f2d0f119c1422eebb37c898e30832d5fda33f5f6) Thanks [@jnsdls](https://github.com/jnsdls)! - add insight.webhooks to capabilities
+
+## 0.9.5
+
+### Patch Changes
+
+- [#6793](https://github.com/thirdweb-dev/js/pull/6793) [`f85163e`](https://github.com/thirdweb-dev/js/commit/f85163edee8ab21a1f7a1b70c4dffc5953a409d3) Thanks [@jnsdls](https://github.com/jnsdls)! - add engineCloud plan capability
+
+- [#6782](https://github.com/thirdweb-dev/js/pull/6782) [`d7dc83f`](https://github.com/thirdweb-dev/js/commit/d7dc83f9e65616fe2f61bb2a680429b163cd0307) Thanks [@jnsdls](https://github.com/jnsdls)! - updated various dependencies
+
+- [#6815](https://github.com/thirdweb-dev/js/pull/6815) [`69ec6e0`](https://github.com/thirdweb-dev/js/commit/69ec6e055363483b0a259d8ed052c6601d39679d) Thanks [@jnsdls](https://github.com/jnsdls)! - expose `rateLimitSlidingWindow` strategy directly for more low-level usage
+
+## 0.9.4
+
+### Patch Changes
+
+- [#6771](https://github.com/thirdweb-dev/js/pull/6771) [`9d72ddd`](https://github.com/thirdweb-dev/js/commit/9d72ddd6045e98822021027dc0e446f9505531f5) Thanks [@jnsdls](https://github.com/jnsdls)! - allow passing the team id explicitly via request headers
+
+## 0.9.3
+
+### Patch Changes
+
+- [#6764](https://github.com/thirdweb-dev/js/pull/6764) [`72875f9`](https://github.com/thirdweb-dev/js/commit/72875f9de5041a6423cfa3ac347bb033e3fbf523) Thanks [@jnsdls](https://github.com/jnsdls)! - add support for service-to-service api key authentication
+
+## 0.9.2
+
+### Patch Changes
+
+- [#6730](https://github.com/thirdweb-dev/js/pull/6730) [`ec099a7`](https://github.com/thirdweb-dev/js/commit/ec099a781a144dfbd5f7558228ce4371c00e9a06) Thanks [@arcoraven](https://github.com/arcoraven)! - Update rate limit to sliding window
+
+## 0.9.1
+
+### Patch Changes
+
+- [#6704](https://github.com/thirdweb-dev/js/pull/6704) [`3ab31c8`](https://github.com/thirdweb-dev/js/commit/3ab31c82104ceb2f6c11998555953e886f13d380) Thanks [@jnsdls](https://github.com/jnsdls)! - fix incrby
+
+## 0.9.0
+
+### Minor Changes
+
+- [#6702](https://github.com/thirdweb-dev/js/pull/6702) [`d036b87`](https://github.com/thirdweb-dev/js/commit/d036b87ae163dd80f58224e4b507e6f4ac01ce62) Thanks [@jnsdls](https://github.com/jnsdls)! - update rateLimit function
+
+## 0.8.19
+
+### Patch Changes
+
+- [#6641](https://github.com/thirdweb-dev/js/pull/6641) [`169ae22`](https://github.com/thirdweb-dev/js/commit/169ae22a86787af674cf20ac4e8d1e4a06c84d77) Thanks [@jnsdls](https://github.com/jnsdls)! - add team capabilities
+
+## 0.8.18
+
+### Patch Changes
+
+- [#6557](https://github.com/thirdweb-dev/js/pull/6557) [`cff2481`](https://github.com/thirdweb-dev/js/commit/cff2481c06e2cdafec85da9d82df81641878957f) Thanks [@arcoraven](https://github.com/arcoraven)! - fix: changeset for optional req
+
+## 0.8.17
+
+### Patch Changes
+
+- [#6526](https://github.com/thirdweb-dev/js/pull/6526) [`21389bb`](https://github.com/thirdweb-dev/js/commit/21389bbef6918a72df3ca1822ea7e5f697931c39) Thanks [@joaquim-verges](https://github.com/joaquim-verges)! - Add engineCloud service
+
+## 0.8.16
+
+### Patch Changes
+
+- [#6502](https://github.com/thirdweb-dev/js/pull/6502) [`f81fd46`](https://github.com/thirdweb-dev/js/commit/f81fd46e9cd1fa11e5fd966e90fe86e574355eda) Thanks [@jnsdls](https://github.com/jnsdls)! - expose project.services.iaw.smsEnabledCountryISOs from api response
+
+## 0.8.15
+
+### Patch Changes
+
+- [#6471](https://github.com/thirdweb-dev/js/pull/6471) [`7ed8fc2`](https://github.com/thirdweb-dev/js/commit/7ed8fc2c43ef7ff8281c8737a4f080d9840b447e) Thanks [@jnsdls](https://github.com/jnsdls)! - update dependencies
+
+## 0.8.14
+
+### Patch Changes
+
+- [#6354](https://github.com/thirdweb-dev/js/pull/6354) [`c653d70`](https://github.com/thirdweb-dev/js/commit/c653d7033d2ac561d6e967ccb2893a0e5e4798be) Thanks [@MananTank](https://github.com/MananTank)! - Update `TeamResponse` type
+
+## 0.8.13
+
+### Patch Changes
+
+- [#6416](https://github.com/thirdweb-dev/js/pull/6416) [`44bb003`](https://github.com/thirdweb-dev/js/commit/44bb0034a69334f05cfa14132d56e354536e77ff) Thanks [@arcoraven](https://github.com/arcoraven)! - [service-utils] Add "pay" as a usage source
+
+## 0.8.12
+
+### Patch Changes
+
+- [#6409](https://github.com/thirdweb-dev/js/pull/6409) [`67354dc`](https://github.com/thirdweb-dev/js/commit/67354dc848bfb00d2296d5e52990321e9d28abb0) Thanks [@arcoraven](https://github.com/arcoraven)! - [service-utils] remove unneeded cloudflare worker types
+
+## 0.8.11
+
+### Patch Changes
+
+- [#6382](https://github.com/thirdweb-dev/js/pull/6382) [`47c9c43`](https://github.com/thirdweb-dev/js/commit/47c9c43a875a81aa357ebf3c741f256c317c5cfd) Thanks [@arcoraven](https://github.com/arcoraven)! - [service-utils] trim project ID prefix
+
+- [#6387](https://github.com/thirdweb-dev/js/pull/6387) [`0c0d837`](https://github.com/thirdweb-dev/js/commit/0c0d837f2355c4aa43c3f1ceef52b450623be76f) Thanks [@arcoraven](https://github.com/arcoraven)! - [service-utils] Add connect promise so it only connects once
+
+- [#6384](https://github.com/thirdweb-dev/js/pull/6384) [`25b149d`](https://github.com/thirdweb-dev/js/commit/25b149d3a98f99984792874ecb4e3144d2932a08) Thanks [@arcoraven](https://github.com/arcoraven)! - [service-utils] Provide CF req to forward origin header
+
+## 0.8.10
+
+### Patch Changes
+
+- [#6345](https://github.com/thirdweb-dev/js/pull/6345) [`0595c37`](https://github.com/thirdweb-dev/js/commit/0595c37163392e986124ebc376020a3bca6ba1ac) Thanks [@arcoraven](https://github.com/arcoraven)! - [service-utils] Use @confluentinc/kafka-javascript
+
+- [#6346](https://github.com/thirdweb-dev/js/pull/6346) [`b60d251`](https://github.com/thirdweb-dev/js/commit/b60d251cd72f72080c3a8d8039bad330a7cda344) Thanks [@arcoraven](https://github.com/arcoraven)! - [service-utils] fix usageV2 caller
+
+- [#6338](https://github.com/thirdweb-dev/js/pull/6338) [`9f69cc2`](https://github.com/thirdweb-dev/js/commit/9f69cc27aec2dd8e0b68541f7d4addc452d5bc5a) Thanks [@jnsdls](https://github.com/jnsdls)! - add `pastDue` to possible billing status flags
+
+## 0.8.9
+
+### Patch Changes
+
+- [#6329](https://github.com/thirdweb-dev/js/pull/6329) [`1fa36c1`](https://github.com/thirdweb-dev/js/commit/1fa36c1d56758788a8f9053f8929497bacb2b115) Thanks [@arcoraven](https://github.com/arcoraven)! - chore: Allow passing teamId with dashboard auth
+
+- [#6293](https://github.com/thirdweb-dev/js/pull/6293) [`8610b46`](https://github.com/thirdweb-dev/js/commit/8610b467b6d13be9dc902db79d3270132dba6894) Thanks [@MananTank](https://github.com/MananTank)! - Update TeamResponse and ProjectResponse types
+
+## 0.8.8
+
+### Patch Changes
+
+- [#6212](https://github.com/thirdweb-dev/js/pull/6212) [`6f2f92d`](https://github.com/thirdweb-dev/js/commit/6f2f92ddea333679ff1962b2df0da4ecf43be966) Thanks [@arcoraven](https://github.com/arcoraven)! - [service-utils] Helper to call client usageV2 reporting endpoint
+
+- [#6213](https://github.com/thirdweb-dev/js/pull/6213) [`cad9c74`](https://github.com/thirdweb-dev/js/commit/cad9c74befe33bef2cc6a12a8ade8d9c996ffe41) Thanks [@arcoraven](https://github.com/arcoraven)! - [service-utils] Omit team_id for client usageV2 events
+
+- [#6219](https://github.com/thirdweb-dev/js/pull/6219) [`91b0367`](https://github.com/thirdweb-dev/js/commit/91b0367b23d5a9b4c345210d430839f7c2351301) Thanks [@arcoraven](https://github.com/arcoraven)! - [service-utils] fix auth for cf workers
+
+- [#6207](https://github.com/thirdweb-dev/js/pull/6207) [`cbfe9ec`](https://github.com/thirdweb-dev/js/commit/cbfe9ec459b33884136ba23a87effd8ab4e99aeb) Thanks [@arcoraven](https://github.com/arcoraven)! - [service-utils] Allow client-side usageV2 reporting
+
+## 0.8.7
+
+### Patch Changes
+
+- [#6206](https://github.com/thirdweb-dev/js/pull/6206) [`8aeb4d6`](https://github.com/thirdweb-dev/js/commit/8aeb4d6308a2624a3e483aa4da408bbbdc8da688) Thanks [@arcoraven](https://github.com/arcoraven)! - Export usageV2 sources
+
+## 0.8.6
+
+### Patch Changes
+
+- [#6172](https://github.com/thirdweb-dev/js/pull/6172) [`a8ac98b`](https://github.com/thirdweb-dev/js/commit/a8ac98bd493d1d6e824aad868dea1ec42ff22768) Thanks [@catalyst17](https://github.com/catalyst17)! - add `canCreatePublicChains` to TeamResponse
+
+- [#6183](https://github.com/thirdweb-dev/js/pull/6183) [`18f0e57`](https://github.com/thirdweb-dev/js/commit/18f0e575c4a9764b3192931451cbd3f632a21e3c) Thanks [@arcoraven](https://github.com/arcoraven)! - [service-utils] Update list of usageV2 sources"
+
+## 0.8.5
+
+### Patch Changes
+
+- [#6171](https://github.com/thirdweb-dev/js/pull/6171) [`ee6bd4f`](https://github.com/thirdweb-dev/js/commit/ee6bd4f8982d2b0db823c8cb472aeb9d6f9408fb) Thanks [@arcoraven](https://github.com/arcoraven)! - [service-utils] export KafkaProducer
+
+- [#6181](https://github.com/thirdweb-dev/js/pull/6181) [`dfd64d2`](https://github.com/thirdweb-dev/js/commit/dfd64d2896444b223cbe999c7973ed1287cd833e) Thanks [@arcoraven](https://github.com/arcoraven)! - [service-utils] Expose maxInFlightRequests in Kafka producer
+
+- [#6164](https://github.com/thirdweb-dev/js/pull/6164) [`821caa6`](https://github.com/thirdweb-dev/js/commit/821caa63d78a2f985925d6c1be24143f46f435f4) Thanks [@arcoraven](https://github.com/arcoraven)! - [service-utils] fix: Add missing CompressionCodecs import
+
+- [#6170](https://github.com/thirdweb-dev/js/pull/6170) [`ccf6329`](https://github.com/thirdweb-dev/js/commit/ccf6329810c1426fadc4483660e154ae38a2927b) Thanks [@arcoraven](https://github.com/arcoraven)! - Add raw kafka producer
+
+## 0.8.4
+
+### Patch Changes
+
+- [#6137](https://github.com/thirdweb-dev/js/pull/6137) [`a6b7e8d`](https://github.com/thirdweb-dev/js/commit/a6b7e8d81868b5f32f1c8b7ff093bb1f06c734ca) Thanks [@jnsdls](https://github.com/jnsdls)! - updated dependencies
+
+- [#6139](https://github.com/thirdweb-dev/js/pull/6139) [`f4f93e6`](https://github.com/thirdweb-dev/js/commit/f4f93e6353d3951c580df25b757b1ac20fdcf763) Thanks [@arcoraven](https://github.com/arcoraven)! - [service-utils] Update to ESM for compression typrse
+
+- [#6131](https://github.com/thirdweb-dev/js/pull/6131) [`a76e653`](https://github.com/thirdweb-dev/js/commit/a76e6534c49480f30ec1fd1e404f76d04947cd49) Thanks [@arcoraven](https://github.com/arcoraven)! - [service-utils] switch to lz4js for compression lib
+
+## 0.8.3
+
+### Patch Changes
+
+- [#6121](https://github.com/thirdweb-dev/js/pull/6121) [`6ed2fd1`](https://github.com/thirdweb-dev/js/commit/6ed2fd13de1638bcf1c28fd4fdbeb00c0d449994) Thanks [@arcoraven](https://github.com/arcoraven)! - [service-utils] import LZ4 codec
+
+- [#6120](https://github.com/thirdweb-dev/js/pull/6120) [`a22457a`](https://github.com/thirdweb-dev/js/commit/a22457a69cc6667ac13599d10ebddc41ceafa0ff) Thanks [@arcoraven](https://github.com/arcoraven)! - [service-utils] Expose kafkajs config
+
+## 0.8.2
+
+### Patch Changes
+
+- [#6113](https://github.com/thirdweb-dev/js/pull/6113) [`6818cba`](https://github.com/thirdweb-dev/js/commit/6818cbabf25ce73d09dfc971ae793cd9844ceca7) Thanks [@arcoraven](https://github.com/arcoraven)! - Change UsageV2 to per-product topics
+
+## 0.8.1
+
+### Patch Changes
+
+- [#6106](https://github.com/thirdweb-dev/js/pull/6106) [`3361140`](https://github.com/thirdweb-dev/js/commit/33611409b0efd58803be4a96194f5872ddf4bde0) Thanks [@jnsdls](https://github.com/jnsdls)! - updated dependencies
+
+## 0.8.0
+
+### Minor Changes
+
+- [#6101](https://github.com/thirdweb-dev/js/pull/6101) [`e8892b1`](https://github.com/thirdweb-dev/js/commit/e8892b152f70d3024dfbefcddcfa74a69a12bdd0) Thanks [@jnsdls](https://github.com/jnsdls)! - pass `team` instead of `project` to `rateLimit`
+
+## 0.7.3
+
+### Patch Changes
+
+- [#6084](https://github.com/thirdweb-dev/js/pull/6084) [`b5e327e`](https://github.com/thirdweb-dev/js/commit/b5e327e5ec745ce1beb9a79404fa5b11d0c5588e) Thanks [@jnsdls](https://github.com/jnsdls)! - add `billingPlanVersion` to `TeamResponse`
+
+## 0.7.2
+
+### Patch Changes
+
+- [#6079](https://github.com/thirdweb-dev/js/pull/6079) [`1616b7f`](https://github.com/thirdweb-dev/js/commit/1616b7f6198d43fc48a1269b1cca93958cbf7dba) Thanks [@jnsdls](https://github.com/jnsdls)! - updated dependencies
+
+## 0.7.1
+
+### Patch Changes
+
+- [#6047](https://github.com/thirdweb-dev/js/pull/6047) [`7a8e4e5`](https://github.com/thirdweb-dev/js/commit/7a8e4e5f861070858b4716ac95ba5bc60c284924) Thanks [@arcoraven](https://github.com/arcoraven)! - Export usageV2 util functions
+
+- [#6050](https://github.com/thirdweb-dev/js/pull/6050) [`fb4d0a2`](https://github.com/thirdweb-dev/js/commit/fb4d0a26f162a098878a1a63a61fef6033bcd5e9) Thanks [@arcoraven](https://github.com/arcoraven)! - [service-utils] replace client_id with project_id in usage_v2
+
+## 0.7.0
+
+### Minor Changes
+
+- [#6021](https://github.com/thirdweb-dev/js/pull/6021) [`5756c74`](https://github.com/thirdweb-dev/js/commit/5756c74a71c4dfd1b17b5141fd7deb779a36a703) Thanks [@arcoraven](https://github.com/arcoraven)! - feat: Add usageV2 support
+
+### Patch Changes
+
+- [#6023](https://github.com/thirdweb-dev/js/pull/6023) [`de039ef`](https://github.com/thirdweb-dev/js/commit/de039ef46282216de9a9c15e7ff8e94ea93f0ac5) Thanks [@arcoraven](https://github.com/arcoraven)! - Use a cache key that doesn't involve hashing
+
+## 0.6.0
+
+### Minor Changes
+
+- [#5950](https://github.com/thirdweb-dev/js/pull/5950) [`c290997`](https://github.com/thirdweb-dev/js/commit/c290997b11b547618fd6e46281ecf82ce4c5a550) Thanks [@nischitpra](https://github.com/nischitpra)! - track usage call once per ratelimit window
+
 ## 0.5.1
 
 ### Patch Changes

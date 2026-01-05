@@ -6,25 +6,34 @@ module.exports = [
   "/bounties",
   "/contact-us",
   // -- product landing pages --
-  // -- connect
-  "/connect",
-  "/connect/sign-in",
-  // -- nebula
-  "/nebula",
-  // --insight
+  // -- build category
+  "/wallets",
+  "/account-abstraction",
+  "/payments",
+  "/x402",
+  "/nexus",
+  "/auth",
+  "/in-app-wallets",
+  "/transactions",
+  // -- end build category
+
+  // -- scale category
+  "/rpc",
   "/insight",
+  "/storage",
+  "/gateway",
+  // -- end scale category
+
+  // -- ai
+  "/ai",
   // -- contracts
   "/contracts",
   "/contracts/modular-contracts",
   "/contracts/explore",
   "/contracts/deployment-tool",
-  // -- engine
-  "/engine",
+
   // -- solutions pages --
-  "/solutions/gaming",
-  "/solutions/consumer-apps",
-  "/solutions/defi",
-  "/solutions/ecosystem",
+  "/solutions/:solution_slug",
   // -- campaigns --
   // "/unlimited-wallets", -- OFF for now
   // -- TPP --
@@ -37,8 +46,29 @@ module.exports = [
   "/community/ambassadors",
   "/community/startup-program",
   // -- grants --
-  "/grant/superchain",
+  "/grants",
+  "/superchain",
   // -- templates --
   "/templates",
   "/templates/:template_slug",
+  // -- learn --
+  "/learn",
+  "/learn/guides",
+  "/learn/guides/:guide_slug",
+  "/learn/courses",
+  "/learn/glossary",
+  "/learn/glossary/:glossary_slug",
+  // -- faucets --
+  "/faucets",
+  // -- brand kit --
+  "/brand-kit",
+  // -- universal bridge landing pages --
+  "/universal-bridge-regions/:region_slug",
+  "/enterprise",
+  "/token",
+  "/vault",
+  "/monetize/bridge",
+  // ai
+  "/ai-privacy-policy",
+  "/ai-terms",
 ];

@@ -18,15 +18,6 @@ export type BuyWithCryptoQuoteQueryOptions = Omit<
 >;
 
 /**
- * @internal
- */
-type BuyWithCryptoQuoteError = {
-  status: string;
-  code: string;
-  statusCode: number;
-};
-
-/**
  * Hook to get a price quote for performing a "Buy with crypto" transaction that allows users to buy a token with another token - aka a swap.
  *
  * The price quote is an object of type [`BuyWithCryptoQuote`](https://portal.thirdweb.com/references/typescript/v5/BuyWithCryptoQuote).
@@ -80,6 +71,7 @@ type BuyWithCryptoQuoteError = {
  *  return <button onClick={handleBuyWithCrypto}>Swap</button>
  * }
  * ```
+ * @deprecated
  * @buyCrypto
  */
 export function useBuyWithCryptoQuote(
@@ -88,7 +80,7 @@ export function useBuyWithCryptoQuote(
 ): UseQueryResult<BuyWithCryptoQuote> {
   return useQuery({
     ...queryParams,
-    queryKey: ["buyWithCryptoQuote", params],
+    enabled: !!params,
     queryFn: () => {
       if (!params) {
         throw new Error("Swap params are required");
@@ -96,27 +88,8 @@ export function useBuyWithCryptoQuote(
 
       return getBuyWithCryptoQuote(params);
     },
-    enabled: !!params,
-    retry(failureCount, error) {
-      if (failureCount > 3) {
-        return false;
-      }
-      try {
-        // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-        const serverError = (error as any).error as BuyWithCryptoQuoteError;
-
-        if (serverError.code === "MINIMUM_PURCHASE_AMOUNT") {
-          return false;
-        }
-
-        if (serverError.statusCode === 404 || serverError.statusCode >= 500) {
-          return false;
-        }
-      } catch {
-        return true;
-      }
-
-      return true;
-    },
+    queryKey: ["buyWithCryptoQuote", params],
+    refetchInterval: 20_000,
+    retry: false,
   });
 }

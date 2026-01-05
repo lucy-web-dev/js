@@ -11,7 +11,7 @@ import { getFid } from "../read/getFid.js";
 
 /**
  * Represents the parameters for the `addSigner` function.
- * @description
+ *
  * This function can be used wither be provided pre-generated signatures or the wallet accounts directly.
  * This is done so the helpers can be used when there's no direct access to the account, but signatures can be generated (e.g. engine)
  *
@@ -60,27 +60,27 @@ export type AddSignerParams = Prettify<
 export function addSigner(options: AddSignerParams) {
   return prepareContractCall({
     contract: getKeyGateway({
-      client: options.client,
       chain: options.chain,
+      client: options.client,
     }),
     method: [
       "0x22b1a414",
       [
         {
-          type: "uint32",
           name: "keyType",
+          type: "uint32",
         },
         {
-          type: "bytes",
           name: "key",
-        },
-        {
-          type: "uint8",
-          name: "metadataType",
-        },
-        {
           type: "bytes",
+        },
+        {
+          name: "metadataType",
+          type: "uint8",
+        },
+        {
           name: "metadata",
+          type: "bytes",
         },
       ],
       [],
@@ -92,12 +92,12 @@ export function addSigner(options: AddSignerParams) {
           : BigInt(Math.floor(Date.now() / 1000) + 3600); // default signatures last for 1 hour
 
       const appFid = await getFid({
-        client: options.client,
-        chain: options.chain,
         address:
           "appAccount" in options
             ? options.appAccount.address
             : options.appAccountAddress,
+        chain: options.chain,
+        client: options.client,
         disableCache: options.disableCache,
       });
 
@@ -112,9 +112,9 @@ export function addSigner(options: AddSignerParams) {
         signedKeyRequestMetadata = await getSignedKeyRequestMetadata({
           account: options.appAccount,
           message: {
-            requestFid: toBigInt(appFid),
-            key: options.signerPublicKey,
             deadline,
+            key: options.signerPublicKey,
+            requestFid: toBigInt(appFid),
           },
         });
       } else {

@@ -1,11 +1,16 @@
 import {
   ArticleIconCard,
+  Callout
 } from "@doc";
 import {
   ReactIcon,
 } from "@/icons";
 
 # Migration from TypeScript SDK v4
+
+<Callout type="warning">
+  The TypeScript SDK v4 will be deprecated on June 23, 2025. We highly recommend you to migrate to the latest version of the SDK v5 as soon as possible.
+</Callout>
 
 <ArticleIconCard
 	title="Looking to migrate to React SDK v5?"
@@ -67,7 +72,7 @@ sendTx(transaction);
 
 As you can see, by pairing the contract extensions with `useReadContract` (for read) and `useSendTransaction` (for write),
 we are able to greatly reduce the amount of code that is packaged & shipped to the end users. Plus, with this approach we can dedicate more time
-to building contract extensions. The SDK v5 currenty supports over hundreds of extensions, with some popular protocols like Uniswap, Farcaster, Lens & more to come.
+to building contract extensions. The SDK v5 currently supports over hundreds of extensions, with some popular protocols like Uniswap, Farcaster, Lens & more to come.
 
 View a list of [supported extensions](/typescript/v5/extensions/built-in) here, or [build your own](/typescript/v5/extensions/create)!
 

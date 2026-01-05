@@ -1,9 +1,12 @@
 "use client";
 
-import { THIRDWEB_CLIENT } from "@/lib/client";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useActiveAccount, useConnect } from "thirdweb/react";
 import { inAppWallet, preAuthenticate } from "thirdweb/wallets";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { THIRDWEB_CLIENT } from "@/lib/client";
+import { Label } from "../ui/label";
 import { InAppConnectEmbed } from "./connect-button";
 
 export function CustomLoginForm() {
@@ -17,8 +20,8 @@ export function CustomLoginForm() {
     setScreen("verify");
     await preAuthenticate({
       client: THIRDWEB_CLIENT,
-      strategy: "email",
       email,
+      strategy: "email",
     });
   };
 
@@ -26,14 +29,34 @@ export function CustomLoginForm() {
     connect(async () => {
       const wallet = inAppWallet();
       await wallet.connect({
-        strategy: "email",
         client: THIRDWEB_CLIENT,
         email,
+        strategy: "email",
         verificationCode,
       });
       return wallet;
     });
   };
+
+  const loginWithGoogle = async () => {
+    connect(async () => {
+      const wallet = inAppWallet({
+        auth: {
+          mode: "redirect",
+          options: ["google"],
+          redirectUrl: `${window.location.origin}/wallets/in-app-wallet`,
+        },
+      });
+      await wallet.connect({
+        client: THIRDWEB_CLIENT,
+        strategy: "google",
+      });
+      return wallet;
+    });
+  };
+
+  const emailId = useId();
+  const verificationCodeId = useId();
 
   if (account) {
     return <InAppConnectEmbed />;
@@ -41,27 +64,31 @@ export function CustomLoginForm() {
 
   if (screen === "login") {
     return (
-      <div className="flex flex-col space-y-2">
-        <label htmlFor="email" className="font-medium text-sm">
-          Email Address
-        </label>
-        <input
-          type="email"
-          id="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="Enter your email"
-          required
-        />
-        <button
-          type="submit"
-          onClick={() => sendEmailVerificationCode(email)}
-          className="rounded-lg bg-blue-500 px-4 py-2 text-white transition-colors enabled:hover:bg-blue-600"
+      <div className="flex w-full max-w-xl flex-col space-y-4 p-6">
+        <div>
+          <Label className="mb-2 block" htmlFor={emailId}>
+            Email Address
+          </Label>
+          <Input
+            id={emailId}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Enter your email"
+            required
+            type="email"
+            value={email}
+          />
+        </div>
+        <Button
           disabled={isConnecting || !email}
+          onClick={() => sendEmailVerificationCode(email)}
+          type="submit"
         >
           {isConnecting ? "Submitting..." : "Submit"}
-        </button>
+        </Button>
+        <p className="text-center text-sm text-white">Or</p>
+        <Button onClick={loginWithGoogle} type="button">
+          Login with Google
+        </Button>
         {error && <p className="max-w-[300px] text-red-500">{error.message}</p>}
       </div>
     );
@@ -69,27 +96,27 @@ export function CustomLoginForm() {
 
   if (screen === "verify") {
     return (
-      <div className="flex flex-col space-y-2">
-        <label htmlFor="verification-code" className="font-medium text-sm">
-          Verification Code
-        </label>
-        <input
-          type="text"
-          id="verification-code"
-          value={verificationCode}
-          onChange={(e) => setVerificationCode(e.target.value)}
-          className="rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="Enter the code you received"
-          required
-        />
-        <button
-          type="submit"
-          onClick={() => loginWithEmail(email, verificationCode)}
-          className="rounded-lg bg-blue-500 px-4 py-2 text-white transition-colors enabled:hover:bg-blue-600"
+      <div className="flex w-full max-w-xl flex-col space-y-4 p-6">
+        <div>
+          <Label className="mb-2 block" htmlFor={verificationCodeId}>
+            Verification Code
+          </Label>
+          <Input
+            id={verificationCodeId}
+            onChange={(e) => setVerificationCode(e.target.value)}
+            placeholder="Enter the code you received"
+            required
+            type="text"
+            value={verificationCode}
+          />
+        </div>
+        <Button
           disabled={isConnecting || !verificationCode}
+          onClick={() => loginWithEmail(email, verificationCode)}
+          type="submit"
         >
           {isConnecting ? "Submitting..." : "Submit"}
-        </button>
+        </Button>
         {error && <p className="max-w-[300px] text-red-500">{error.message}</p>}
       </div>
     );

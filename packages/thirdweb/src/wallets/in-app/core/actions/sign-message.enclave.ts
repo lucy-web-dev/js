@@ -6,13 +6,15 @@ import type { ClientScopedStorage } from "../authentication/client-scoped-storag
 
 export async function signMessage({
   client,
-  payload: { message, isRaw },
+  payload: { message, isRaw, originalMessage, chainId },
   storage,
 }: {
   client: ThirdwebClient;
   payload: {
     message: string;
     isRaw: boolean;
+    originalMessage?: string;
+    chainId?: number;
   };
   storage: ClientScopedStorage;
 }) {
@@ -27,18 +29,20 @@ export async function signMessage({
   const response = await clientFetch(
     `${getThirdwebBaseUrl("inAppWallet")}/api/v1/enclave-wallet/sign-message`,
     {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-thirdweb-client-id": client.clientId,
-        Authorization: `Bearer embedded-wallet-token:${authToken}`,
-      },
       body: stringify({
         messagePayload: {
-          message,
+          chainId,
           isRaw,
+          message,
+          originalMessage,
         },
       }),
+      headers: {
+        Authorization: `Bearer embedded-wallet-token:${authToken}`,
+        "Content-Type": "application/json",
+        "x-thirdweb-client-id": client.clientId,
+      },
+      method: "POST",
     },
   );
 

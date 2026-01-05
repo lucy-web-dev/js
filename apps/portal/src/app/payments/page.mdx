@@ -1,84 +1,240 @@
-import { DocImage } from "@doc";
-import checkoutsOverviewImage from "./assets/checkouts-overview.png";
-import { createMetadata } from "@doc";
+import {
+  Callout,
+  OpenSourceCard,
+  createMetadata,
+  InstallTabs,
+  SDKCard,
+  Grid,
+  ArticleIconCard,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+  Badge,
+  OpenApiEndpoint,
+} from "@doc";
+import {
+  ReactIcon,
+  TypeScriptIcon,
+  UnityIcon,
+  DotNetIcon,
+  UnrealEngineIcon,
+  EngineIcon
+} from "@/icons";
 
 export const metadata = createMetadata({
-	image: {
-		title: "thirdweb Payments",
-		icon: "infra",
-	},
-	title: "thirdweb Payments",
-	description:
-		"Checkout delivers the easiest NFT payments experience for you and your buyers. Sell NFTs on any one of our supported EVM chains and allow your users to pay with any supported payment option. You and your buyers can expect instant payouts and instant NFT processing - all done through your smart contract.",
+  image: {
+    title: "Get started with Payments",
+    icon: "payments"
+  },
+  title: "Get started with Payments",
+  description: "Monetize your app with thirdweb Payments. Sell products, transfer funds between users, launch tokens, and more.",
 });
 
-# thirdweb Payments
+# Get Started
 
-Checkouts delivers the easiest NFT payments experience for you and your buyers. Sell NFTs on any one of our supported EVM chains and allow your users to pay with
-any supported payment option. You and your buyers can expect instant payouts and instant NFT processing - all done through your smart contract.
+thirdweb Payments allow developers to create advanced payment flows to monetize their apps through product sales, peer to peer payments, token sales, and more.
 
-<DocImage src={checkoutsOverviewImage} alt="Checkouts Process Diagram" />
+<Tabs defaultValue="react">
+  <TabsList>
+    <TabsTrigger value="react" className="flex items-center [&>p]:mb-0">
+      <ReactIcon className="size-4 mr-1.5" />
+      React
+    </TabsTrigger>
+     <TabsTrigger value="typescript" className="flex items-center [&>p]:mb-0">
+      <TypeScriptIcon className="size-4 mr-1.5" />
+      TypeScript
+    </TabsTrigger>
+    <TabsTrigger value="http" className="flex items-center [&>p]:mb-0">
+      <EngineIcon className="size-4 mr-1.5" />
+      HTTP
+    </TabsTrigger>
+  </TabsList>
 
-### Accepted payment options for buyers
+  <TabsContent value="typescript">
+    Get started sending payments in your apps with the thirdweb TypeScript SDK.
 
-thirdweb accepts fiat payments via Credit & Debit Card, Apple Pay, and Google Pay. Card and other fiat payments are accepted from all 50 US states and most countries. We also support crypto payments via ETH.
+    ### Installation
 
-### Supported chains and currencies for developers
+    Install the thirdweb SDK in your TypeScript project:
 
-thirdweb currently supports checkout for NFTs on any of the following chains with any of the following currencies:
+    <InstallTabs
+      npm="npm i thirdweb"
+      yarn="yarn add thirdweb"
+      pnpm="pnpm i thirdweb"
+      bun="bun i thirdweb"
+    />
 
-| Blockchain (Mainnet) | Supported Currencies            |
-| :------------------- | :------------------------------ |
-| Arbitrum Nova        | ETH                             |
-| Arbitrum One         | ETH, USDC.e\*                   |
-| Avalanche            | AVAX, USDC.e\*                  |
-| Ethereum             | ETH, USDC\*                     |
-| Optimism             | ETH, USDC\*                     |
-| Polygon              | MATIC, USDC\*, USDC.e\*, WETH\* |
-| Zora                 | ETH                             |
+    ### Set up the Client
 
-\* - ERC-20 tokens are available for pro or enterprise customers only
+    First, create a client instance to connect with thirdweb services:
 
-#
+    ```typescript
+    import { createThirdwebClient } from "thirdweb";
 
-| Blockchain (Testnet) | Supported Currencies |
-| :------------------- | :------------------- |
-| Arbitrum Sepolia     | ETH                  |
-| Avalanche Fuji       | AVAX                 |
-| Base Sepolia	       | ETH                  |
-| Sepolia              | ETH                  |
-| Zora Testnet         | ETH                  |
-| Polygon Amoy Testnet | MATIC                |
+    // - clientId for client-side applications
+    // - secretKey for server-side applications
+    const client = createThirdwebClient({
+      clientId: "YOUR_CLIENT_ID", // Get from your thirdweb dashboard
+    });
+    ```
 
-### Fraud prevention & chargeback protection
+    ### Generate a payment
 
-thirdweb deters bots and fraudulent activity by using multiple data points about the buyer's device, network, behavior, payment, and more. Only high-risk buyers will need to verify their identity with an ID and selfie.
+    To get started, lets generate a payment for 10 USDC on Optimism, paid with USDT on Arbitrum.
 
-We protect you from these concerns by offering **full chargeback protection.**
+    ```typescript
+    import { Bridge, NATIVE_TOKEN_ADDRESS, toWei } from "thirdweb";
 
-### Reliable NFT Delivery
+// Quote to buy 10 USDC on Optimism, paid with USDT on Arbitrum
+const preparedQuote = await Bridge.Buy.prepare({
+  originChainId: 42161,
+  originTokenAddress: "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9", // USDT on Arbitrum
+  destinationChainId: 10,
+  destinationTokenAddress: "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85", // USDC on Optimism
+  amount: 10_000_000n, // 10 USDC in wei (USDC has 6 decimals)
+  sender: "0x2a4f24F935Eb178e3e7BA9B53A5Ee6d8407C0709",
+  receiver: "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+  client,
+});
+    ```
 
-thirdweb manages a fleet of funded crypto wallets to handle blockchain transactions at scale. Queues are automated to monitor for stuck transactions, failed onchain calls, and low funds.
+    The prepared quote will contain details about the payment, including the transactions needed to execute it.
 
-### Conversion-optimized UX
+    You can execute the included transactions using the wallet of your choice. To learn how to send it using thirdweb Wallets, checkout the [Send a Payment](/payments/send) guide.
 
-Our checkout flow accounts for many cases to provide buyers a seamless experience with minimal steps:
+  </TabsContent>
 
-- Does the buyer need a crypto wallet or do they already have one?
-- Do they exhibit bot-like or suspicious behavior?
-- Do they have enough tokens to mint directly from their wallet?
-- Is your user trying to purchase more than one NFT?
-- Is your user allowlisted to purchase?
-- Are there enough NFTs remaining to purchase?
+  <TabsContent value="react">
+    The quickest way to setup payments in your React app is with the [`BuyWidget`](/references/typescript/v5/BuyWidget), [`CheckoutWidget`](/references/typescript/v5/CheckoutWidget), and [`TransactionWidget`](/references/typescript/v5/TransactionWidget) components.
 
-### Webhooks & custom metadata
+    ### Live Playground
 
-Configure webhooks to notify your backend when payments and transfers are completed. Webhooks allow you to unlock NFT-gated utilities, send customized emails, and more.
+<ArticleIconCard
+  title="Payment Widgets Playground"
+  description="Try out the Payment Widgets in our live playground"
+  icon={ReactIcon}
+  href="https://playground.thirdweb.com/bridge/transaction-widget"
+/>
 
-Provide custom metadata to tag purchases with added information.
+    ### Installation
 
-### Analytics
+    Install the thirdweb SDK in your React project:
 
-View purchases to your checkouts including breakdowns by payment method and wallet. Export your data with additional details including buyer location, transaction hash, conversion rate, and custom metadata.
+    <InstallTabs
+      npm="npm i thirdweb"
+      yarn="yarn add thirdweb"
+      pnpm="pnpm i thirdweb"
+      bun="bun i thirdweb"
+    />
 
-Get visibility into failed transactions to speed up debugging and resolve support questions.
+
+    ### Create a Client
+
+    First, create a client file (e.g., `thirdwebClient.ts`) for reuse throughout your app:
+
+    ```typescript
+    // thirdwebClient.ts
+    import { createThirdwebClient } from "thirdweb";
+
+    export const client = createThirdwebClient({
+      clientId: "YOUR_CLIENT_ID", // Get from your thirdweb dashboard
+    });
+    ```
+
+    ### Setup the Provider
+
+    Wrap your application with the ThirdwebProvider:
+
+    ```tsx
+    // app.tsx / _app.tsx
+    import { ThirdwebProvider } from "thirdweb/react";
+
+    function App() {
+      return (
+        <ThirdwebProvider>
+          <YourApp />
+        </ThirdwebProvider>
+      );
+    }
+    ```
+
+    ### Buy Widget
+
+    Use the BuyWidget to let users purchase tokens:
+
+    ```tsx
+    import { BuyWidget } from "thirdweb/react";
+    import { base } from "thirdweb/chains";
+
+    function PaymentComponent() {
+      return (
+        <BuyWidget
+          client={client}
+          chain={base}
+          amount="10" // 10 USDC
+          tokenAddress="0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+        />
+      );
+    }
+    ```
+
+  </TabsContent>
+
+  <TabsContent value="http">
+    Use the thirdweb payments API to create and manage payments programmatically.
+
+    ### Create Payment
+
+    Create a payment for your product or service:
+
+    <OpenApiEndpoint path="/v1/payments" method="POST" />
+
+    ### Complete Payment
+
+    Complete a payment using the product ID:
+
+    <OpenApiEndpoint path="/v1/payments/{id}" method="POST" />
+
+    ### Swap Tokens
+
+    Swap tokens for optimal payment processing:
+
+    <OpenApiEndpoint path="/v1/payments/swap" method="POST" />
+
+    For more details, see the full [API Reference](/reference).
+  </TabsContent>
+</Tabs>
+
+## Going further
+
+To connect with other auth strategies, use external wallets, or sponsor gas for users, check out the following guides:
+
+- [Send a Payment](/payments/send)
+- [Webhooks](/payments/webhooks)
+- [Custom Data](/payments/custom-data)
+
+## Explore Full API References
+
+For comprehensive guides on implementing the full thirdweb SDK, explore our language-specific documentation:
+
+<Grid>
+	<SDKCard
+		title="TypeScript"
+		href="/references/typescript/v5"
+		icon={TypeScriptIcon}
+	/>
+	<SDKCard title="React" href="/references/typescript/v5" icon={ReactIcon} />
+	<SDKCard
+		title="React Native"
+		href="/references/typescript/v5"
+		icon={ReactIcon}
+	/>
+	<SDKCard title="DotNet" href="/dotnet/getting-started" icon={DotNetIcon} />
+	<SDKCard title="Unity" href="/unity/v5/getting-started" icon={UnityIcon} />
+	<SDKCard
+		title="Unreal Engine"
+		href="/unreal-engine/getting-started"
+		icon={UnrealEngineIcon}
+	/>
+</Grid>

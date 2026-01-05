@@ -5,7 +5,7 @@ export const wallet = {
   id: "com.bitget.web3",
   name: "Bitget Wallet",
   homepage: "https://web3.bitget.com",
-  image_id: "ac927cca-531b-40e1-0ff2-4eefe946d100",
+  image_id: "f6ff957e-7e74-4f43-a3ae-a643bf18a200",
   app: {
     browser: "https://bitkeep.com",
     ios: "https://web3.bitget.com/en/wallet-download?type=0",
@@ -20,7 +20,7 @@ export const wallet = {
     edge: null,
     opera: null,
   },
-  rdns: null,
+  rdns: "com.bitget.web3",
   mobile: {
     native: "bitkeep://",
     universal: "https://bkapp.vip",

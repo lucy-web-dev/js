@@ -1,38 +1,16 @@
-"use client";
-
-import { THIRDWEB_CLIENT } from "@/lib/client";
-import { getContract } from "thirdweb";
-import { ethereum } from "thirdweb/chains";
-import { NFTDescription, NFTMedia, NFTName, NFTProvider } from "thirdweb/react";
 import { CodeExample } from "../code/code-example";
+import {
+  NftCardDemoPreview,
+  NftDescriptionBasicPreview,
+  NftMediaBasicPreview,
+  NftMediaOverridePreview,
+  NftNameBasicPreview,
+} from "./nft-previews";
 
-const nftContract = getContract({
-  address: "0xbd3531da5cf5857e7cfaa92426877b022e612cf8",
-  chain: ethereum,
-  client: THIRDWEB_CLIENT,
-});
-
-export function NftMediaBasic() {
+export function NftMediaExample() {
   return (
-    <>
-      <div className="space-y-2">
-        <h2 className="font-semibold text-2xl tracking-tight sm:text-3xl">
-          NFTMedia
-        </h2>
-        <p className="max-w-[600px] text-lg">
-          Show the media of an NFT in a collection.
-        </p>
-      </div>
-
+    <div>
       <CodeExample
-        preview={
-          <NFTProvider tokenId={0n} contract={nftContract}>
-            <NFTMedia
-              className="h-40 w-40 rounded-md"
-              loadingComponent={<span>Loading...</span>}
-            />
-          </NFTProvider>
-        }
         code={`import { NFTProvider, NFTMedia } from "thirdweb/react";
 
 function App() {
@@ -40,38 +18,21 @@ function App() {
     <NFTMedia className="rounded-md w-40 h-40" loadingComponent={<span>Loading...</span>} />
   </NFTProvider>
 }`}
+        header={{
+          description: "Show the media of an NFT in a collection.",
+          title: "NFTMedia",
+        }}
         lang="tsx"
+        preview={<NftMediaBasicPreview />}
       />
-    </>
-  );
-}
 
-export function NftMediaOverride() {
-  return (
-    <>
-      <div className="mt-8 space-y-2">
-        <h4 className="font-semibold text-lg">
-          Override the NFT media using the <b>mediaResolver</b> prop.
-        </h4>
-        <p className="max-w-[600px] text-lg">
-          This prop is very useful when you already have the media src and want
-          to skip the network requests on the client.
-        </p>
-      </div>
+      <p className="my-4 text-muted-foreground">
+        Override the NFT media using the mediaResolver prop. This is useful when
+        you already have the media src and want to skip the network requests on
+        the client.
+      </p>
 
       <CodeExample
-        preview={
-          <NFTProvider tokenId={0n} contract={nftContract}>
-            <NFTMedia
-              className="h-40 w-40 rounded-md border"
-              mediaResolver={{
-                src: "ipfs://QmeGCqV1mSHTZrvuFzW1XZdCRRGXB6AmSotTqHoxA2xfDo/1.mp4",
-                poster:
-                  "ipfs://QmeGCqV1mSHTZrvuFzW1XZdCRRGXB6AmSotTqHoxA2xfDo/0.png",
-              }}
-            />
-          </NFTProvider>
-        }
         code={`import { NFTProvider, NFTMedia } from "thirdweb/react";
 
 function App() {
@@ -86,108 +47,61 @@ function App() {
     </NFTProvider>
 }`}
         lang="tsx"
+        preview={<NftMediaOverridePreview />}
       />
-    </>
+    </div>
   );
 }
 
-export function NftNameBasic() {
+export function NftNameExample() {
   return (
-    <>
-      <div className="mt-8 space-y-2">
-        <h2 className="font-semibold text-2xl tracking-tight sm:text-3xl">
-          NFTName
-        </h2>
-        <p className="max-w-[600px] text-lg">
-          Show the name of an NFT in a collection.
-        </p>
-      </div>
-
-      <CodeExample
-        preview={
-          <NFTProvider tokenId={0n} contract={nftContract}>
-            <NFTName loadingComponent={<span>Loading...</span>} />
-          </NFTProvider>
-        }
-        code={`import { NFTProvider, NFTName } from "thirdweb/react";
+    <CodeExample
+      code={`import { NFTProvider, NFTName } from "thirdweb/react";
 
 function App() {
   return <NFTProvider tokenId={0n} contract={nftContract}>
     <NFTName loadingComponent={<span>Loading...</span>} />
   </NFTProvider>
 }`}
-        lang="tsx"
-      />
-    </>
+      header={{
+        description: "Show the name of an NFT in a collection.",
+        title: "NFTName",
+      }}
+      lang="tsx"
+      preview={<NftNameBasicPreview />}
+    />
   );
 }
 
 export function NftDescriptionBasic() {
   return (
-    <>
-      <div className="mt-8 space-y-2">
-        <h2 className="font-semibold text-2xl tracking-tight sm:text-3xl">
-          NFTDescription
-        </h2>
-        <p className="max-w-[600px] text-lg">
-          Show the description of an NFT in a collection.
-        </p>
-      </div>
-
-      <CodeExample
-        preview={
-          <NFTProvider tokenId={0n} contract={nftContract}>
-            <NFTDescription
-              className="text-center"
-              loadingComponent={<span>Loading...</span>}
-            />
-          </NFTProvider>
-        }
-        code={`import { NFTProvider, NFTDescription } from "thirdweb/react";
+    <CodeExample
+      code={`import { NFTProvider, NFTDescription } from "thirdweb/react";
 
 function App() {
   return <NFTProvider tokenId={0n} contract={nftContract}>
     <NFTDescription className="text-center" loadingComponent={<span>Loading...</span>} />
   </NFTProvider>
 }`}
-        lang="tsx"
-      />
-    </>
+      header={{
+        description: "Show the description of an NFT in a collection.",
+        title: "NFTDescription",
+      }}
+      lang="tsx"
+      preview={<NftDescriptionBasicPreview />}
+    />
   );
 }
 
-export function NftCardDemo() {
+export function NftCardExample() {
   return (
-    <>
-      <div className="mt-8 space-y-2">
-        <h2 className="font-semibold text-2xl tracking-tight sm:text-3xl">
-          Build an NFT Card
-        </h2>
-        <p className="max-w-[600px] text-lg">
-          Using these headless components, you can easily build your own NFT
-          Card
-        </p>
-      </div>
-
-      <CodeExample
-        preview={
-          <NFTProvider tokenId={0n} contract={nftContract}>
-            <div className="flex w-[230px] flex-col gap-3 rounded-lg border bg-gray-900 px-1 py-3">
-              <NFTMedia className="rounded-md px-2 text-center" />
-              <NFTName className="px-2 font-bold" />
-              <NFTDescription
-                className="px-2 text-sm"
-                loadingComponent={<span>Loading...</span>}
-              />
-            </div>
-          </NFTProvider>
-        }
-        code={`import { NFTProvider, NFTDescription, NFTName, NFTMedia } from "thirdweb/react";
+    <CodeExample
+      code={`import { NFTProvider, NFTDescription, NFTName, NFTMedia } from "thirdweb/react";
 
 function App() {
   return (
       <NFTProvider tokenId={0n} contract={nftContract}>
-      <div className="flex w-[230px] flex-col gap-3 rounded-lg border bg-gray-900 px-1 py-3">
+      <div className="flex w-[230px] flex-col gap-3 rounded-lg border bg-zinc-900 px-1 py-3">
         <NFTMedia className="rounded-md px-2 text-center" />
         <NFTName className="px-2 font-bold" />
         <NFTDescription
@@ -198,8 +112,13 @@ function App() {
     </NFTProvider>
   )
 }`}
-        lang="tsx"
-      />
-    </>
+      header={{
+        description:
+          "Using these headless components, you can easily build your own NFT Card",
+        title: "Build an NFT Card",
+      }}
+      lang="tsx"
+      preview={<NftCardDemoPreview />}
+    />
   );
 }

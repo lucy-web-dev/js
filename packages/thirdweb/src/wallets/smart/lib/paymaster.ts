@@ -52,8 +52,8 @@ export async function getPaymasterAndData(args: {
   const paymasterUrl = getDefaultBundlerUrl(chain);
 
   const body = {
-    jsonrpc: "2.0",
     id: 1,
+    jsonrpc: "2.0",
     method: "pm_sponsorUserOperation",
     params: [hexlifyUserOp(userOp), entrypoint],
   };
@@ -61,22 +61,18 @@ export async function getPaymasterAndData(args: {
   // Ask the paymaster to sign the transaction and return a valid paymasterAndData value.
   const fetchWithHeaders = getClientFetch(client);
   const response = await fetchWithHeaders(paymasterUrl, {
-    method: "POST",
-    headers,
     body: stringify(body),
+    headers,
+    method: "POST",
   });
-  const res = await response.json();
 
   if (!response.ok) {
-    const error = res.error || response.statusText;
-    const code = res.code || "UNKNOWN";
+    const error = (await response.text()) || response.statusText;
 
-    throw new Error(
-      `Paymaster error: ${error}
-Status: ${response.status}
-Code: ${code}`,
-    );
+    throw new Error(`Paymaster error: ${response.status} - ${error}`);
   }
+
+  const res = await response.json();
 
   if (res.result) {
     // some paymasters return a string, some return an object with more data
@@ -86,30 +82,30 @@ Code: ${code}`,
       };
     }
     // check for policy errors
-    if (res.result.policyId && res.result.reason) {
+    if (res.result.reason) {
       console.warn(
-        `Paymaster policy rejected this transaction with reason: ${res.result.reason} (policyId: ${res.result.policyId})`,
+        `Paymaster policy rejected this transaction with reason: ${res.result.reason} ${res.result.policyId ? `(policyId: ${res.result.policyId})` : ""}`,
       );
     }
 
     return {
-      paymasterAndData: res.result.paymasterAndData,
-      verificationGasLimit: res.result.verificationGasLimit
-        ? hexToBigInt(res.result.verificationGasLimit)
-        : undefined,
-      preVerificationGas: res.result.preVerificationGas
-        ? hexToBigInt(res.result.preVerificationGas)
-        : undefined,
       callGasLimit: res.result.callGasLimit
         ? hexToBigInt(res.result.callGasLimit)
         : undefined,
       paymaster: res.result.paymaster,
+      paymasterAndData: res.result.paymasterAndData,
       paymasterData: res.result.paymasterData,
+      paymasterPostOpGasLimit: res.result.paymasterPostOpGasLimit
+        ? hexToBigInt(res.result.paymasterPostOpGasLimit)
+        : undefined,
       paymasterVerificationGasLimit: res.result.paymasterVerificationGasLimit
         ? hexToBigInt(res.result.paymasterVerificationGasLimit)
         : undefined,
-      paymasterPostOpGasLimit: res.result.paymasterPostOpGasLimit
-        ? hexToBigInt(res.result.paymasterPostOpGasLimit)
+      preVerificationGas: res.result.preVerificationGas
+        ? hexToBigInt(res.result.preVerificationGas)
+        : undefined,
+      verificationGasLimit: res.result.verificationGasLimit
+        ? hexToBigInt(res.result.verificationGasLimit)
         : undefined,
     };
   }

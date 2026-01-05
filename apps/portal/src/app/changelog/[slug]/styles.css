@@ -2,17 +2,19 @@
   display: none;
 }
 
-.changelog-page a {
-  color: var(--accent-500);
+.changelog-page h2 a {
+  text-decoration: none;
 }
 
 .changelog-page a:hover {
-  color: var(--f-100);
+  color: hsl(var(--foreground));
+  text-decoration-color: hsl(var(--foreground));
+  text-decoration-style: solid;
 }
 
 .changelog-page figcaption {
   text-align: center;
-  color: var(--f-300);
+  color: hsl(var(--muted-foreground));
 }
 
 .changelog-page iframe {
@@ -43,7 +45,7 @@
   display: flex;
   gap: 10px;
   margin: 20px 0;
-  background: var(--b-800);
+  background: hsl(var(--card));
 }
 
 .kg-video-overlay {

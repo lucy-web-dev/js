@@ -5,7 +5,7 @@ export const wallet = {
   id: "com.fireblocks",
   name: "Fireblocks",
   homepage: "https://www.fireblocks.com/",
-  image_id: "7e1514ba-932d-415d-1bdb-bccb6c2cbc00",
+  image_id: "94e7efd8-001d-40c0-e490-61e6b85e1b00",
   app: {
     browser: "https://console.fireblocks.io/",
     ios: "https://apps.apple.com/us/app/fireblocks/id1439296596",

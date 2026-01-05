@@ -4,6 +4,7 @@ import type { ThirdwebClient } from "../../../../client/client.js";
 import type { BuyWithCryptoStatus } from "../../../../pay/buyWithCrypto/getStatus.js";
 import type { BuyWithFiatStatus } from "../../../../pay/buyWithFiat/getStatus.js";
 import type { SupportedFiatCurrency } from "../../../../pay/convert/type.js";
+import type { PurchaseData } from "../../../../pay/types.js";
 import type { FiatProvider } from "../../../../pay/utils/commonTypes.js";
 import type { AssetTabs } from "../../../../react/web/ui/ConnectWallet/screens/ViewAssets.js";
 import type { PreparedTransaction } from "../../../../transaction/prepare-transaction.js";
@@ -14,6 +15,7 @@ import type { SmartWalletOptions } from "../../../../wallets/smart/types.js";
 import type { AppMetadata } from "../../../../wallets/types.js";
 import type { WalletId } from "../../../../wallets/wallet-types.js";
 import type { NetworkSelectorProps } from "../../../web/ui/ConnectWallet/NetworkSelector.js";
+import type { CurrencyMeta } from "../../../web/ui/ConnectWallet/screens/Buy/fiat/currencies.js";
 import type { WelcomeScreen } from "../../../web/ui/ConnectWallet/screens/types.js";
 import type { LocaleId } from "../../../web/ui/types.js";
 import type { Theme } from "../../design-system/index.js";
@@ -23,37 +25,44 @@ import type {
   TokenInfo,
 } from "../../utils/defaultTokens.js";
 import type { SiweAuthOptions } from "../auth/useSiweAuth.js";
+import type { OnConnectCallback } from "./types.js";
 
-export type PaymentInfo = {
-  /**
-   * The chain to receive the payment on.
-   */
-  chain: Chain;
-  /**
-   * The address of the seller wallet to receive the payment on.
-   */
-  sellerAddress: string;
-  /**
-   * Optional ERC20 token to receive the payment on.
-   * If not provided, the native token will be used.
-   */
-  token?: TokenInfo;
-} & (
-  | {
-      /**
-       * The amount of tokens to receive in ETH or tokens.
-       * ex: 0.1 ETH or 100 USDC
-       */
-      amount: string;
-    }
-  | {
-      /**
-       * The amount of tokens to receive in wei.
-       * ex: 1000000000000000000 wei
-       */
-      amountWei: bigint;
-    }
-);
+export type PaymentInfo = Prettify<
+  {
+    /**
+     * The chain to receive the payment on.
+     */
+    chain: Chain;
+    /**
+     * The address of the seller wallet to receive the payment on.
+     */
+    sellerAddress: string;
+    /**
+     * Optional ERC20 token to receive the payment on.
+     * If not provided, the native token will be used.
+     */
+    token?: Partial<TokenInfo> & { address: string };
+    /**
+     * For direct transfers, specify who will pay the transfer fee. Can be "sender" or "receiver".
+     */
+    feePayer?: "sender" | "receiver";
+  } & (
+    | {
+        /**
+         * The amount of tokens to receive in ETH or tokens.
+         * ex: 0.1 ETH or 100 USDC
+         */
+        amount: string;
+      }
+    | {
+        /**
+         * The amount of tokens to receive in wei.
+         * ex: 1000000000000000000 wei
+         */
+        amountWei: bigint;
+      }
+  )
+>;
 
 export type PayUIOptions = Prettify<
   {
@@ -70,10 +79,13 @@ export type PayUIOptions = Prettify<
     buyWithCrypto?:
       | false
       | {
+          /**
+           * @deprecated
+           */
           testMode?: boolean;
           prefillSource?: {
             chain: Chain;
-            token?: TokenInfo;
+            token?: Partial<TokenInfo> & { address: string };
             allowEdits?: {
               token: boolean;
               chain: boolean;
@@ -88,11 +100,17 @@ export type PayUIOptions = Prettify<
      */
     buyWithFiat?:
       | {
+          /**
+           * @deprecated
+           */
           testMode?: boolean;
           prefillSource?: {
-            currency?: "USD" | "CAD" | "GBP" | "EUR" | "JPY";
+            currency?: CurrencyMeta["shorthand"];
           };
           preferredProvider?: FiatProvider;
+          supportedProviders?: FiatProvider[];
+          onrampChainId?: number;
+          onrampTokenAddress?: string;
         }
       | false;
 
@@ -101,13 +119,14 @@ export type PayUIOptions = Prettify<
      *
      * This details will be stored with the purchase and can be retrieved later via the status API or Webhook
      */
-    purchaseData?: object;
+    purchaseData?: PurchaseData;
 
     /**
      * Callback to be called when the user successfully completes the purchase.
      */
     onPurchaseSuccess?: (
-      info:
+      // TODO: remove this type from the callback entirely or adapt it from the new format
+      info?:
         | {
             type: "crypto";
             status: BuyWithCryptoStatus;
@@ -127,9 +146,17 @@ export type PayUIOptions = Prettify<
      */
     metadata?: {
       name?: string;
+      description?: string;
       image?: string;
     };
-  } & (FundWalletOptions | DirectPaymentOptions | TranasctionOptions)
+
+    /**
+     * Show the "Powered by Thirdweb" branding at the bottom of the PayEmbed UI.
+     *
+     * By default it is `true`.
+     */
+    showThirdwebBranding?: boolean;
+  } & (FundWalletOptions | DirectPaymentOptions | TransactionOptions)
 >;
 
 export type FundWalletOptions = {
@@ -145,13 +172,14 @@ export type FundWalletOptions = {
    */
   prefillBuy?: {
     chain: Chain;
-    token?: TokenInfo;
+    token?: Partial<TokenInfo> & { address: string };
     amount?: string;
     allowEdits?: {
       amount: boolean;
       token: boolean;
       chain: boolean;
     };
+    presetOptions?: [number, number, number];
   };
 };
 
@@ -163,13 +191,16 @@ export type DirectPaymentOptions = {
   paymentInfo: PaymentInfo;
 };
 
-export type TranasctionOptions = {
+export type TransactionOptions = {
   mode: "transaction";
   /**
    * The transaction to be executed.
    */
   transaction: PreparedTransaction;
 };
+
+// Note: When adding props to ConnectButton_connectButtonOptions,
+// make sure to also add it in UseWalletDetailsModalOptions for useWalletDetailsModal hook
 
 /**
  * Options for configuring the `ConnectButton`'s Connect Button
@@ -907,13 +938,14 @@ export type ConnectButtonProps = {
    *
    * ```tsx
    * <ConnectButton
-   *  onConnect={(wallet) => {
-   *    console.log("connected to", wallet)
+   *  onConnect={(activeWallet, allConnectedWallets) => {
+   *    console.log("connected to", activeWallet)
+   *    console.log("all connected wallets", allConnectedWallets)
    *  }}
    * />
    * ```
    */
-  onConnect?: (wallet: Wallet) => void;
+  onConnect?: OnConnectCallback;
 
   /**
    * Called when the user disconnects the wallet by clicking on the "Disconnect Wallet" button in the `ConnectButton`'s Details Modal.
@@ -967,6 +999,11 @@ export type ConnectButtonProps = {
    * You can disable this button by setting `showAllWallets` prop to `false`
    */
   showAllWallets?: boolean;
+
+  /**
+   * All wallet IDs included in this array will be hidden from the wallet selection list.
+   */
+  hiddenWallets?: WalletId[];
 
   /**
    * Enable SIWE (Sign in with Ethererum) by passing an object of type `SiweAuthOptions` to

@@ -1,10 +1,9 @@
 import type { EIP1193RequestFn, EIP1474Methods } from "viem";
-import type { ThirdwebClient } from "../client/client.js";
-
 import type { Chain } from "../chains/types.js";
 import { getRpcUrlForChain } from "../chains/utils.js";
+import type { ThirdwebClient } from "../client/client.js";
 import { stringify } from "../utils/json.js";
-import { type RpcRequest, fetchRpc, fetchSingleRpc } from "./fetch-rpc.js";
+import { fetchRpc, fetchSingleRpc, type RpcRequest } from "./fetch-rpc.js";
 
 const RPC_CLIENT_MAP = new WeakMap();
 
@@ -71,8 +70,8 @@ export function getRpcClient(
   const rpcClient: EIP1193RequestFn<EIP1474Methods> = (() => {
     // we can do this upfront because it cannot change later
     const rpcUrl = getRpcUrlForChain({
-      client: options.client,
       chain: options.chain,
+      client: options.client,
     });
 
     const batchSize =
@@ -126,7 +125,7 @@ export function getRpcClient(
         inflight.request.id = index;
         // also assign the jsonrpc version
         inflight.request.jsonrpc = "2.0";
-        // assing the request to the requests array (so we don't have to map it again later)
+        // assign the request to the requests array (so we don't have to map it again later)
         requests[index] = inflight.request;
         return inflight;
       });
@@ -144,7 +143,11 @@ export function getRpcClient(
 
             // No response.
             if (!response) {
-              inflight.reject(new Error("No response"));
+              inflight.reject(
+                new Error(
+                  `RPC Error from ${rpcUrl}:\nrequests: ${stringify(requests)}\nresponses: ${stringify(responses)}`,
+                ),
+              );
             }
             // Response is an error or error string.
             else if (response instanceof Error) {
@@ -218,8 +221,8 @@ export function getRpcClient(
         reject = reject_;
       });
       inflightRequests.set(requestKey, promise);
-      // @ts-expect-error - they *are* definitely assgined within the promise constructor
-      pendingBatch.push({ request, resolve, reject, requestKey });
+      // @ts-expect-error - they *are* definitely assigned within the promise constructor
+      pendingBatch.push({ reject, request, requestKey, resolve });
       if (batchSize > 1) {
         // if there is no timeout, set one
         if (!pendingBatchTimeout) {

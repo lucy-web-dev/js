@@ -1,5 +1,7 @@
 import type { ThirdwebClient } from "../../../../client/client.js";
 import { getThirdwebBaseUrl } from "../../../../utils/domains.js";
+import type { AsyncStorage } from "../../../../utils/storage/AsyncStorage.js";
+import { inMemoryStorage } from "../../../../utils/storage/inMemoryStorage.js";
 import { webLocalStorage } from "../../../../utils/storage/webStorage.js";
 import type { SocialAuthOption } from "../../../../wallets/types.js";
 import type { Account } from "../../../interfaces/wallet.js";
@@ -48,7 +50,7 @@ export class InAppWebConnector implements InAppConnector {
   private client: ThirdwebClient;
   private ecosystem?: Ecosystem;
   private querier: InAppWalletIframeCommunicator<AuthQuerierTypes>;
-  private storage: ClientScopedStorage;
+  public storage: ClientScopedStorage;
 
   private wallet?: IWebWallet;
   /**
@@ -74,6 +76,7 @@ export class InAppWebConnector implements InAppConnector {
     onAuthSuccess,
     ecosystem,
     passkeyDomain,
+    storage,
   }: InAppWalletConstructorType) {
     if (this.isClientIdLegacyPaper(client.clientId)) {
       throw new Error(
@@ -85,32 +88,31 @@ export class InAppWebConnector implements InAppConnector {
     this.ecosystem = ecosystem;
     this.passkeyDomain = passkeyDomain;
     this.storage = new ClientScopedStorage({
-      storage: webLocalStorage,
       clientId: client.clientId,
       ecosystem: ecosystem,
+      storage: storage ?? getDefaultStorage(),
     });
     this.querier = new InAppWalletIframeCommunicator({
+      baseUrl,
       clientId: client.clientId,
       ecosystem,
-      baseUrl,
     });
 
     this.auth = new Auth({
-      client,
-      querier: this.querier,
       baseUrl,
-      localStorage: this.storage,
+      client,
       ecosystem,
+      localStorage: this.storage,
       onAuthSuccess: async (authResult) => {
         onAuthSuccess?.(authResult);
 
         if (authResult.storedToken.authDetails.walletType === "sharded") {
           // If this is an existing sharded ecosystem wallet, we'll need to migrate
           const result = await this.querier.call<boolean>({
-            procedureName: "migrateFromShardToEnclave",
             params: {
               storedToken: authResult.storedToken,
             },
+            procedureName: "migrateFromShardToEnclave",
           });
           if (!result) {
             console.warn(
@@ -133,37 +135,38 @@ export class InAppWebConnector implements InAppConnector {
             : undefined;
 
         await this.wallet.postWalletSetUp({
-          storedToken: authResult.storedToken,
           deviceShareStored,
+          storedToken: authResult.storedToken,
         });
 
         if (this.wallet instanceof IFrameWallet) {
           await this.querier.call({
-            procedureName: "initIframe",
             params: {
-              partnerId: ecosystem?.partnerId,
-              ecosystemId: ecosystem?.id,
+              authCookie: authResult.storedToken.cookieString,
               clientId: this.client.clientId,
               // For enclave wallets we won't have a device share
               deviceShareStored:
                 "deviceShareStored" in authResult.walletDetails
                   ? authResult.walletDetails.deviceShareStored
                   : null,
+              ecosystemId: ecosystem?.id,
+              partnerId: ecosystem?.partnerId,
               walletUserId: authResult.storedToken.authDetails.userWalletId,
-              authCookie: authResult.storedToken.cookieString,
             },
+            procedureName: "initIframe",
           });
         }
 
         return {
           user: {
-            status: "Logged In, Wallet Initialized",
-            authDetails: authResult.storedToken.authDetails,
             account: await this.wallet.getAccount(),
+            authDetails: authResult.storedToken.authDetails,
+            status: "Logged In, Wallet Initialized",
             walletAddress: authResult.walletDetails.walletAddress,
           },
         };
       },
+      querier: this.querier,
     });
   }
 
@@ -192,9 +195,9 @@ export class InAppWebConnector implements InAppConnector {
 
     if (user.wallets[0]?.type === "enclave") {
       return new EnclaveWallet({
+        address: user.wallets[0].address,
         client: this.client,
         ecosystem: this.ecosystem,
-        address: user.wallets[0].address,
         storage: this.storage,
       });
     }
@@ -202,8 +205,8 @@ export class InAppWebConnector implements InAppConnector {
     return new IFrameWallet({
       client: this.client,
       ecosystem: this.ecosystem,
-      querier: this.querier,
       localStorage: this.storage,
+      querier: this.querier,
     });
   }
 
@@ -260,17 +263,17 @@ export class InAppWebConnector implements InAppConnector {
     });
   }
 
-  authenticateWithRedirect(
+  async authenticateWithRedirect(
     strategy: SocialAuthOption,
     mode?: "redirect" | "popup" | "window",
     redirectUrl?: string,
-  ): void {
-    loginWithOauthRedirect({
+  ): Promise<void> {
+    return loginWithOauthRedirect({
       authOption: strategy,
       client: this.client,
       ecosystem: this.ecosystem,
-      redirectUrl,
       mode,
+      redirectUrl,
     });
   }
 
@@ -303,16 +306,16 @@ export class InAppWebConnector implements InAppConnector {
         });
       case "auth_endpoint": {
         return authEndpoint({
-          payload: args.payload,
           client: this.client,
           ecosystem: this.ecosystem,
+          payload: args.payload,
         });
       }
       case "jwt":
         return customJwt({
-          jwt: args.jwt,
           client: this.client,
           ecosystem: this.ecosystem,
+          jwt: args.jwt,
         });
       case "passkey": {
         return this.passkeyAuth(args);
@@ -334,14 +337,16 @@ export class InAppWebConnector implements InAppConnector {
       case "farcaster":
       case "line":
       case "x":
+      case "tiktok":
+      case "epic":
       case "steam":
       case "coinbase":
       case "discord": {
         return loginWithOauth({
           authOption: strategy,
           client: this.client,
-          ecosystem: this.ecosystem,
           closeOpenedWindow: args.closeOpenedWindow,
+          ecosystem: this.ecosystem,
           openedWindow: args.openedWindow,
         });
       }
@@ -349,20 +354,20 @@ export class InAppWebConnector implements InAppConnector {
         return guestAuthenticate({
           client: this.client,
           ecosystem: this.ecosystem,
-          storage: webLocalStorage,
+          storage: this.storage,
         });
       }
       case "backend": {
         return backendAuthenticate({
           client: this.client,
-          walletSecret: args.walletSecret,
           ecosystem: this.ecosystem,
+          walletSecret: args.walletSecret,
         });
       }
       case "wallet": {
         return siweAuthenticate({
-          ecosystem: this.ecosystem,
           client: this.client,
+          ecosystem: this.ecosystem,
           wallet: args.wallet,
           chain: args.chain,
         });
@@ -407,6 +412,8 @@ export class InAppWebConnector implements InAppConnector {
       case "github":
       case "line":
       case "x":
+      case "tiktok":
+      case "epic":
       case "guest":
       case "coinbase":
       case "twitch":
@@ -436,24 +443,24 @@ export class InAppWebConnector implements InAppConnector {
       return registerPasskey({
         client: this.client,
         ecosystem: this.ecosystem,
-        username: passkeyName,
         passkeyClient,
-        storage: storeLastUsedPasskey ? storage : undefined,
         rp: {
           id: this.passkeyDomain ?? window.location.hostname,
           name: this.passkeyDomain ?? window.document.title,
         },
+        storage: storeLastUsedPasskey ? storage : undefined,
+        username: passkeyName,
       });
     }
     return loginWithPasskey({
       client: this.client,
       ecosystem: this.ecosystem,
       passkeyClient,
-      storage: storeLastUsedPasskey ? storage : undefined,
       rp: {
         id: this.passkeyDomain ?? window.location.hostname,
         name: this.passkeyDomain ?? window.document.title,
       },
+      storage: storeLastUsedPasskey ? storage : undefined,
     });
   }
 
@@ -461,18 +468,19 @@ export class InAppWebConnector implements InAppConnector {
     const { storedToken } = await this.authenticate(args);
     return await linkAccount({
       client: args.client,
-      tokenToLink: storedToken.cookieString,
-      storage: this.storage,
       ecosystem: args.ecosystem || this.ecosystem,
+      storage: this.storage,
+      tokenToLink: storedToken.cookieString,
     });
   }
 
-  async unlinkProfile(profile: Profile) {
+  async unlinkProfile(profile: Profile, allowAccountDeletion?: boolean) {
     return await unlinkAccount({
+      allowAccountDeletion,
       client: this.client,
-      storage: this.storage,
       ecosystem: this.ecosystem,
       profileToUnlink: profile,
+      storage: this.storage,
     });
   }
 
@@ -487,4 +495,12 @@ export class InAppWebConnector implements InAppConnector {
 
 function assertUnreachable(x: never, message?: string): never {
   throw new Error(message ?? `Invalid param: ${x}`);
+}
+
+function getDefaultStorage(): AsyncStorage {
+  if (typeof window !== "undefined" && window.localStorage) {
+    return webLocalStorage;
+  }
+  // default to in-memory storage if we're not in the browser
+  return inMemoryStorage;
 }

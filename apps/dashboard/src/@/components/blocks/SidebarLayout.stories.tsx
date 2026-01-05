@@ -1,29 +1,21 @@
-import type { Meta, StoryObj } from "@storybook/react";
-import { mobileViewport } from "../../../stories/utils";
+import type { Meta, StoryObj } from "@storybook/nextjs";
 import { SidebarLayout } from "./SidebarLayout";
 
 const meta = {
-  title: "blocks/SidebarLayout",
   component: Story,
   parameters: {
     nextjs: {
       appDirectory: true,
     },
   },
+  title: "blocks/SidebarLayout",
 } satisfies Meta<typeof Story>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Desktop: Story = {
+export const Variants: Story = {
   args: {},
-};
-
-export const Mobile: Story = {
-  args: {},
-  parameters: {
-    viewport: mobileViewport("iphone14"),
-  },
 };
 
 function Story() {
@@ -43,8 +35,8 @@ function Story() {
           label: "eiusmod",
         },
         {
-          label: "incididunt",
           href: "https://playground.thirdweb.com/",
+          label: "incididunt",
         },
       ]}
     >

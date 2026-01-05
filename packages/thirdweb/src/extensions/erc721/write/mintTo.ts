@@ -17,6 +17,8 @@ export type MintToParams = WithOverrides<{
 
 /**
  * Mints a new ERC721 token and assigns it to the specified address.
+ * This method is only available on the `TokenERC721` contract.
+ *
  * If the `nft` parameter is a string, it will be used as the token URI.
  * If the `nft` parameter is a file, it will be uploaded to the storage server and the resulting URI will be used as the token URI.
  * @param options - The transaction options.
@@ -42,7 +44,6 @@ export type MintToParams = WithOverrides<{
  */
 export function mintTo(options: BaseTransactionOptions<MintToParams>) {
   return generatedMintTo({
-    contract: options.contract,
     asyncParams: async () => {
       let tokenUri: string;
 
@@ -60,10 +61,11 @@ export function mintTo(options: BaseTransactionOptions<MintToParams>) {
         });
       }
       return {
+        overrides: options.overrides,
         to: options.to,
         uri: tokenUri,
-        overrides: options.overrides,
       } as const;
     },
+    contract: options.contract,
   });
 }

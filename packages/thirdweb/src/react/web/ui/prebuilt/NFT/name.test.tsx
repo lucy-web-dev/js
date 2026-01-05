@@ -7,6 +7,8 @@ import {
 import { getFunctionId } from "../../../../../utils/function-id.js";
 import { fetchNftName, getQueryKey } from "./name.js";
 
+const testContractAddress = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
+
 describe.runIf(process.env.TW_SECRET_KEY)("NFTName", () => {
   it("fetchNftName should work with ERC721", async () => {
     const desc = await fetchNftName({
@@ -27,8 +29,8 @@ describe.runIf(process.env.TW_SECRET_KEY)("NFTName", () => {
   it("fetchNftName should respect nameResolver as a string", async () => {
     const desc = await fetchNftName({
       contract: DOODLES_CONTRACT,
-      tokenId: 0n,
       nameResolver: "string",
+      tokenId: 0n,
     });
     expect(desc).toBe("string");
   });
@@ -36,8 +38,8 @@ describe.runIf(process.env.TW_SECRET_KEY)("NFTName", () => {
   it("fetchNftName should respect nameResolver as a non-async function", async () => {
     const desc = await fetchNftName({
       contract: DOODLES_CONTRACT,
-      tokenId: 0n,
       nameResolver: () => "non-async",
+      tokenId: 0n,
     });
     expect(desc).toBe("non-async");
   });
@@ -45,14 +47,14 @@ describe.runIf(process.env.TW_SECRET_KEY)("NFTName", () => {
   it("fetchNftName should respect nameResolver as a async function", async () => {
     const desc = await fetchNftName({
       contract: DOODLES_CONTRACT,
-      tokenId: 0n,
       nameResolver: async () => "async",
+      tokenId: 0n,
     });
     expect(desc).toBe("async");
   });
 
   it("fetchNftName should throw error if failed to resolve nft info", async () => {
-    await expect(() =>
+    await expect(
       fetchNftName({
         contract: UNISWAPV3_FACTORY_CONTRACT,
         tokenId: 0n,
@@ -61,9 +63,16 @@ describe.runIf(process.env.TW_SECRET_KEY)("NFTName", () => {
   });
 
   it("getQueryKey should work without nameResolver", () => {
-    expect(getQueryKey({ chainId: 1, tokenId: 1n })).toStrictEqual([
+    expect(
+      getQueryKey({
+        chainId: 1,
+        contractAddress: testContractAddress,
+        tokenId: 1n,
+      }),
+    ).toStrictEqual([
       "_internal_nft_name_",
       1,
+      testContractAddress,
       "1",
       { resolver: undefined },
     ]);
@@ -71,16 +80,38 @@ describe.runIf(process.env.TW_SECRET_KEY)("NFTName", () => {
 
   it("getQueryKey should work with nameResolver being a string", () => {
     expect(
-      getQueryKey({ chainId: 1, tokenId: 1n, nameResolver: "test" }),
-    ).toStrictEqual(["_internal_nft_name_", 1, "1", { resolver: "test" }]);
+      getQueryKey({
+        chainId: 1,
+        contractAddress: testContractAddress,
+        nameResolver: "test",
+        tokenId: 1n,
+      }),
+    ).toStrictEqual([
+      "_internal_nft_name_",
+      1,
+      testContractAddress,
+      "1",
+      { resolver: "test" },
+    ]);
   });
 
   it("getQueryKey should work with nameResolver being a () => string", () => {
     const fn = () => "test";
     const fnId = getFunctionId(fn);
     expect(
-      getQueryKey({ chainId: 1, tokenId: 1n, nameResolver: fn }),
-    ).toStrictEqual(["_internal_nft_name_", 1, "1", { resolver: fnId }]);
+      getQueryKey({
+        chainId: 1,
+        contractAddress: testContractAddress,
+        nameResolver: fn,
+        tokenId: 1n,
+      }),
+    ).toStrictEqual([
+      "_internal_nft_name_",
+      1,
+      testContractAddress,
+      "1",
+      { resolver: fnId },
+    ]);
   });
 
   it("getQueryKey should work with nameResolver being a async () => string", () => {
@@ -89,9 +120,16 @@ describe.runIf(process.env.TW_SECRET_KEY)("NFTName", () => {
     expect(
       getQueryKey({
         chainId: 1,
-        tokenId: 1n,
+        contractAddress: testContractAddress,
         nameResolver: fn,
+        tokenId: 1n,
       }),
-    ).toStrictEqual(["_internal_nft_name_", 1, "1", { resolver: fnId }]);
+    ).toStrictEqual([
+      "_internal_nft_name_",
+      1,
+      testContractAddress,
+      "1",
+      { resolver: fnId },
+    ]);
   });
 });

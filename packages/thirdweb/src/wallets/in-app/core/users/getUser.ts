@@ -8,6 +8,7 @@ import type { Ecosystem } from "../wallet/types.js";
 export type GetUserResult = {
   userId: string;
   walletAddress: string;
+  smartAccountAddress?: string;
   email?: string;
   phone?: string;
   createdAt: string;
@@ -94,12 +95,16 @@ export async function getUser({
   const res = await clientFetch(url.toString());
 
   if (!res.ok) {
-    throw new Error("Failed to get profiles");
+    const error = await res.text().catch(() => "Unknown error");
+    throw new Error(
+      `Failed to get profiles. ${res.status} ${res.statusText}: ${error}`,
+    );
   }
 
   const data = (await res.json()) as {
     userId: string;
     walletAddress: string;
+    smartAccountAddress?: string;
     email?: string;
     phone?: string;
     createdAt: string;
@@ -108,17 +113,18 @@ export async function getUser({
 
   return (
     data.map((item) => ({
-      userId: item.userId,
-      walletAddress: item.walletAddress,
+      createdAt: item.createdAt,
       email: item.email,
       phone: item.phone,
-      createdAt: item.createdAt,
       profiles: item.linkedAccounts.map((profile) => {
         return {
-          type: (profile.type as string) === "siwe" ? "wallet" : profile.type,
           details: profile.details,
+          type: (profile.type as string) === "siwe" ? "wallet" : profile.type,
         };
       }),
+      smartAccountAddress: item.smartAccountAddress,
+      userId: item.userId,
+      walletAddress: item.walletAddress,
     }))[0] || null
   );
 }

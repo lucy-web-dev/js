@@ -1,4 +1,7 @@
-import type { BaseTransactionOptions } from "../../../../transaction/types.js";
+import type {
+  BaseTransactionOptions,
+  WithOverrides,
+} from "../../../../transaction/types.js";
 import type { NFT, NFTInput } from "../../../../utils/nft/parseNft.js";
 import * as BatchBaseURI from "../../__generated__/DropERC721/write/updateBatchBaseURI.js";
 import * as BaseURICount from "../../__generated__/IBatchMintMetadata/read/getBaseURICount.js";
@@ -48,17 +51,30 @@ async function getUpdateMetadataParams(
     (_, k) => BigInt(k) + startTokenId,
   );
 
-  const currentMetadatas = await Promise.all(
-    range.map((id) =>
-      GetNFT.getNFT({ contract, tokenId: id, includeOwner: false }),
-    ),
-  );
-
-  // Abort if any of the items failed to load
-  if (currentMetadatas.some((item) => item === undefined || !item.tokenURI)) {
-    throw new Error(
-      `Failed to load all ${range.length} items from batchIndex: ${batchIndex}`,
+  const BATCH_SIZE = 50;
+  const currentMetadatas = [];
+  for (let i = 0; i < range.length; i += BATCH_SIZE) {
+    const chunk = range.slice(i, i + BATCH_SIZE);
+    const chunkResults = await Promise.all(
+      chunk.map((id) =>
+        GetNFT.getNFT({
+          contract,
+          includeOwner: false,
+          tokenId: id,
+          useIndexer: false,
+        }),
+      ),
     );
+    currentMetadatas.push(...chunkResults);
+    if (i + BATCH_SIZE < range.length) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    // Abort if any of the items failed to load
+    if (currentMetadatas.some((item) => item === undefined || !item.tokenURI)) {
+      throw new Error(
+        `Failed to load all ${range.length} items from batchIndex: ${batchIndex}`,
+      );
+    }
   }
 
   const newMetadatas: NFTInput[] = [];
@@ -115,12 +131,13 @@ async function getUpdateMetadataParams(
  * ```
  */
 export function updateMetadata(
-  options: BaseTransactionOptions<UpdateMetadataParams>,
+  options: BaseTransactionOptions<WithOverrides<UpdateMetadataParams>>,
 ) {
   const { contract } = options;
   return BatchBaseURI.updateBatchBaseURI({
-    contract,
     asyncParams: async () => getUpdateMetadataParams(options),
+    contract,
+    overrides: options.overrides,
   });
 }
 

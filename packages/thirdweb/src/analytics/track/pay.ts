@@ -12,26 +12,28 @@ export async function trackPayEvent(args: {
   walletAddress?: string;
   walletType?: string;
   fromToken?: string;
-  fromAmount?: string;
-  toToken?: string;
-  toAmount?: string;
+  amountWei?: string;
   chainId?: number;
-  dstChainId?: number;
+  toToken?: string;
+  toChainId?: number;
+  error?: string;
 }) {
+  const data = {
+    action: args.event,
+    amountWei: args.amountWei,
+    chainId: args.chainId,
+    clientId: args.client.clientId,
+    dstChainId: args.toChainId,
+    dstTokenAddress: args.toToken,
+    errorCode: args.error,
+    source: "pay",
+    tokenAddress: args.fromToken,
+    walletAddress: args.walletAddress,
+    walletType: args.walletType,
+  };
   return track({
     client: args.client,
+    data,
     ecosystem: args.ecosystem,
-    data: {
-      source: "pay",
-      action: args.event,
-      clientId: args.client.clientId,
-      chainId: args.chainId,
-      walletAddress: args.walletAddress,
-      walletType: args.walletType,
-      tokenAddress: args.fromToken,
-      amountWei: args.fromAmount,
-      dstTokenAddress: args.toToken,
-      dstChainId: args.chainId,
-    },
   });
 }

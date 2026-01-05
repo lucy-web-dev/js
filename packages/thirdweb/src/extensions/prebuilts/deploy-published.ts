@@ -1,9 +1,8 @@
 import type { AbiFunction } from "abitype";
 import type { Chain } from "../../chains/types.js";
 import type { ThirdwebClient } from "../../client/client.js";
-import { type ThirdwebContract, getContract } from "../../contract/contract.js";
+import { getContract, type ThirdwebContract } from "../../contract/contract.js";
 import { fetchPublishedContractMetadata } from "../../contract/deployment/publisher.js";
-import { getOrDeployInfraContractFromMetadata } from "../../contract/deployment/utils/bootstrap.js";
 import { sendAndConfirmTransaction } from "../../transaction/actions/send-and-confirm-transaction.js";
 import { simulateTransaction } from "../../transaction/actions/simulate.js";
 import { prepareContractCall } from "../../transaction/prepare-contract-call.js";
@@ -11,11 +10,13 @@ import { resolveMethod } from "../../transaction/resolve-method.js";
 import { encodeAbiParameters } from "../../utils/abi/encodeAbiParameters.js";
 import { normalizeFunctionParams } from "../../utils/abi/normalizeFunctionParams.js";
 import { getAddress } from "../../utils/address.js";
+import type { FetchDeployMetadataResult } from "../../utils/any-evm/deploy-metadata.js";
 import {
   type CompilerMetadata,
   fetchBytecodeFromCompilerMetadata,
 } from "../../utils/any-evm/deploy-metadata.js";
-import type { FetchDeployMetadataResult } from "../../utils/any-evm/deploy-metadata.js";
+import { encodeExtraDataWithUri } from "../../utils/any-evm/encode-extra-data-with-uri.js";
+import { isZkSyncChain } from "../../utils/any-evm/zksync/isZkSyncChain.js";
 import type { Hex } from "../../utils/encoding/hex.js";
 import type { Account } from "../../wallets/interfaces/wallet.js";
 import { getAllDefaultConstructorParamsForImplementation } from "./get-required-transactions.js";
@@ -50,7 +51,7 @@ export type DeployPublishedContractOptions = {
  * ```ts
  * import { deployPublishedContract } from "thirdweb/deploys";
  *
- * const address = await deployedPublishedContract({
+ * const address = await deployPublishedContract({
  *   client,
  *   chain,
  *   account,
@@ -68,7 +69,7 @@ export type DeployPublishedContractOptions = {
  * ```ts
  * import { deployPublishedContract } from "thirdweb/deploys";
  *
- * const address = await deployedPublishedContract({
+ * const address = await deployPublishedContract({
  *   client,
  *   chain,
  *   account,
@@ -107,11 +108,16 @@ export async function deployPublishedContract(
   return deployContractfromDeployMetadata({
     account,
     chain,
-    deployMetadata,
     client,
-    initializeParams: contractParams || deployMetadata.constructorParams,
-    implementationConstructorParams:
-      implementationConstructorParams || deployMetadata.implConstructorParams,
+    deployMetadata,
+    implementationConstructorParams: {
+      ...deployMetadata.implConstructorParams,
+      ...implementationConstructorParams,
+    },
+    initializeParams: {
+      ...deployMetadata.constructorParams,
+      ...contractParams,
+    },
     salt,
   });
 }
@@ -125,7 +131,9 @@ export type DeployContractfromDeployMetadataOptions = {
   account: Account;
   deployMetadata: FetchDeployMetadataResult;
   initializeParams?: Record<string, unknown>;
+  initializeData?: `0x${string}`;
   implementationConstructorParams?: Record<string, unknown>;
+  isCrosschain?: boolean;
   modules?: {
     deployMetadata: FetchDeployMetadataResult;
     initializeParams?: Record<string, unknown>;
@@ -144,7 +152,9 @@ export async function deployContractfromDeployMetadata(
     account,
     chain,
     initializeParams,
+    initializeData,
     deployMetadata,
+    isCrosschain,
     implementationConstructorParams,
     modules,
     salt,
@@ -157,9 +167,9 @@ export async function deployContractfromDeployMetadata(
     processedImplParams = {};
     for (const key in implementationConstructorParams) {
       processedImplParams[key] = await processRefDeployments({
-        client,
         account,
         chain,
+        client,
         paramValue: implementationConstructorParams[key] as
           | string
           | ImplementationConstructorParam,
@@ -171,9 +181,9 @@ export async function deployContractfromDeployMetadata(
     processedInitializeParams = {};
     for (const key in initializeParams) {
       processedInitializeParams[key] = await processRefDeployments({
-        client,
         account,
         chain,
+        client,
         paramValue: initializeParams[key] as
           | string
           | ImplementationConstructorParam,
@@ -185,10 +195,11 @@ export async function deployContractfromDeployMetadata(
     case "standard": {
       return directDeploy({
         account,
-        client,
         chain,
+        client,
         compilerMetadata: deployMetadata,
         contractParams: processedInitializeParams,
+        metadataUri: deployMetadata.metadataUri,
         salt,
       });
     }
@@ -200,37 +211,75 @@ export async function deployContractfromDeployMetadata(
         import("../../contract/deployment/deploy-via-autofactory.js"),
         import("../../contract/deployment/utils/bootstrap.js"),
       ]);
+
+      if (
+        deployMetadata.routerType === "dynamic" &&
+        deployMetadata.defaultExtensions &&
+        !(await isZkSyncChain(chain))
+      ) {
+        for (const e of deployMetadata.defaultExtensions) {
+          await getOrDeployInfraForPublishedContract({
+            account,
+            chain,
+            client,
+            constructorParams:
+              await getAllDefaultConstructorParamsForImplementation({
+                chain,
+                client,
+                contractId: e.extensionName,
+              }),
+            contractId: e.extensionName,
+            publisher: e.publisherAddress,
+            version: e.extensionVersion || "latest",
+          });
+        }
+      }
+
       const { cloneFactoryContract, implementationContract } =
         await getOrDeployInfraForPublishedContract({
+          account,
           chain,
           client,
-          account,
-          contractId: deployMetadata.name,
-          constructorParams:
-            processedImplParams ||
-            (await getAllDefaultConstructorParamsForImplementation({
+          constructorParams: {
+            ...(await getAllDefaultConstructorParamsForImplementation({
               chain,
               client,
               contractId: deployMetadata.name,
+              defaultExtensions: deployMetadata.defaultExtensions,
             })),
+            ...processedImplParams,
+          },
+          contractId: deployMetadata.name,
           publisher: deployMetadata.publisher,
           version: deployMetadata.version,
         });
 
+      if (isCrosschain) {
+        return deployViaAutoFactory({
+          account,
+          chain,
+          client,
+          cloneFactoryContract,
+          implementationAddress: implementationContract.address,
+          initializeData,
+          isCrosschain,
+          salt,
+        });
+      }
+
       const initializeTransaction = await getInitializeTransaction({
-        client,
+        account,
         chain,
-        deployMetadata: deployMetadata,
+        client,
+        deployMetadata,
         implementationContract,
         initializeParams: processedInitializeParams,
-        account,
         modules,
       });
-
       return deployViaAutoFactory({
-        client,
-        chain,
         account,
+        chain,
+        client,
         cloneFactoryContract,
         initializeTransaction,
         salt,
@@ -251,9 +300,9 @@ export async function deployContractfromDeployMetadata(
       }
 
       const factory = getContract({
-        client,
-        chain,
         address: factoryAddress,
+        chain,
+        client,
       });
       const method = await resolveMethod(factoryFunction)(factory);
       const deployTx = prepareContractCall({
@@ -261,13 +310,13 @@ export async function deployContractfromDeployMetadata(
         method,
         params: normalizeFunctionParams(method, initializeParams),
       });
-      // asumption here is that the factory address returns the deployed proxy address
+      // assumption here is that the factory address returns the deployed proxy address
       const address = await simulateTransaction({
         transaction: deployTx,
       });
       await sendAndConfirmTransaction({
-        transaction: deployTx,
         account,
+        transaction: deployTx,
       });
       return address as string;
     }
@@ -275,10 +324,11 @@ export async function deployContractfromDeployMetadata(
       // Default to standard deployment if none was specified
       return directDeploy({
         account,
-        client,
         chain,
+        client,
         compilerMetadata: deployMetadata,
         contractParams: processedInitializeParams,
+        metadataUri: deployMetadata.metadataUri,
         salt,
       });
     }
@@ -295,6 +345,7 @@ async function directDeploy(options: {
   compilerMetadata: CompilerMetadata;
   contractParams?: Record<string, unknown>;
   salt?: string;
+  metadataUri?: string;
 }): Promise<string> {
   const { account, client, chain, compilerMetadata, contractParams, salt } =
     options;
@@ -302,17 +353,25 @@ async function directDeploy(options: {
   const { deployContract } = await import(
     "../../contract/deployment/deploy-with-abi.js"
   );
+  const isStylus = options.compilerMetadata.metadata.language === "rust";
   return deployContract({
-    account,
-    client,
-    chain,
-    bytecode: await fetchBytecodeFromCompilerMetadata({
-      compilerMetadata,
-      client,
-      chain,
-    }),
     abi: compilerMetadata.abi,
+    account,
+    bytecode: await fetchBytecodeFromCompilerMetadata({
+      chain,
+      client,
+      compilerMetadata,
+    }),
+    chain,
+    client,
     constructorParams: contractParams,
+    extraDataWithUri:
+      isStylus && options.metadataUri
+        ? encodeExtraDataWithUri({
+            metadataUri: options.metadataUri,
+          })
+        : undefined,
+    isStylus,
     salt,
   });
 }
@@ -377,18 +436,21 @@ export async function getInitializeTransaction(options: {
     const moduleInstallData: Hex[] = [];
     for (const module of modules) {
       // deploy the module if not already deployed
-      const contract = await getOrDeployInfraContractFromMetadata({
-        client,
-        chain,
+      const contractAddress = await deployContractfromDeployMetadata({
         account,
-        contractMetadata: module.deployMetadata,
+        chain,
+        client,
+        deployMetadata: module.deployMetadata,
+        implementationConstructorParams:
+          module.deployMetadata.implConstructorParams,
+        salt: "",
       });
 
       const installFunction = module.deployMetadata.abi.find(
         (i) => i.type === "function" && i.name === "encodeBytesOnInstall",
       ) as AbiFunction | undefined;
 
-      moduleAddresses.push(getAddress(contract.address));
+      moduleAddresses.push(getAddress(contractAddress));
       moduleInstallData.push(
         installFunction
           ? encodeAbiParameters(
@@ -404,9 +466,9 @@ export async function getInitializeTransaction(options: {
 
   const initializeTransaction = prepareContractCall({
     contract: getContract({
-      client,
-      chain,
       address: implementationContract.address,
+      chain,
+      client,
     }),
     method: initializeFunction,
     params: normalizeFunctionParams(initializeFunction, initializeParams),

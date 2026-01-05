@@ -17,11 +17,6 @@ export async function getCoinbaseMobileProvider(
       mobileProvider = (await initSmartWalletProvider(
         options,
       )) as unknown as ProviderInterface;
-      const ExpoLinking = await import("expo-linking");
-      const { handleResponse } = await import("@mobile-wallet-protocol/client");
-      ExpoLinking.addEventListener("url", ({ url }) => {
-        handleResponse(url);
-      });
     } else {
       // otherwise, use the coinbase app provider
       // TODO: remove this path once the new @mobile-wallet-protocol/client supports it
@@ -55,10 +50,10 @@ async function initSmartWalletProvider(
   }
   const sdk = new EIP1193Provider({
     metadata: {
-      appName: options?.appMetadata?.name || "thirdweb powered app",
-      appChainIds: options?.chains?.map((c) => c.id),
-      appDeeplinkUrl,
-      appLogoUrl: options?.appMetadata?.logoUrl,
+      chainIds: options?.chains?.map((c) => c.id),
+      customScheme: appDeeplinkUrl,
+      logoUrl: options?.appMetadata?.logoUrl,
+      name: options?.appMetadata?.name || "thirdweb powered app",
     },
     wallet: Wallets.CoinbaseSmartWallet, // TODO support both smart and EOA once the SDK supports it
   });
@@ -77,8 +72,8 @@ async function initCoinbaseAppProvider(
   const { configure } = await import("@coinbase/wallet-mobile-sdk");
   configure({
     callbackURL: new URL(appDeeplinkUrl),
-    hostURL: new URL("https://wallet.coinbase.com/wsegue"),
     hostPackageName: "org.toshi",
+    hostURL: new URL("https://wallet.coinbase.com/wsegue"),
   });
   let CoinbaseWalletMobileSDK = (
     await import(
@@ -99,7 +94,7 @@ async function initCoinbaseAppProvider(
   }
   const chain = options.chains?.[0];
   return new CoinbaseWalletMobileSDK({
-    jsonRpcUrl: chain?.rpc,
     chainId: chain?.id,
+    jsonRpcUrl: chain?.rpc,
   });
 }

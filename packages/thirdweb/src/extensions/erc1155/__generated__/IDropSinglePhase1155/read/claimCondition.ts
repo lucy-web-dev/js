@@ -1,10 +1,10 @@
 import type { AbiParameterToPrimitiveType } from "abitype";
+import { decodeAbiParameters } from "viem";
 import { readContract } from "../../../../../transaction/read-contract.js";
 import type { BaseTransactionOptions } from "../../../../../transaction/types.js";
 import { encodeAbiParameters } from "../../../../../utils/abi/encodeAbiParameters.js";
-import { decodeAbiParameters } from "viem";
-import type { Hex } from "../../../../../utils/encoding/hex.js";
 import { detectMethod } from "../../../../../utils/bytecode/detectExtension.js";
+import type { Hex } from "../../../../../utils/encoding/hex.js";
 
 /**
  * Represents the parameters for the "claimCondition" function.
@@ -16,48 +16,42 @@ export type ClaimConditionParams = {
 export const FN_SELECTOR = "0xe9703d25" as const;
 const FN_INPUTS = [
   {
-    type: "uint256",
     name: "tokenId",
+    type: "uint256",
   },
 ] as const;
 const FN_OUTPUTS = [
   {
-    type: "tuple",
-    name: "condition",
-    components: [
-      {
-        type: "uint256",
-        name: "startTimestamp",
-      },
-      {
-        type: "uint256",
-        name: "maxClaimableSupply",
-      },
-      {
-        type: "uint256",
-        name: "supplyClaimed",
-      },
-      {
-        type: "uint256",
-        name: "quantityLimitPerWallet",
-      },
-      {
-        type: "bytes32",
-        name: "merkleRoot",
-      },
-      {
-        type: "uint256",
-        name: "pricePerToken",
-      },
-      {
-        type: "address",
-        name: "currency",
-      },
-      {
-        type: "string",
-        name: "metadata",
-      },
-    ],
+    name: "startTimestamp",
+    type: "uint256",
+  },
+  {
+    name: "maxClaimableSupply",
+    type: "uint256",
+  },
+  {
+    name: "supplyClaimed",
+    type: "uint256",
+  },
+  {
+    name: "quantityLimitPerWallet",
+    type: "uint256",
+  },
+  {
+    name: "merkleRoot",
+    type: "bytes32",
+  },
+  {
+    name: "pricePerToken",
+    type: "uint256",
+  },
+  {
+    name: "currency",
+    type: "address",
+  },
+  {
+    name: "metadata",
+    type: "string",
   },
 ] as const;
 
@@ -130,7 +124,7 @@ export function encodeClaimCondition(options: ClaimConditionParams) {
  * ```
  */
 export function decodeClaimConditionResult(result: Hex) {
-  return decodeAbiParameters(FN_OUTPUTS, result)[0];
+  return decodeAbiParameters(FN_OUTPUTS, result);
 }
 
 /**

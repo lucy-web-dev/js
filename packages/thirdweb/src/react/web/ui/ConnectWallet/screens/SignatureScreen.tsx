@@ -17,21 +17,22 @@ import { useAdminWallet } from "../../../../core/hooks/wallets/useAdminWallet.js
 import { useDisconnect } from "../../../../core/hooks/wallets/useDisconnect.js";
 import { wait } from "../../../../core/utils/wait.js";
 import { LoadingScreen } from "../../../wallets/shared/LoadingScreen.js";
-import { Spacer } from "../../components/Spacer.js";
-import { Spinner } from "../../components/Spinner.js";
-import { WalletImage } from "../../components/WalletImage.js";
 import { Container, ModalHeader } from "../../components/basic.js";
 import { Button } from "../../components/buttons.js";
+import { Spacer } from "../../components/Spacer.js";
+import { Spinner } from "../../components/Spinner.js";
 import { Text } from "../../components/text.js";
+import { WalletImage } from "../../components/WalletImage.js";
 import { StyledDiv } from "../../design-system/elements.js";
-import { TOS } from "../Modal/TOS.js";
 import type { ConnectLocale } from "../locale/types.js";
+import { TOS } from "../Modal/TOS.js";
 import { WalletLogoSpinner } from "./WalletLogoSpinner.js";
 
 type Status = "signing" | "failed" | "idle";
 
 export const SignatureScreen: React.FC<{
   onDone: (() => void) | undefined;
+  onClose?: (() => void) | undefined;
   modalSize: "compact" | "wide";
   termsOfServiceUrl?: string;
   privacyPolicyUrl?: string;
@@ -42,6 +43,7 @@ export const SignatureScreen: React.FC<{
   const {
     onDone,
     modalSize,
+    onClose,
     termsOfServiceUrl,
     privacyPolicyUrl,
     connectLocale,
@@ -69,7 +71,7 @@ export const SignatureScreen: React.FC<{
     }
   }, [onDone, siweAuth]);
 
-  if (!wallet) {
+  if (!wallet || siweAuth.isPending) {
     return <LoadingScreen data-testid="loading-screen" />;
   }
 
@@ -81,10 +83,10 @@ export const SignatureScreen: React.FC<{
   ) {
     return (
       <HeadlessSignIn
+        connectLocale={connectLocale}
         error={error}
         signIn={signIn}
         status={status}
-        connectLocale={connectLocale}
         wallet={wallet}
       />
     );
@@ -95,7 +97,7 @@ export const SignatureScreen: React.FC<{
   };
 
   return (
-    <Container animate="fadein" fullHeight flex="column">
+    <Container animate="fadein" flex="column" fullHeight>
       <Container
         p="lg"
         style={{
@@ -106,51 +108,52 @@ export const SignatureScreen: React.FC<{
       </Container>
 
       <Container
-        style={{
-          paddingTop: 0,
-          paddingBottom: spacing.xl,
-        }}
-        flex="column"
-        px={modalSize === "compact" ? "lg" : "xxl"}
         center="y"
         expand
+        flex="column"
+        px={modalSize === "compact" ? "lg" : "xxl"}
+        style={{
+          paddingBottom: spacing.xl,
+          paddingTop: 0,
+        }}
       >
         {status === "idle" ? (
           <>
-            <Container flex="row" center="x" animate="fadein" py="3xl">
+            <Container animate="fadein" center="x" flex="row" py="3xl">
               <PulsatingContainer>
-                <WalletImage id={wallet.id} client={props.client} size="80" />
+                <WalletImage client={props.client} id={wallet.id} size="80" />
               </PulsatingContainer>
             </Container>
 
-            <Text center multiline balance>
+            <Text balance center multiline>
               {locale.instructionScreen.instruction}
             </Text>
             <Spacer y="lg" />
             <Button
-              fullWidth
-              variant="accent"
               data-testid="sign-in-button"
+              fullWidth
               onClick={signIn}
               style={{
                 alignItems: "center",
                 padding: spacing.md,
               }}
+              variant="accent"
             >
               {connectLocale.signatureScreen.instructionScreen.signInButton}
             </Button>
             <Spacer y="sm" />
             <Button
-              fullWidth
-              variant="secondary"
               data-testid="disconnect-button"
+              fullWidth
               onClick={() => {
+                onClose?.();
                 disconnect(wallet);
               }}
               style={{
                 alignItems: "center",
                 padding: spacing.md,
               }}
+              variant="secondary"
             >
               {connectLocale.signatureScreen.instructionScreen.disconnectWallet}
             </Button>
@@ -165,15 +168,25 @@ export const SignatureScreen: React.FC<{
               />
             </Container>
 
-            <Container flex="column" gap="md" animate="fadein" key={status}>
-              <Text size="lg" center color="primaryText">
+            <Container animate="fadein" flex="column" gap="md" key={status}>
+              <Text
+                center
+                color="primaryText"
+                size="lg"
+                className="tw-screen-title"
+              >
                 {status === "failed"
                   ? error || locale.signingScreen.failedToSignIn
-                  : locale.signingScreen.inProgress}
+                  : locale.signingScreen.inProgress}{" "}
               </Text>
 
               {status === "signing" && (
-                <Text center multiline balance>
+                <Text
+                  balance
+                  center
+                  multiline
+                  className="tw-screen-description"
+                >
                   {connectLocale.signatureScreen.signingScreen.prompt}
                 </Text>
               )}
@@ -183,21 +196,20 @@ export const SignatureScreen: React.FC<{
                   <Spacer y="sm" />
                   <Button
                     fullWidth
-                    variant="accent"
                     onClick={handleRetry}
                     style={{
-                      gap: spacing.xs,
                       alignItems: "center",
+                      gap: spacing.xs,
                       padding: spacing.md,
                     }}
+                    variant="accent"
                   >
-                    <ReloadIcon width={iconSize.sm} height={iconSize.sm} />
+                    <ReloadIcon height={iconSize.sm} width={iconSize.sm} />
                     {locale.signingScreen.tryAgain}
                   </Button>
                   <Spacer y="sm" />
                   <Button
                     fullWidth
-                    variant="secondary"
                     onClick={() => {
                       disconnect(wallet);
                     }}
@@ -205,6 +217,7 @@ export const SignatureScreen: React.FC<{
                       alignItems: "center",
                       padding: spacing.md,
                     }}
+                    variant="secondary"
                   >
                     {locale.instructionScreen.disconnectWallet}
                   </Button>
@@ -216,11 +229,11 @@ export const SignatureScreen: React.FC<{
       </Container>
 
       {(termsOfServiceUrl || privacyPolicyUrl) && (
-        <Container p="md" animate="fadein">
+        <Container animate="fadein" p="md">
           <TOS
-            termsOfServiceUrl={termsOfServiceUrl}
-            privacyPolicyUrl={privacyPolicyUrl}
             locale={connectLocale.agreement}
+            privacyPolicyUrl={privacyPolicyUrl}
+            termsOfServiceUrl={termsOfServiceUrl}
           />
         </Container>
       )}
@@ -262,53 +275,53 @@ function HeadlessSignIn({
   }, [signIn]);
 
   return (
-    <Container p="lg" fullHeight flex="column" animate="fadein">
+    <Container animate="fadein" flex="column" fullHeight p="lg">
       <ModalHeader title={locale.signingScreen.title} />
       <Container
+        center="both"
         expand
         flex="row"
-        center="both"
         style={{
           minHeight: "250px",
         }}
       >
-        {status === "signing" && <Spinner size="xl" color="accentText" />}
+        {status === "signing" && <Spinner color="accentText" size="xl" />}
 
         {status === "failed" && (
           <Container>
             <Spacer y="lg" />
-            <Text size="lg" center color="danger">
+            <Text center color="danger" size="lg">
               {error || locale.signingScreen.failedToSignIn}
             </Text>
 
             <Spacer y="lg" />
             <Button
               fullWidth
-              variant="accent"
               onClick={() => {
                 signIn();
               }}
               style={{
-                gap: spacing.xs,
                 alignItems: "center",
+                gap: spacing.xs,
                 padding: spacing.md,
               }}
+              variant="accent"
             >
-              <ReloadIcon width={iconSize.sm} height={iconSize.sm} />
+              <ReloadIcon height={iconSize.sm} width={iconSize.sm} />
               {locale.signingScreen.tryAgain}
             </Button>
             <Spacer y="sm" />
             <Button
+              data-testid="disconnect-button"
               fullWidth
-              variant="secondary"
               onClick={() => {
                 disconnect(wallet);
               }}
-              data-testid="disconnect-button"
               style={{
                 alignItems: "center",
                 padding: spacing.md,
               }}
+              variant="secondary"
             >
               {locale.instructionScreen.disconnectWallet}
             </Button>
@@ -332,19 +345,19 @@ const pulseAnimation = keyframes`
 const PulsatingContainer = /* @__PURE__ */ StyledDiv((_) => {
   const theme = useCustomTheme();
   return {
-    position: "relative",
     "&::before": {
+      animation: `${pulseAnimation} 2s cubic-bezier(0.175, 0.885, 0.32, 1.1) infinite`,
+      background: theme.colors.accentText,
+      borderRadius: radius.xl,
+      bottom: 0,
       content: '""',
       display: "block",
-      position: "absolute",
       left: 0,
-      top: 0,
-      bottom: 0,
+      position: "absolute",
       right: 0,
-      background: theme.colors.accentText,
-      animation: `${pulseAnimation} 2s cubic-bezier(0.175, 0.885, 0.32, 1.1) infinite`,
+      top: 0,
       zIndex: -1,
-      borderRadius: radius.xl,
     },
+    position: "relative",
   };
 });

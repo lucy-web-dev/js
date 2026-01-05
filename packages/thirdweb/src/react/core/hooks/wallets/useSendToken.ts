@@ -1,13 +1,17 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { ThirdwebClient } from "../../../../client/client.js";
 import { getContract } from "../../../../contract/contract.js";
 import { resolveAddress } from "../../../../extensions/ens/resolve-address.js";
 import { transfer } from "../../../../extensions/erc20/write/transfer.js";
+import { estimateGas } from "../../../../transaction/actions/estimate-gas.js";
 import { sendTransaction } from "../../../../transaction/actions/send-transaction.js";
+import { waitForReceipt } from "../../../../transaction/actions/wait-for-tx-receipt.js";
 import { prepareTransaction } from "../../../../transaction/prepare-transaction.js";
 import { isAddress } from "../../../../utils/address.js";
 import { isValidENSName } from "../../../../utils/ens/isValidENSName.js";
 import { toWei } from "../../../../utils/units.js";
+import { getWalletBalance } from "../../../../wallets/utils/getWalletBalance.js";
+import { invalidateWalletBalance } from "../../providers/invalidateWalletBalance.js";
 import { useActiveWallet } from "./useActiveWallet.js";
 
 /**
@@ -33,6 +37,7 @@ import { useActiveWallet } from "./useActiveWallet.js";
  */
 export function useSendToken(client: ThirdwebClient) {
   const wallet = useActiveWallet();
+  const queryClient = useQueryClient();
   return useMutation({
     async mutationFn(option: {
       tokenAddress?: string;
@@ -82,19 +87,30 @@ export function useSendToken(client: ThirdwebClient) {
           to,
           value: toWei(amount),
         });
-
-        await sendTransaction({
-          transaction: sendNativeTokenTx,
+        const gasEstimate = await estimateGas({
           account,
+          transaction: sendNativeTokenTx,
+        });
+        const balance = await getWalletBalance({
+          address: account.address,
+          chain: activeChain,
+          client,
+        });
+        if (toWei(amount) + gasEstimate > balance.value) {
+          throw new Error("Insufficient balance for transfer amount and gas");
+        }
+
+        return await sendTransaction({
+          account,
+          transaction: sendNativeTokenTx,
         });
       }
-
       // erc20 token transfer
       else {
         const contract = getContract({
           address: tokenAddress,
-          client,
           chain: activeChain,
+          client,
         });
 
         const tx = transfer({
@@ -103,11 +119,25 @@ export function useSendToken(client: ThirdwebClient) {
           to,
         });
 
-        await sendTransaction({
-          transaction: tx,
+        return await sendTransaction({
           account,
+          transaction: tx,
         });
       }
+    },
+    onSettled: async (data, error) => {
+      if (error) {
+        return;
+      }
+      if (data?.transactionHash) {
+        await waitForReceipt({
+          chain: data.chain,
+          client,
+          maxBlocksWaitTime: 10_000,
+          transactionHash: data.transactionHash,
+        });
+      }
+      invalidateWalletBalance(queryClient);
     },
   });
 }

@@ -1,18 +1,22 @@
-import type { BaseTransactionOptions } from "../../../transaction/types.js";
+import type {
+  BaseTransactionOptions,
+  WithOverrides,
+} from "../../../transaction/types.js";
 import * as URI from "../__generated__/IERC1155/read/uri.js";
 import * as MintTo from "../__generated__/IMintableERC1155/write/mintTo.js";
 
 /**
  * @extension ERC1155
  */
-export type MintAdditionalSupplyToParams = {
+export type MintAdditionalSupplyToParams = WithOverrides<{
   to: string;
   tokenId: bigint;
   supply: bigint;
-};
+}>;
 
 /**
  * Mints a "supply" number of additional ERC1155 tokens to the specified "to" address.
+ * This method is only available on the `TokenERC1155` contract.
  * @param options - The transaction options.
  * @returns A promise that resolves to the transaction result.
  * @extension ERC1155
@@ -36,15 +40,16 @@ export function mintAdditionalSupplyTo(
   options: BaseTransactionOptions<MintAdditionalSupplyToParams>,
 ) {
   return MintTo.mintTo({
-    contract: options.contract,
     asyncParams: async () => {
       return {
-        to: options.to,
-        tokenId: options.tokenId,
-        uri: "", // contract will maintain the existing token URI
         amount: options.supply,
+        to: options.to,
+        tokenId: options.tokenId, // contract will maintain the existing token URI
+        uri: "",
       };
     },
+    contract: options.contract,
+    overrides: options.overrides,
   });
 }
 

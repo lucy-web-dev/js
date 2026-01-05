@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { ANVIL_CHAIN } from "~test/chains.js";
-import {} from "~test/react-render.js";
 import { TEST_CLIENT } from "~test/test-clients.js";
 import {
   UNISWAPV3_FACTORY_CONTRACT,
@@ -17,8 +16,8 @@ describe.runIf(process.env.TW_SECRET_KEY)("TokenSymbol component", () => {
   it("fetchTokenSymbol should respect the symbolResolver being a string", async () => {
     const res = await fetchTokenSymbol({
       address: "thing",
-      client,
       chain: ANVIL_CHAIN,
+      client,
       symbolResolver: "tw",
     });
     expect(res).toBe("tw");
@@ -27,8 +26,8 @@ describe.runIf(process.env.TW_SECRET_KEY)("TokenSymbol component", () => {
   it("fetchTokenSymbol should respect the symbolResolver being a non-async function", async () => {
     const res = await fetchTokenSymbol({
       address: "thing",
-      client,
       chain: ANVIL_CHAIN,
+      client,
       symbolResolver: () => "tw",
     });
 
@@ -38,8 +37,8 @@ describe.runIf(process.env.TW_SECRET_KEY)("TokenSymbol component", () => {
   it("fetchTokenSymbol should respect the symbolResolver being an async function", async () => {
     const res = await fetchTokenSymbol({
       address: "thing",
-      client,
       chain: ANVIL_CHAIN,
+      client,
       symbolResolver: async () => {
         await new Promise((resolve) => setTimeout(resolve, 2000));
         return "tw";
@@ -52,8 +51,8 @@ describe.runIf(process.env.TW_SECRET_KEY)("TokenSymbol component", () => {
   it("fetchTokenSymbol should work for contract with `symbol` function", async () => {
     const res = await fetchTokenSymbol({
       address: USDT_CONTRACT.address,
-      client,
       chain: USDT_CONTRACT.chain,
+      client,
     });
 
     expect(res).toBe("USDT");
@@ -62,8 +61,8 @@ describe.runIf(process.env.TW_SECRET_KEY)("TokenSymbol component", () => {
   it("fetchTokenSymbol should work for native token", async () => {
     const res = await fetchTokenSymbol({
       address: NATIVE_TOKEN_ADDRESS,
-      client,
       chain: ethereum,
+      client,
     });
 
     expect(res).toBe("ETH");
@@ -74,11 +73,11 @@ describe.runIf(process.env.TW_SECRET_KEY)("TokenSymbol component", () => {
   });
 
   it("fetchTokenSymbol should throw in the end where all fallback solutions failed to resolve to any symbol", async () => {
-    await expect(() =>
+    await expect(
       fetchTokenSymbol({
         address: UNISWAPV3_FACTORY_CONTRACT.address,
-        client,
         chain: UNISWAPV3_FACTORY_CONTRACT.chain,
+        client,
       }),
     ).rejects.toThrowError(
       "Failed to resolve symbol from both symbol() and contract metadata",
@@ -86,7 +85,7 @@ describe.runIf(process.env.TW_SECRET_KEY)("TokenSymbol component", () => {
   });
 
   it("getQueryKeys should work without resolver", () => {
-    expect(getQueryKeys({ chainId: 1, address: "0x" })).toStrictEqual([
+    expect(getQueryKeys({ address: "0x", chainId: 1 })).toStrictEqual([
       "_internal_token_symbol_",
       1,
       "0x",
@@ -98,7 +97,7 @@ describe.runIf(process.env.TW_SECRET_KEY)("TokenSymbol component", () => {
 
   it("getQueryKeys should work with resolver being a string", () => {
     expect(
-      getQueryKeys({ chainId: 1, address: "0x", symbolResolver: "tw" }),
+      getQueryKeys({ address: "0x", chainId: 1, symbolResolver: "tw" }),
     ).toStrictEqual([
       "_internal_token_symbol_",
       1,
@@ -113,7 +112,7 @@ describe.runIf(process.env.TW_SECRET_KEY)("TokenSymbol component", () => {
     const fn = () => "tw";
     const fnId = getFunctionId(fn);
     expect(
-      getQueryKeys({ chainId: 1, address: "0x", symbolResolver: fn }),
+      getQueryKeys({ address: "0x", chainId: 1, symbolResolver: fn }),
     ).toStrictEqual([
       "_internal_token_symbol_",
       1,
@@ -132,8 +131,8 @@ describe.runIf(process.env.TW_SECRET_KEY)("TokenSymbol component", () => {
     const fnId = getFunctionId(fn);
     expect(
       getQueryKeys({
-        chainId: 1,
         address: "0x",
+        chainId: 1,
         symbolResolver: fn,
       }),
     ).toStrictEqual([

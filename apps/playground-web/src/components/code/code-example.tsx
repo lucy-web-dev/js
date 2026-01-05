@@ -1,46 +1,68 @@
+import { Code2Icon, EyeIcon } from "lucide-react";
 import type { JSX } from "react";
 import type { BundledLanguage } from "shiki";
-import { Code } from "./code";
+import { ClientOnly } from "../ClientOnly";
+import { CodeServer } from "./code";
 
-export type CodeExampleProps = {
+type CodeExampleProps = {
   preview: JSX.Element;
   code: string;
   lang: BundledLanguage;
+  header?: {
+    title: React.ReactNode;
+    description?: React.ReactNode;
+  };
 };
 
 export const CodeExample: React.FC<CodeExampleProps> = ({
   code,
   lang,
   preview,
+  header,
 }) => {
   return (
-    <div className="grid grid-cols-1 items-center overflow-hidden rounded-xl border md:grid-cols-2">
-      <div className="h-full md:border-r">
-        <Code
-          code={code}
-          lang={lang}
-          className="h-full rounded-none border-none"
-        />
-      </div>
-      <div className="relative grid h-full min-h-[300px] place-items-center bg-secondary/10 py-8">
-        {preview}
-        <BackgroundPattern />
+    <div className="relative z-0">
+      {header && (
+        <div className="mb-4">
+          <h2 className="font-semibold text-xl tracking-tight capitalize mb-1">
+            {header.title}
+          </h2>
+          <p className="max-w-5xl text-muted-foreground text-sm md:text-base text-pretty">
+            {header.description}
+          </p>
+        </div>
+      )}
+      <div className="grid grid-cols-1 overflow-hidden rounded-lg border bg-card md:grid-cols-2">
+        <div className="flex grow flex-col border-b md:border-r md:border-b-0">
+          <TabName icon={Code2Icon} name="Code" />
+          <CodeServer
+            className="h-full rounded-none border-none"
+            code={code}
+            lang={lang}
+          />
+        </div>
+        <div className="flex grow flex-col">
+          <TabName icon={EyeIcon} name="Preview" />
+          <ClientOnly
+            className="relative grid h-full min-h-[300px] place-items-center bg-card py-20"
+            ssr={null}
+          >
+            {preview}
+          </ClientOnly>
+        </div>
       </div>
     </div>
   );
 };
 
-function BackgroundPattern() {
-  const color = "hsl(var(--foreground)/10%)";
+export function TabName(props: {
+  name: string;
+  icon: React.FC<{ className: string }>;
+}) {
   return (
-    <div
-      className="absolute inset-0 z-[-1]"
-      style={{
-        backgroundImage: `radial-gradient(${color} 1px, transparent 1px)`,
-        backgroundSize: "24px 24px",
-        maskImage:
-          "radial-gradient(ellipse 100% 100% at 50% 50%, black 30%, transparent 60%)",
-      }}
-    />
+    <div className="flex items-center gap-2 border-b p-4 text-muted-foreground text-sm">
+      <props.icon className="size-4" />
+      {props.name}
+    </div>
   );
 }

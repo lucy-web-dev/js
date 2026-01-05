@@ -17,6 +17,11 @@ type ProcessRefDeploymentsOptions = {
   paramValue: string | ImplementationConstructorParam;
 };
 
+/**
+ * Processes published contract references in constructor params. Deploys recursively if needed.
+ * @returns Param value after processing references.
+ * @internal
+ */
 export async function processRefDeployments(
   options: ProcessRefDeploymentsOptions,
 ): Promise<string | string[]> {
@@ -42,16 +47,16 @@ export async function processRefDeployments(
         const salt =
           contracts[0]?.salt && contracts[0]?.salt.length > 0
             ? contracts[0]?.salt
-            : "thirdweb";
+            : "";
 
         const addr = await deployPublishedContract({
-          client,
-          chain,
           account,
+          chain,
+          client,
           contractId: contracts[0]?.contractId,
           publisher: contracts[0]?.publisherAddress,
-          version: contracts[0]?.version,
           salt,
+          version: contracts[0]?.version,
         });
 
         return addr;
@@ -64,17 +69,17 @@ export async function processRefDeployments(
         const addressArray = [];
 
         for (const c of contracts) {
-          const salt = c?.salt && c?.salt.length > 0 ? c?.salt : "thirdweb";
+          const salt = c?.salt && c?.salt.length > 0 ? c?.salt : "";
 
           addressArray.push(
             await deployPublishedContract({
-              client,
-              chain,
               account,
+              chain,
+              client,
               contractId: c.contractId,
               publisher: c.publisherAddress,
-              version: c.version,
               salt,
+              version: c.version,
             }),
           );
         }
@@ -99,9 +104,9 @@ export async function processRefDeployments(
             } else if (v.dynamicValue) {
               values.push(
                 await processRefDeployments({
-                  client,
                   account,
                   chain,
+                  client,
                   paramValue: v,
                 }),
               );
@@ -138,9 +143,9 @@ export async function processRefDeployments(
               } else if (v.dynamicValue) {
                 values.push(
                   await processRefDeployments({
-                    client,
                     account,
                     chain,
+                    client,
                     paramValue: v,
                   }),
                 );

@@ -1,140 +1,18 @@
 module.exports = {
+  env: {
+    browser: true,
+    node: true,
+  },
   extends: [
     "eslint:recommended",
     "plugin:@typescript-eslint/recommended",
     "plugin:@next/next/recommended",
     "plugin:storybook/recommended",
   ],
-  rules: {
-    "react-compiler/react-compiler": "error",
-    "no-restricted-syntax": [
-      "error",
-      {
-        selector: "CallExpression[callee.name='useEffect']",
-        message:
-          'Are you *sure* you need to use "useEffect" here? If you loading any async function prefer using "useQuery".',
-      },
-      {
-        selector: "CallExpression[callee.name='createContext']",
-        message:
-          'Are you *sure* you need to use a "Context"? In almost all cases you should prefer passing props directly.',
-      },
-      {
-        selector: "CallExpression[callee.name='defineChain']",
-        message:
-          "Use useV5DashboardChain instead if you are using it inside a component",
-      },
-      {
-        selector: "CallExpression[callee.name='defineDashboardChain']",
-        message:
-          "Use useV5DashboardChain instead if you are using it inside a component",
-      },
-      {
-        selector: "CallExpression[callee.name='mapV4ChainToV5Chain']",
-        message:
-          "Use useV5DashboardChain instead if you are using it inside a component",
-      },
-      {
-        selector: "CallExpression[callee.name='resolveScheme']",
-        message:
-          "resolveScheme can throw error if resolution fails. Either catch the error and ignore the lint warning or Use `resolveSchemeWithErrorHandler` / `replaceIpfsUrl` utility in dashboard instead",
-      },
-    ],
-    "no-restricted-imports": [
-      "error",
-      {
-        paths: [
-          {
-            name: "@chakra-ui/react",
-            // these are provided by tw-components, so we don't want to import them from chakra directly
-            importNames: [
-              "Card",
-              "Button",
-              "Checkbox",
-              "Badge",
-              "Drawer",
-              "Heading",
-              "Text",
-              "FormLabel",
-              "FormHelperText",
-              "FormErrorMessage",
-              "MenuGroup",
-              "VStack",
-              "HStack",
-              "AspectRatio",
-              "useToast",
-              "useClipboard",
-              "Badge",
-              "Stack",
-              // also the types
-              "ButtonProps",
-              "BadgeProps",
-              "DrawerProps",
-              "HeadingProps",
-              "TextProps",
-              "FormLabelProps",
-              "HelpTextProps",
-              "MenuGroupProps",
-              "MenuItemProps",
-              "AspectRatioProps",
-              "BadgeProps",
-              "StackProps",
-            ],
-            message:
-              'Use the equivalent component from "tw-components" instead.',
-          },
-          {
-            name: "@chakra-ui/layout",
-            message:
-              "Import from `@chakra-ui/react` instead of `@chakra-ui/layout`.",
-          },
-          {
-            name: "@chakra-ui/button",
-            message:
-              "Import from `@chakra-ui/react` instead of `@chakra-ui/button`.",
-          },
-          {
-            name: "@chakra-ui/menu",
-            message:
-              "Import from `@chakra-ui/react` instead of `@chakra-ui/menu`.",
-          },
-          {
-            name: "next/navigation",
-            importNames: ["useRouter"],
-            message:
-              'Use `import { useDashboardRouter } from "@/lib/DashboardRouter";` instead',
-          },
-          {
-            name: "lucide-react",
-            importNames: ["Link", "Table", "Sidebar"],
-            message:
-              'This is likely a mistake. If you really want to import this - postfix the imported name with Icon. Example - "LinkIcon"',
-          },
-        ],
-      },
-    ],
-  },
-  parser: "@typescript-eslint/parser",
-  plugins: ["@typescript-eslint", "react-compiler"],
-  parserOptions: {
-    ecmaVersion: 2019,
-    ecmaFeatures: {
-      impliedStrict: true,
-      jsx: true,
-    },
-    warnOnUnsupportedTypeScriptVersion: true,
-  },
-  settings: {
-    react: {
-      createClass: "createReactClass",
-      pragma: "React",
-      version: "detect",
-    },
-  },
   overrides: [
-    // disable restricted imports in tw-components
+    // allow direct PostHog imports inside analytics helpers
     {
-      files: "src/tw-components/**/*",
+      files: "src/@/analytics/**/*",
       rules: {
         "no-restricted-imports": ["off"],
       },
@@ -151,8 +29,8 @@ module.exports = {
     {
       files: ["*test.ts?(x)"],
       rules: {
-        "@typescript-eslint/no-non-null-assertion": "off",
         "@typescript-eslint/no-explicit-any": "off",
+        "@typescript-eslint/no-non-null-assertion": "off",
 
         "react/display-name": "off",
       },
@@ -177,14 +55,119 @@ module.exports = {
         "import/newline-after-import": "off",
       },
     },
+    // turn OFF unused vars via eslint
+    {
+      files: ["*.ts", "*.tsx"],
+      rules: {
+        "@next/next/no-img-element": "off",
+        "@typescript-eslint/no-unused-vars": "off",
+      },
+    },
     // THIS NEEDS TO GO LAST!
     {
-      files: ["*.ts", "*.js", "*.tsx", "*.jsx"],
       extends: ["biome"],
+      files: ["*.ts", "*.js", "*.tsx", "*.jsx"],
     },
   ],
-  env: {
-    browser: true,
-    node: true,
+  parser: "@typescript-eslint/parser",
+  parserOptions: {
+    ecmaFeatures: {
+      impliedStrict: true,
+      jsx: true,
+    },
+    ecmaVersion: 2019,
+    warnOnUnsupportedTypeScriptVersion: true,
+  },
+  plugins: ["@typescript-eslint", "react-compiler"],
+  rules: {
+    "no-restricted-imports": [
+      "error",
+      {
+        paths: [
+          {
+            importNames: ["useRouter"],
+            message:
+              'Use `import { useDashboardRouter } from "@/lib/DashboardRouter";` instead',
+            name: "next/navigation",
+          },
+          {
+            message:
+              'Import "posthog-js" directly only within the analytics helpers ("src/@/analytics/*"). Use the exported helpers from "@/analytics/track" elsewhere.',
+            name: "posthog-js",
+          },
+          {
+            importNames: ["useSendTransaction"],
+            message:
+              'Use `import { useSendAndConfirmTx } from "@/hooks/useSendTx";` instead',
+            name: "thirdweb/react",
+          },
+          {
+            importNames: ["useSendAndConfirmTransaction"],
+            message:
+              'Use `import { useSendAndConfirmTx } from "@/hooks/useSendTx";` instead',
+            name: "thirdweb/react",
+          },
+          {
+            importNames: ["sendTransaction"],
+            message:
+              'Use `import { useSendAndConfirmTx } from "@/hooks/useSendTx";` instead if used in react component',
+            name: "thirdweb",
+          },
+          {
+            importNames: ["sendAndConfirmTransaction"],
+            message:
+              'Use `import { useSendAndConfirmTx } from "@/hooks/useSendTx";` instead if used in react component',
+            name: "thirdweb",
+          },
+        ],
+        patterns: [
+          {
+            group: ["**/../@/**"],
+            message: "Use absolute imports instead. Example: '@/foo/bar..'",
+          },
+        ],
+      },
+    ],
+    "no-restricted-syntax": [
+      "error",
+      {
+        message:
+          'Are you *sure* you need to use "useEffect" here? If you loading any async function prefer using "useQuery".',
+        selector: "CallExpression[callee.name='useEffect']",
+      },
+      {
+        message:
+          'Are you *sure* you need to use a "Context"? In almost all cases you should prefer passing props directly.',
+        selector: "CallExpression[callee.name='createContext']",
+      },
+      {
+        message:
+          "Use useV5DashboardChain instead if you are using it inside a component",
+        selector: "CallExpression[callee.name='defineChain']",
+      },
+      {
+        message:
+          "Use useV5DashboardChain instead if you are using it inside a component",
+        selector: "CallExpression[callee.name='defineDashboardChain']",
+      },
+      {
+        message:
+          "Use useV5DashboardChain instead if you are using it inside a component",
+        selector: "CallExpression[callee.name='mapV4ChainToV5Chain']",
+      },
+      {
+        message:
+          "resolveScheme can throw error if resolution fails. Either catch the error and ignore the lint warning or Use `resolveSchemeWithErrorHandler` / `replaceIpfsUrl` utility in dashboard instead",
+        selector: "CallExpression[callee.name='resolveScheme']",
+      },
+    ],
+    "react-compiler/react-compiler": "error",
+  },
+  settings: {
+    react: {
+      createClass: "createReactClass",
+      pragma: "React",
+      version: "detect",
+    },
   },
 };

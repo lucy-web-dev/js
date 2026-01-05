@@ -1,10 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TEST_CLIENT } from "../../../test/src/test-clients.js";
 import { TEST_ACCOUNT_A } from "../../../test/src/test-wallets.js";
+import { baseSepolia } from "../../chains/chain-definitions/base-sepolia.js";
 import { sepolia } from "../../chains/chain-definitions/sepolia.js";
 import type { ThirdwebClient } from "../../client/client.js";
 import type { AsyncStorage } from "../../utils/storage/AsyncStorage.js";
+import { inAppWallet } from "../in-app/web/in-app.js";
 import type { Account, Wallet } from "../interfaces/wallet.js";
+import { smartWallet } from "../smart/smart-wallet.js";
 import type { SmartWalletOptions } from "../smart/types.js";
 import {
   createConnectionManager,
@@ -21,19 +24,19 @@ describe.runIf(process.env.TW_SECRET_KEY)("Connection Manager", () => {
   beforeEach(() => {
     storage = {
       getItem: vi.fn(),
-      setItem: vi.fn(),
       removeItem: vi.fn(),
+      setItem: vi.fn(),
     };
     client = TEST_CLIENT;
     account = TEST_ACCOUNT_A;
     wallet = {
-      id: "wallet-id",
-      getAccount: vi.fn().mockReturnValue(account),
-      subscribe: vi.fn().mockReturnValue(vi.fn()),
       disconnect: vi.fn(),
-      switchChain: vi.fn(),
+      getAccount: vi.fn().mockReturnValue(account),
       getChain: vi.fn().mockReturnValue(sepolia),
       getConfig: vi.fn(),
+      id: "wallet-id",
+      subscribe: vi.fn().mockReturnValue(vi.fn()),
+      switchChain: vi.fn(),
     } as unknown as Wallet;
     smartWalletOptions = {
       chain: sepolia,
@@ -46,7 +49,7 @@ describe.runIf(process.env.TW_SECRET_KEY)("Connection Manager", () => {
 
     await manager.connect(wallet, { client, onConnect });
 
-    expect(onConnect).toHaveBeenCalledWith(wallet);
+    expect(onConnect).toHaveBeenCalledWith(wallet, [wallet]);
     expect(storage.setItem).toHaveBeenCalled();
   });
 
@@ -54,8 +57,8 @@ describe.runIf(process.env.TW_SECRET_KEY)("Connection Manager", () => {
     const manager = createConnectionManager(storage);
 
     const smartWallet = await manager.handleConnection(wallet, {
-      client,
       accountAbstraction: smartWalletOptions,
+      client,
     });
 
     expect(manager.activeWalletStore.getValue()).toBe(smartWallet);
@@ -73,8 +76,8 @@ describe.runIf(process.env.TW_SECRET_KEY)("Connection Manager", () => {
     const manager = createConnectionManager(storage);
 
     const smartWallet = await manager.handleConnection(wallet, {
-      client,
       accountAbstraction: smartWalletOptions,
+      client,
     });
 
     expect(manager.activeWalletStore.getValue()).toBe(smartWallet);
@@ -110,13 +113,13 @@ describe.runIf(process.env.TW_SECRET_KEY)("Connection Manager", () => {
     const manager = createConnectionManager(storage);
 
     wallet = {
-      id: "wallet-id",
-      getAccount: vi.fn().mockReturnValue(null),
-      subscribe: vi.fn(),
       disconnect: vi.fn(),
-      switchChain: vi.fn(),
+      getAccount: vi.fn().mockReturnValue(null),
       getChain: vi.fn().mockReturnValue(sepolia),
       getConfig: vi.fn(),
+      id: "wallet-id",
+      subscribe: vi.fn(),
+      switchChain: vi.fn(),
     } as unknown as Wallet;
 
     await expect(manager.handleConnection(wallet, { client })).rejects.toThrow(
@@ -155,6 +158,46 @@ describe.runIf(process.env.TW_SECRET_KEY)("Connection Manager", () => {
     await manager.switchActiveWalletChain(newChain);
 
     expect(wallet.switchChain).toHaveBeenCalledWith(newChain);
+  });
+
+  it("should switch admin wallet for smart wallet if available", async () => {
+    const manager = createConnectionManager(storage);
+    const adminAccount = TEST_ACCOUNT_A;
+    const adminWallet = inAppWallet();
+    adminWallet.getAccount = () => adminAccount;
+
+    const _wallet = smartWallet({
+      chain: baseSepolia,
+      sponsorGas: true,
+    });
+    await _wallet.connect({
+      client,
+      personalAccount: adminAccount,
+    });
+
+    await manager.handleConnection(adminWallet, { client });
+    await manager.handleConnection(_wallet, { client });
+
+    const newChain = {
+      id: 2,
+      name: "New Chain",
+      rpc: "https://rpc.example.com",
+    };
+
+    // Mock storage and wallet setup
+    storage.getItem = vi.fn().mockResolvedValue("inApp");
+    adminWallet.id = "inApp";
+    _wallet.switchChain = vi.fn();
+    adminWallet.switchChain = vi.fn();
+
+    // Add wallets to connected wallets store
+    manager.addConnectedWallet(adminWallet);
+    manager.addConnectedWallet(_wallet);
+
+    await manager.switchActiveWalletChain(newChain);
+
+    expect(_wallet.switchChain).toHaveBeenCalledWith(newChain);
+    expect(adminWallet.switchChain).toHaveBeenCalledWith(newChain);
   });
 
   it("should define chains", async () => {
@@ -208,13 +251,13 @@ describe.runIf(process.env.TW_SECRET_KEY)("Connection Manager", () => {
     beforeEach(() => {
       client = TEST_CLIENT;
       eoaWallet = {
-        id: "eoa-wallet-id",
-        getAccount: vi.fn().mockReturnValue(TEST_ACCOUNT_A),
-        subscribe: vi.fn().mockReturnValue(vi.fn()),
         disconnect: vi.fn(),
-        switchChain: vi.fn(),
+        getAccount: vi.fn().mockReturnValue(TEST_ACCOUNT_A),
         getChain: vi.fn().mockReturnValue(sepolia),
         getConfig: vi.fn(),
+        id: "eoa-wallet-id",
+        subscribe: vi.fn().mockReturnValue(vi.fn()),
+        switchChain: vi.fn(),
       } as unknown as Wallet;
       smartWalletOptions = {
         chain: sepolia,
@@ -276,18 +319,18 @@ describe.runIf(process.env.TW_SECRET_KEY)("Connection Manager", () => {
     beforeEach(() => {
       storage = {
         getItem: vi.fn(),
-        setItem: vi.fn(),
         removeItem: vi.fn(),
+        setItem: vi.fn(),
       };
       client = TEST_CLIENT;
       wallet = {
-        id: "wallet-id",
-        getAccount: vi.fn().mockReturnValue(null), // Simulate wallet without an account
-        subscribe: vi.fn(),
         disconnect: vi.fn(),
-        switchChain: vi.fn(),
+        getAccount: vi.fn().mockReturnValue(null), // Simulate wallet without an account
         getChain: vi.fn().mockReturnValue(sepolia),
         getConfig: vi.fn(),
+        id: "wallet-id",
+        subscribe: vi.fn(),
+        switchChain: vi.fn(),
       } as unknown as Wallet;
     });
 
@@ -317,19 +360,19 @@ describe.runIf(process.env.TW_SECRET_KEY)("Connection Manager", () => {
     beforeEach(() => {
       storage = {
         getItem: vi.fn(),
-        setItem: vi.fn(),
         removeItem: vi.fn(),
+        setItem: vi.fn(),
       };
       client = TEST_CLIENT;
       account = TEST_ACCOUNT_A;
       wallet = {
-        id: "wallet-id",
-        getAccount: vi.fn().mockReturnValue(account),
-        subscribe: vi.fn().mockReturnValue(vi.fn()),
         disconnect: vi.fn(),
-        switchChain: vi.fn(),
+        getAccount: vi.fn().mockReturnValue(account),
         getChain: vi.fn().mockReturnValue(sepolia),
         getConfig: vi.fn(),
+        id: "wallet-id",
+        subscribe: vi.fn().mockReturnValue(vi.fn()),
+        switchChain: vi.fn(),
       } as unknown as Wallet;
     });
 

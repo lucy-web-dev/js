@@ -24,7 +24,7 @@ export const wallet = {
   },
   rdns: "app.nightly",
   mobile: {
-    native: null,
+    native: "nightly://",
     universal: null,
   },
   desktop: {

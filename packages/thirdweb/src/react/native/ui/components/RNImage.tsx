@@ -50,18 +50,16 @@ export const RNImage = (props: ImageInfo) => {
     case "url":
     case "image":
       return (
-        <>
-          <Image
-            source={{ uri: image }}
-            loadingIndicatorSource={{ uri: placeholder }}
-            width={size}
-            height={size}
-            style={[{ borderRadius: radius.md }]}
-          />
-        </>
+        <Image
+          height={size}
+          loadingIndicatorSource={{ uri: placeholder }}
+          source={{ uri: image }}
+          style={[{ borderRadius: radius.md }]}
+          width={size}
+        />
       );
     case "xml":
-      return <SvgXml xml={image} width={size} height={size} color={color} />;
+      return <SvgXml color={color} height={size} width={size} xml={image} />;
     default:
       return null;
   }

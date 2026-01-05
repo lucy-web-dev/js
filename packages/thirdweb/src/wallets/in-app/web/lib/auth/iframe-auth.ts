@@ -72,16 +72,16 @@ export class Auth {
     this.localStorage = localStorage;
     this.onAuthSuccess = onAuthSuccess;
     this.BaseLogin = new BaseLogin({
+      baseUrl,
+      client,
+      ecosystem,
       postLogin: async (result) => {
         return this.postLogin(result);
       },
       preLogin: async () => {
         await this.preLogin();
       },
-      ecosystem,
       querier: querier,
-      client,
-      baseUrl,
     });
   }
 
@@ -107,7 +107,10 @@ export class Auth {
     authToken: AuthStoredTokenWithCookieReturnType,
     recoveryCode?: string,
   ): Promise<AuthLoginReturnType> {
-    await this.preLogin();
+    // We don't call logout for backend auth because that is handled on the backend where the iframe isn't available to call. Moreover, logout clears the local storage which isn't applicable for backend auth.
+    if (authToken.storedToken.authProvider !== "Backend") {
+      await this.preLogin();
+    }
 
     const user = await getUserStatus({
       authToken: authToken.storedToken.cookieString,
@@ -145,11 +148,11 @@ export class Auth {
 
     // If this is an existing sharded wallet or in-app wallet, we'll login with the sharded wallet
     const result = await this.AuthQuerier.call<AuthAndWalletRpcReturnType>({
-      procedureName: "loginWithStoredTokenDetails",
       params: {
-        storedToken: authToken.storedToken,
         recoveryCode,
+        storedToken: authToken.storedToken,
       },
+      procedureName: "loginWithStoredTokenDetails",
     });
     return this.postLogin(result);
   }
@@ -321,13 +324,6 @@ export class Auth {
    * @internal
    */
   async logout(): Promise<LogoutReturnType> {
-    if (this.AuthQuerier) {
-      await this.AuthQuerier.call<LogoutReturnType>({
-        procedureName: "logout",
-        params: undefined,
-      });
-    }
-
     const isRemoveAuthCookie = await this.localStorage.removeAuthCookie();
     const isRemoveUserId = await this.localStorage.removeWalletUserId();
 

@@ -3,12 +3,12 @@ import type {
   Account,
   SendTransactionOption,
 } from "../../wallets/interfaces/wallet.js";
-import type { PreparedTransaction } from "../prepare-transaction.js";
 import { encode } from "./encode.js";
+import type { SendTransactionOptions } from "./send-transaction.js";
 import type { WaitForReceiptOptions } from "./wait-for-tx-receipt.js";
 
 export type SendBatchTransactionOptions = {
-  transactions: PreparedTransaction[];
+  transactions: SendTransactionOptions["transaction"][];
   account: Account;
 };
 
@@ -53,11 +53,11 @@ export async function sendBatchTransaction(
           resolvePromisedValue(tx.value),
         ]);
         const serializedTx: SendTransactionOption = {
-          data,
+          accessList,
           chainId: tx.chain.id,
+          data,
           to,
           value,
-          accessList,
         };
         return serializedTx;
       }),

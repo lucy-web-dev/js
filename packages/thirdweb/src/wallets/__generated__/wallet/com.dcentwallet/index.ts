@@ -5,7 +5,7 @@ export const wallet = {
   id: "com.dcentwallet",
   name: "D'CENT Wallet",
   homepage: "https://dcentwallet.com",
-  image_id: "0b0ca1f1-1e43-4429-7b23-2e0ce4b1b700",
+  image_id: "e7e60788-6806-47d4-7b4a-a410e7aa3300",
   app: {
     browser: null,
     ios: "https://apps.apple.com/app/dcent-hardware-wallet/id1447206611",

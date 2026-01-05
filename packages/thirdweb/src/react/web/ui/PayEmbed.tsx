@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { ethereum } from "../../../chains/chain-definitions/ethereum.js";
 import type { Chain } from "../../../chains/types.js";
 import type { ThirdwebClient } from "../../../client/client.js";
+import type { Address } from "../../../utils/address.js";
 import type { Wallet } from "../../../wallets/interfaces/wallet.js";
 import type { SmartWalletOptions } from "../../../wallets/smart/types.js";
 import type { AppMetadata } from "../../../wallets/types.js";
@@ -16,12 +18,11 @@ import type {
 } from "../../core/hooks/connection/ConnectButtonProps.js";
 import { useConnectionManager } from "../../core/providers/connection-manager.js";
 import type { SupportedTokens } from "../../core/utils/defaultTokens.js";
+import { BuyWidget } from "./Bridge/BuyWidget.js";
+import { CheckoutWidget } from "./Bridge/CheckoutWidget.js";
+import { TransactionWidget } from "./Bridge/TransactionWidget.js";
 import { EmbedContainer } from "./ConnectWallet/Modal/ConnectEmbed.js";
-import { useConnectLocale } from "./ConnectWallet/locale/getConnectLocale.js";
-import BuyScreen from "./ConnectWallet/screens/Buy/BuyScreen.js";
-import { ExecutingTxScreen } from "./TransactionButton/ExecutingScreen.js";
 import { DynamicHeight } from "./components/DynamicHeight.js";
-import { Spinner } from "./components/Spinner.js";
 import type { LocaleId } from "./types.js";
 
 /**
@@ -130,9 +131,19 @@ export type PayEmbedProps = {
    */
   hiddenWallets?: WalletId[];
 
+  /**
+   * The wallet that should be pre-selected in the PayEmbed UI.
+   */
+  activeWallet?: Wallet;
+
   style?: React.CSSProperties;
 
   className?: string;
+
+  /**
+   * @hidden
+   */
+  paymentLinkId?: string;
 };
 
 /**
@@ -219,7 +230,6 @@ export type PayEmbedProps = {
  *   }}
  *  />
  * ```
- *
  * You can also handle ERC20 payments by passing `erc20value` to your transaction:
  *
  * ```tsx
@@ -251,6 +261,7 @@ export type PayEmbedProps = {
  *     buyWithFiat: false,
  *   }}
  *  />
+ * ```
  *
  * ### Customize the UI
  *
@@ -287,11 +298,9 @@ export type PayEmbedProps = {
  *
  * Refer to the [`PayEmbedConnectOptions`](https://portal.thirdweb.com/references/typescript/v5/PayEmbedConnectOptions) type for more details.
  *
- * @buyCrypto
+ * @deprecated Use `BuyWidget`, `CheckoutWidget` or `TransactionWidget` instead.
  */
 export function PayEmbed(props: PayEmbedProps) {
-  const localeQuery = useConnectLocale(props.locale || "en_US");
-  const [screen, setScreen] = useState<"buy" | "execute-tx">("buy");
   const theme = props.theme || "dark";
   const connectionManager = useConnectionManager();
 
@@ -308,82 +317,96 @@ export function PayEmbed(props: PayEmbedProps) {
     }
   }, [props.connectOptions?.chains, connectionManager]);
 
-  let content = null;
+  useEffect(() => {
+    if (props.activeWallet) {
+      connectionManager.setActiveWallet(props.activeWallet);
+    }
+  }, [props.activeWallet, connectionManager]);
+
+  const content = null;
   const metadata =
     props.payOptions && "metadata" in props.payOptions
       ? props.payOptions.metadata
       : null;
 
-  if (!localeQuery.data) {
-    content = (
-      <div
-        style={{
-          minHeight: "350px",
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-        }}
-      >
-        <Spinner size="xl" color="secondaryText" />
-      </div>
+  if (!props.payOptions?.mode || props.payOptions?.mode === "fund_wallet") {
+    return (
+      <BuyWidget
+        amount={props.payOptions?.prefillBuy?.amount || "0.01"}
+        chain={props.payOptions?.prefillBuy?.chain || ethereum}
+        client={props.client}
+        onSuccess={() => props.payOptions?.onPurchaseSuccess?.()}
+        paymentMethods={
+          props.payOptions?.buyWithFiat === false
+            ? ["crypto"]
+            : props.payOptions?.buyWithCrypto === false
+              ? ["card"]
+              : ["crypto", "card"]
+        }
+        purchaseData={props.payOptions?.purchaseData}
+        theme={theme}
+        title={metadata?.name || "Buy"}
+        tokenAddress={
+          props.payOptions?.prefillBuy?.token?.address as Address | undefined
+        }
+      />
     );
-  } else {
-    content = (
-      <>
-        {screen === "buy" && (
-          <BuyScreen
-            title={metadata?.name || "Buy"}
-            isEmbed={true}
-            supportedTokens={props.supportedTokens}
-            theme={theme}
-            client={props.client}
-            connectLocale={localeQuery.data}
-            hiddenWallets={props.hiddenWallets}
-            payOptions={
-              props.payOptions || {
-                mode: "fund_wallet",
-              }
-            }
-            onDone={() => {
-              if (props.payOptions?.mode === "transaction") {
-                setScreen("execute-tx");
-              }
-            }}
-            connectOptions={props.connectOptions}
-            onBack={undefined}
-          />
-        )}
+  }
 
-        {screen === "execute-tx" &&
-          props.payOptions?.mode === "transaction" &&
-          props.payOptions.transaction && (
-            <ExecutingTxScreen
-              tx={props.payOptions.transaction}
-              closeModal={() => {
-                setScreen("buy");
-              }}
-              onBack={() => {
-                setScreen("buy");
-              }}
-              onTxSent={(data) => {
-                props.payOptions?.onPurchaseSuccess?.({
-                  type: "transaction",
-                  chainId: data.chain.id,
-                  transactionHash: data.transactionHash,
-                });
-              }}
-            />
-          )}
-      </>
+  if (props.payOptions?.mode === "direct_payment") {
+    return (
+      <CheckoutWidget
+        amount={(props.payOptions.paymentInfo as { amount: string }).amount}
+        chain={props.payOptions.paymentInfo.chain}
+        client={props.client}
+        description={metadata?.description}
+        feePayer={
+          props.payOptions.paymentInfo.feePayer === "sender" ? "user" : "seller"
+        }
+        image={metadata?.image}
+        name={metadata?.name || "Checkout"}
+        onSuccess={() => props.payOptions?.onPurchaseSuccess?.()}
+        paymentMethods={
+          props.payOptions?.buyWithFiat === false
+            ? ["crypto"]
+            : ["crypto", "card"]
+        }
+        purchaseData={props.payOptions?.purchaseData}
+        seller={props.payOptions.paymentInfo.sellerAddress as Address}
+        theme={theme}
+        tokenAddress={
+          props.payOptions.paymentInfo.token?.address as Address | undefined
+        }
+      />
+    );
+  }
+
+  if (props.payOptions?.mode === "transaction") {
+    return (
+      <TransactionWidget
+        client={props.client}
+        description={metadata?.description}
+        image={metadata?.image}
+        onSuccess={() => props.payOptions?.onPurchaseSuccess?.()}
+        paymentMethods={
+          props.payOptions?.buyWithFiat === false
+            ? ["crypto"]
+            : ["crypto", "card"]
+        }
+        purchaseData={props.payOptions?.purchaseData}
+        theme={theme}
+        title={metadata?.name}
+        transaction={props.payOptions.transaction}
+      />
     );
   }
 
   return (
     <CustomThemeProvider theme={theme}>
       <EmbedContainer
+        className={props.className}
         modalSize="compact"
         style={props.style}
-        className={props.className}
       >
         <DynamicHeight>{content}</DynamicHeight>
       </EmbedContainer>

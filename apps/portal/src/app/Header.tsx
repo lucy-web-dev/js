@@ -1,5 +1,10 @@
 "use client";
 
+import clsx from "clsx";
+import { ChevronDownIcon, MenuIcon, TableOfContentsIcon } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useState } from "react";
 import { DocSearch } from "@/components/others/DocSearch";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,232 +13,302 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import clsx from "clsx";
-import { ChevronDownIcon, Menu } from "lucide-react";
-import Image from "next/image";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { ChatButton } from "../components/AI/chat-button";
 import { GithubIcon } from "../components/Document/GithubButtonLink";
 import { CustomAccordion } from "../components/others/CustomAccordion";
 import { ThemeSwitcher } from "../components/others/theme/ThemeSwitcher";
+import {
+  DotNetIcon,
+  ReactIcon,
+  TypeScriptIcon,
+  UnityIcon,
+  UnrealEngineIcon,
+} from "../icons";
 import { ThirdwebIcon } from "../icons/thirdweb";
 
 const links = [
   {
-    name: "Engine",
-    href: "/engine",
+    href: "/wallets",
+    name: "Wallets",
   },
   {
-    name: "Contracts",
-    href: "/contracts",
+    href: "/x402",
+    name: "x402",
   },
   {
-    name: "Insight",
-    href: "/insight",
+    href: "/bridge",
+    name: "Bridge",
   },
   {
-    name: "Nebula",
-    href: "/nebula",
-  },
-];
-
-const toolLinks = [
-  {
-    name: "Chain List",
-    href: "https://thirdweb.com/chainlist",
+    href: "/tokens",
+    name: "Tokens",
   },
   {
-    name: "Wei Converter",
-    href: "https://thirdweb.com/tools/wei-converter",
+    href: "/ai/chat",
+    name: "AI",
   },
   {
-    name: "Hex Converter",
-    href: "https://thirdweb.com/tools/hex-converter",
-  },
-  {
-    name: "Account",
-    href: "/account",
-  },
-  {
-    name: "API Keys",
-    href: "/account/api-keys",
-  },
-  {
-    name: "CLI",
-    href: "/cli",
+    href: "/reference",
+    name: "API Reference",
   },
 ];
 
-export const connectLinks = [
+export const connectLinks: Array<{
+  name: string;
+  href: string;
+  icon: React.FC<{ className?: string }>;
+}> = [
   {
+    href: "/wallets",
+    icon: TableOfContentsIcon,
     name: "Overview",
-    href: "/connect",
-    icon: "/icons/navbar/nav-icon-dashboard.svg",
   },
   {
-    name: "TypeScript",
     href: "/typescript/v5",
-    icon: "/icons/navbar/nav-icon-typescript.svg",
+    icon: TypeScriptIcon,
+    name: "TypeScript",
   },
   {
-    name: "React",
     href: "/react/v5",
-    icon: "/icons/navbar/nav-icon-react.svg",
+    icon: ReactIcon,
+    name: "React",
   },
   {
-    name: "React Native",
     href: "/react-native/v5",
-    icon: "/icons/navbar/nav-icon-react.svg",
-    // icon: "/icons/navbar/nav-icon-react-native.svg",
+    icon: ReactIcon,
+    name: "React Native",
   },
   {
-    name: ".NET",
     href: "/dotnet",
-    icon: "/icons/navbar/nav-icon-dotnet.svg",
+    icon: DotNetIcon,
+    name: ".NET",
   },
   {
-    name: "Unity",
     href: "/unity",
-    icon: "/icons/navbar/nav-icon-unity.svg",
+    icon: UnityIcon,
+    name: "Unity",
   },
   {
-    name: "Unreal Engine",
     href: "/unreal-engine",
-    icon: "/icons/navbar/nav-icon-unreal-engine.svg",
+    icon: UnrealEngineIcon,
+    name: "Unreal Engine",
   },
 ] as const;
 
+const sdkLinks = [
+  {
+    href: "/references/typescript/v5",
+    icon: TypeScriptIcon,
+    name: "TypeScript",
+  },
+  {
+    href: "/references/typescript/v5",
+    icon: ReactIcon,
+    name: "React",
+  },
+  {
+    href: "/references/typescript/v5",
+    icon: ReactIcon,
+    name: "React Native",
+  },
+  {
+    href: "/dotnet",
+    icon: DotNetIcon,
+    name: ".NET",
+  },
+  {
+    href: "/unity",
+    icon: UnityIcon,
+    name: "Unity",
+  },
+  {
+    href: "/unreal-engine",
+    icon: UnrealEngineIcon,
+    name: "Unreal Engine",
+  },
+];
+
 const supportLinks = [
   {
-    name: "Get thirdweb support",
-    href: "https://thirdweb.com/support",
+    href: "/knowledge-base",
+    name: "Articles",
   },
   {
-    name: "Knowledge Base",
-    href: "https://support.thirdweb.com",
+    href: "/account",
+    name: "Account",
   },
   {
-    name: "Contact Sales",
-    href: "https://thirdweb.com/contact-us",
+    href: "https://status.thirdweb.com",
+    name: "Status",
   },
 ];
 
 export function Header() {
   const [showBurgerMenu, setShowBurgerMenu] = useState(false);
+  const pathname = usePathname();
 
   return (
-    <header className="flex w-full items-center border-b bg-b-900">
-      <div className="container flex items-center justify-between gap-6 p-4 xl:justify-start">
-        <Link
-          className="flex items-center gap-2"
-          href="/"
-          aria-label="thirdweb Docs"
-          title="thirdweb Docs"
-        >
-          <ThirdwebIcon className="size-8" />
-          <span className="font-bold text-[23px] text-f-100 leading-none tracking-tight">
-            Docs
-          </span>
-        </Link>
+    <header className="flex w-full border-b overflow-hidden relative">
+      <div className="container flex-col">
+        {/* Top row */}
+        <div className="flex items-center justify-between gap-6 relative z-10 py-4 lg:pt-5">
+          <div className="flex items-center gap-2">
+            <Link
+              aria-label="thirdweb Docs"
+              className="flex items-center gap-2"
+              href="/"
+              title="thirdweb Docs"
+            >
+              <ThirdwebIcon className="size-8" />
+              <span className="font-bold text-[23px] text-foreground leading-none tracking-tight">
+                Docs
+              </span>
+            </Link>
+          </div>
 
-        <div className="flex items-center gap-1 xl:hidden">
-          <ThemeSwitcher className="border-none bg-transparent" />
+          <div className="flex items-center gap-4">
+            <div className="hidden xl:block">
+              <Link
+                className="text-foreground"
+                href="https://github.com/thirdweb-dev"
+                target="_blank"
+              >
+                <GithubIcon className="size-6 lg:size-5" />
+              </Link>
+            </div>
 
-          <DocSearch variant="icon" />
-
-          <Link
-            href="https://github.com/thirdweb-dev"
-            target="_blank"
-            className="text-f-100"
-          >
-            <GithubIcon className="mx-3 size-6" />
-          </Link>
-
-          {/* Mobile burger menu */}
-          <Button
-            variant="ghost"
-            className="p-2"
-            onClick={() => setShowBurgerMenu(!showBurgerMenu)}
-          >
-            <Menu className="size-7" />
-          </Button>
-        </div>
-
-        <nav
-          className={clsx(
-            "grow gap-5",
-            !showBurgerMenu ? "hidden xl:flex" : "flex",
-            "fade-in-20 slide-in-from-top-3 fixed inset-0 top-sticky-top-height animate-in flex-col overflow-auto bg-b-800 p-6",
-            "xl:static xl:animate-none xl:flex-row xl:justify-between xl:bg-transparent xl:p-0",
-          )}
-        >
-          <ul className="flex flex-col gap-5 xl:flex-row xl:items-center">
-            <DropdownLinks
-              links={connectLinks}
-              onLinkClick={() => setShowBurgerMenu(false)}
-              category="Connect"
-            />
-
-            {links.map((link) => {
-              return (
-                <li
-                  className="flex items-center"
-                  key={link.href}
-                  onClick={() => {
-                    setShowBurgerMenu(false);
-                  }}
-                  onKeyDown={() => {
-                    setShowBurgerMenu(false);
-                  }}
-                >
-                  <NavLink name={link.name} href={link.href} />
-                </li>
-              );
-            })}
-
-            <DropdownLinks
-              links={toolLinks}
-              onLinkClick={() => setShowBurgerMenu(false)}
-              category="Tools"
-            />
-          </ul>
-
-          <div className="flex flex-col justify-start gap-5 xl:flex-row xl:items-center xl:gap-3">
-            <div className="hidden xl:flex">
-              <ThemeSwitcher />
+            <div className="hidden xl:block">
+              <ThemeSwitcher className="border-none bg-transparent" />
             </div>
 
             <div className="hidden xl:block">
               <DocSearch variant="search" />
             </div>
 
-            <div className="xl:px-2">
-              <DropdownLinks
-                links={supportLinks}
-                onLinkClick={() => setShowBurgerMenu(false)}
-                category="Support"
-              />
+            <div className="hidden xl:block">
+              <ChatButton />
             </div>
 
+            <div className="flex items-center gap-1 xl:hidden">
+              <ThemeSwitcher className="border-none bg-transparent" />
+              <DocSearch variant="icon" />
+              <ChatButton />
+              <Button
+                className="p-2"
+                onClick={() => setShowBurgerMenu(!showBurgerMenu)}
+                variant="ghost"
+              >
+                <MenuIcon className="size-7" />
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom row - hidden on mobile */}
+        <div className="hidden items-start justify-between gap-6 xl:flex relative z-10">
+          <nav className="flex grow gap-5">
+            <ul className="flex flex-row items-center gap-0 mb-1.5">
+              {links.map((link) => {
+                return (
+                  <li
+                    className="flex items-center relative"
+                    key={link.href}
+                    onClick={() => {
+                      setShowBurgerMenu(false);
+                    }}
+                    onKeyDown={() => {
+                      setShowBurgerMenu(false);
+                    }}
+                  >
+                    <NavLink
+                      href={link.href}
+                      name={link.name}
+                      className="py-2.5 px-3 hover:bg-accent rounded-lg hover:text-foreground font-normal"
+                    />
+                    {pathname?.startsWith(link.href) && (
+                      <div className="bg-foreground h-[2px] inset-x-0 rounded-full absolute -bottom-1.5" />
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
+
+          <div className="flex items-center">
+            <DropdownLinks
+              category="SDKs"
+              links={sdkLinks}
+              onLinkClick={() => setShowBurgerMenu(false)}
+            />
+            <DropdownLinks
+              category="Support"
+              links={supportLinks}
+              onLinkClick={() => setShowBurgerMenu(false)}
+            />
+
             <NavLink
-              name="Changelog"
               href="/changelog"
+              className="px-3 py-2.5 hover:bg-accent hover:text-foreground rounded-lg"
+              name="Changelog"
               onClick={() => {
                 setShowBurgerMenu(false);
               }}
             />
-
-            <Link
-              href="https://github.com/thirdweb-dev"
-              target="_blank"
-              className="hidden text-f-300 transition-colors hover:text-f-100 xl:block"
-            >
-              <GithubIcon className="mx-2 size-6" />
-            </Link>
           </div>
-        </nav>
+        </div>
       </div>
+
+      {/* Mobile menu */}
+      {showBurgerMenu && (
+        <div className="fixed inset-0 top-sticky-top-height z-50 overflow-auto bg-card p-6 xl:hidden">
+          <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-4">
+              <h3 className="font-semibold text-lg">Products</h3>
+              {links.map((link) => (
+                <NavLink
+                  href={link.href}
+                  key={link.name}
+                  name={link.name}
+                  onClick={() => setShowBurgerMenu(false)}
+                />
+              ))}
+            </div>
+
+            <div className="flex flex-col gap-4">
+              <h3 className="font-semibold text-lg">SDKs</h3>
+              {sdkLinks.map((link) => (
+                <NavLink
+                  href={link.href}
+                  key={link.name}
+                  icon={link.icon}
+                  name={link.name}
+                  onClick={() => setShowBurgerMenu(false)}
+                />
+              ))}
+            </div>
+
+            <div className="flex flex-col gap-4">
+              <h3 className="font-semibold text-lg">Support</h3>
+              {supportLinks.map((link) => (
+                <NavLink
+                  href={link.href}
+                  key={link.name}
+                  name={link.name}
+                  onClick={() => setShowBurgerMenu(false)}
+                />
+              ))}
+            </div>
+
+            <NavLink
+              href="/changelog"
+              name="Changelog"
+              onClick={() => setShowBurgerMenu(false)}
+            />
+          </div>
+        </div>
+      )}
+
+      <div className="absolute inset-0 bg-card/70 backdrop-blur-xl z-0" />
     </header>
   );
 }
@@ -241,7 +316,11 @@ export function Header() {
 function DropdownLinks(props: {
   onLinkClick?: () => void;
   category: string;
-  links: readonly { name: string; href: string; icon?: string }[];
+  links: readonly {
+    name: string;
+    href: string;
+    icon?: React.FC<{ className?: string }>;
+  }[];
 }) {
   return (
     <>
@@ -250,43 +329,39 @@ function DropdownLinks(props: {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
+              className="inline-flex items-center gap-1.5 font-normal text-muted-foreground text-sm hover:bg-accent hover:text-foreground rounded-lg px-3 py-2.5"
               variant="ghost"
-              className="inline-flex items-center gap-1 p-0 font-medium text-f-300 text-sm hover:bg-transparent hover:text-f-100"
             >
               {props.category}
-              <ChevronDownIcon className="size-4 text-f-300 opacity-70" />
+              <ChevronDownIcon className="size-3.5 text-muted-foreground opacity-70" />
             </Button>
           </DropdownMenuTrigger>
 
           <DropdownMenuContent
-            className="flex flex-col gap-1 bg-b-800 p-3"
-            style={{
-              minWidth: "150px",
-            }}
+            className="flex flex-col gap-1 bg-card p-1 rounded-xl min-w-[200px]"
+            sideOffset={14}
           >
             {props.links.map((info) => {
               return (
                 <DropdownMenuItem asChild key={info.name}>
-                  <Link
-                    href={info.href}
-                    target={info.href.startsWith("http") ? "_blank" : ""}
-                    prefetch={false}
+                  <div
                     className={clsx(
-                      "flex cursor-pointer font-medium text-f-200",
-                      "hover:bg-b-600 hover:text-f-100",
+                      "relative flex cursor-pointer gap-3 font-medium text-foreground !rounded-lg px-3 py-2",
+                      "hover:bg-accent",
                     )}
                   >
                     {info.icon && (
-                      <Image
-                        src={info.icon}
-                        width="20"
-                        height="20"
-                        alt=""
-                        className="mr-2"
-                      />
+                      <info.icon className="size-5 text-muted-foreground" />
                     )}
-                    {info.name}
-                  </Link>
+                    <Link
+                      className="before:absolute before:inset-0"
+                      href={info.href}
+                      prefetch={false}
+                      target={info.href.startsWith("http") ? "_blank" : ""}
+                    >
+                      {info.name}
+                    </Link>
+                  </div>
                 </DropdownMenuItem>
               );
             })}
@@ -300,18 +375,18 @@ function DropdownLinks(props: {
           chevronPosition="right"
           containerClassName="border-none"
           trigger={props.category}
-          triggerContainerClassName="py-0 text-base font-medium text-f-300"
+          triggerContainerClassName="py-0 text-base font-medium text-muted-foreground"
         >
           <div className="pt-2">
             <div className="flex flex-col gap-4 border-l-2 pt-3 pl-4">
               {props.links.map((info) => {
                 return (
                   <NavLink
+                    href={info.href}
+                    icon={info.icon}
                     key={info.name}
                     name={info.name}
-                    href={info.href}
                     onClick={props.onLinkClick}
-                    icon={info.icon}
                   />
                 );
               })}
@@ -327,29 +402,27 @@ function NavLink(props: {
   href: string;
   name: string;
   onClick?: () => void;
-  icon?: string;
+  icon?: React.FC<{ className?: string }>;
+  className?: string;
 }) {
   const pathname = usePathname();
   return (
     <Link
+      className={clsx(
+        "font-medium text-base transition-colors hover:text-foreground xl:text-sm",
+        pathname?.startsWith(props.href)
+          ? "text-foreground"
+          : "text-muted-foreground",
+        props.icon ? "flex flex-row gap-3" : "",
+        props.className,
+      )}
       href={props.href}
       onClick={props.onClick}
       target={props.href.startsWith("http") ? "_blank" : ""}
-      className={clsx(
-        "font-medium text-base transition-colors hover:text-f-100 xl:text-sm",
-        pathname === props.href ? "text-f-100" : "text-f-300 ",
-        props.icon ? "flex flex-row gap-2" : "",
-      )}
     >
       {props.icon ? (
         <>
-          <Image
-            src={props.icon}
-            width="40"
-            height="40"
-            className="size-7"
-            alt=""
-          />
+          <props.icon className="size-6" />
           <span className="my-auto">{props.name}</span>
         </>
       ) : (

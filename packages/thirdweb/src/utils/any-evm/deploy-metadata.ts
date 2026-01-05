@@ -26,8 +26,8 @@ export async function fetchDeployMetadata(
   options: FetchDeployMetadataOptions,
 ): Promise<FetchDeployMetadataResult> {
   const rawMeta: RawCompilerMetadata = await download({
-    uri: options.uri,
     client: options.client,
+    uri: options.uri,
   }).then((r) => r.json());
 
   const metadataUri = rawMeta.metadataUri;
@@ -39,8 +39,8 @@ export async function fetchDeployMetadata(
   return {
     ...rawMeta,
     ...parsedMeta,
-    version: rawMeta.version,
     name: rawMeta.name,
+    version: rawMeta.version,
   };
 }
 
@@ -89,14 +89,14 @@ export async function fetchBytecodeFromCompilerMetadata(options: {
         );
       }
       const deployBytecode = await download({
-        uri: bytecodeUri,
         client,
+        uri: bytecodeUri,
       }).then((res) => res.text() as Promise<Hex>);
 
       return deployBytecode;
     },
     {
-      cacheKey: `bytecode:${compilerMetadata.name}:${chain.id}`,
+      cacheKey: `bytecode:${compilerMetadata.name}:${compilerMetadata.publisher}:${compilerMetadata.version}:${chain.id}`,
       cacheTime: 24 * 60 * 60 * 1000,
     },
   );
@@ -253,7 +253,7 @@ export type ExtendedMetadata = {
   >;
   compositeAbi?: Abi;
   compilers?: Record<
-    "solc" | "zksolc",
+    "solc" | "zksolc" | "stylus",
     {
       evmVersion: string;
       compilerVersion: string;

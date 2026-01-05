@@ -1,49 +1,42 @@
 "use client";
 
 import {
+  keepPreviousData,
   QueryClient,
   QueryClientProvider,
-  keepPreviousData,
   useQuery,
 } from "@tanstack/react-query";
-
-import { useEffect, useRef, useState } from "react";
-import { Button } from "../ui/button";
-
-import type { SearchResult } from "@/app/api/search/types";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-import { cn } from "@/lib/utils";
-import {
-  Command as CommandIcon,
-  FileText as FileTextIcon,
-  Search as SearchIcon,
-} from "lucide-react";
+import { CommandIcon, FileTextIcon, SearchIcon } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Spinner } from "../ui/Spinner/Spinner";
-import { Input } from "../ui/input";
+import { useEffect, useRef, useState } from "react";
+import type { SearchResult } from "@/app/api/search/types";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/Spinner";
+import { cn } from "@/lib/utils";
 import { DynamicHeight } from "./DynamicHeight";
 
 const suggestedLinks: { title: string; href: string }[] = [
   {
-    title: "TypeScript SDK",
     href: "/typescript/v5",
+    title: "TypeScript SDK",
   },
   {
-    title: "Connect",
-    href: "/connect",
+    href: "/wallets",
+    title: "Wallets",
   },
   {
-    title: "Contracts",
     href: "/contracts",
+    title: "Contracts",
   },
   {
-    title: "Engine",
-    href: "/engine",
+    href: "/transactions",
+    title: "Transactions",
   },
   {
-    title: "Payments",
     href: "/payments",
+    title: "Payments",
   },
 ];
 
@@ -53,7 +46,7 @@ type Tag =
   | "Unity"
   | "TypeScript"
   | "Wallet SDK"
-  | "Connect"
+  | "Wallets"
   | "Reference"
   | "Python"
   | "Contracts"
@@ -63,22 +56,12 @@ type Tag =
   | "Solidity"
   | "Payments"
   | "Glossary"
-  | "Engine";
+  | "Engine"
+  | "Transactions";
 
 function SearchModalContent(props: { closeModal: () => void }) {
   const [input, setInput] = useState("");
   const debouncedInput = useDebounce(input, 500);
-  const pathname = usePathname();
-
-  const [showOldSDK, setShowOldSDK] = useState(false);
-
-  useEffect(() => {
-    if (isOldSDK(pathname)) {
-      setShowOldSDK(true);
-    } else {
-      setShowOldSDK(false);
-    }
-  }, [pathname]);
 
   const [selectedTags, setSelectedTags] = useState<{
     [T in Tag]?: boolean;
@@ -88,26 +71,11 @@ function SearchModalContent(props: { closeModal: () => void }) {
   const scrollableElement = useRef<HTMLDivElement | null>(null);
 
   const searchQuery = useQuery({
-    queryKey: ["search-index", debouncedInput],
+    enabled: debouncedInput.length > 0,
+    placeholderData: keepPreviousData,
     queryFn: async () => {
       const res = await fetch(`/api/search?q=${encodeURI(debouncedInput)}`);
-      const { results: _results } = (await res.json()) as SearchResult;
-
-      const results = _results.filter((x) => {
-        const isOld = isOldSDK(x.pageHref);
-
-        // filter out old SDKs if should not be shown
-        if (isOld && !showOldSDK) {
-          return false;
-        }
-
-        // filter out new SDKs if should not be shown
-        if (!isOld && showOldSDK) {
-          return false;
-        }
-
-        return true;
-      });
+      const { results } = (await res.json()) as SearchResult;
 
       const tagsSet: Set<Tag> = new Set([]);
 
@@ -136,8 +104,7 @@ function SearchModalContent(props: { closeModal: () => void }) {
 
       return results;
     },
-    enabled: debouncedInput.length > 0,
-    placeholderData: keepPreviousData,
+    queryKey: ["search-index", debouncedInput],
   });
 
   const data = searchQuery.data;
@@ -155,10 +122,14 @@ function SearchModalContent(props: { closeModal: () => void }) {
         {searchQuery.isFetching ? (
           <Spinner className="size-5" />
         ) : (
-          <SearchIcon className="size-5 shrink-0 text-f-300" />
+          <SearchIcon className="size-5 shrink-0 text-muted-foreground" />
         )}
 
         <Input
+          className={cn(
+            "h-auto flex-1 border-none bg-transparent p-4 px-0 text-base placeholder:text-base placeholder:text-muted-foreground",
+            "focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-transparent",
+          )}
           onChange={(e) => {
             setInput(e.target.value);
           }}
@@ -167,11 +138,7 @@ function SearchModalContent(props: { closeModal: () => void }) {
               e.target.blur();
             }
           }}
-          placeholder="Search documentation"
-          className={cn(
-            "flex-1 border-none bg-transparent p-4 px-0 text-base caret-accent-500 placeholder:text-base placeholder:text-f-300",
-            "focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-transparent",
-          )}
+          placeholder="Search docs"
         />
       </div>
 
@@ -179,17 +146,16 @@ function SearchModalContent(props: { closeModal: () => void }) {
         <div className="min-h-[200px]">
           {/* tags */}
           {enabledTags && enabledTags.length > 0 && (
-            <div className="flex flex-wrap gap-2 border-b p-4">
+            <div className="flex flex-wrap gap-2 border-b p-4 bg-card/50">
               {enabledTags.map((tag) => (
                 <Button
-                  variant="ghost"
-                  key={tag}
                   className={cn(
-                    "rounded-lg border px-3 py-1 text-sm ",
+                    "rounded-lg border px-2.5 py-1.5 text-xs h-auto",
                     selectedTags[tag]
-                      ? "!bg-b-600 !text-f-100 border-f-300"
-                      : "!bg-b-800 !text-f-300",
+                      ? "!bg-muted !text-foreground border-foreground"
+                      : "!bg-card !text-muted-foreground",
                   )}
+                  key={tag}
                   onClick={() => {
                     // do not allow removing the last remaining tag
                     const enabledTags = Object.keys(selectedTags).filter(
@@ -222,6 +188,7 @@ function SearchModalContent(props: { closeModal: () => void }) {
                       };
                     });
                   }}
+                  variant="ghost"
                 >
                   {tag}
                 </Button>
@@ -232,7 +199,7 @@ function SearchModalContent(props: { closeModal: () => void }) {
           {/* links */}
           {data && data.length > 0 && (
             <div
-              className="styled-scrollbar flex max-h-[50vh] min-h-[200px] flex-col gap-2 overflow-y-auto p-4"
+              className="styled-scrollbar flex max-h-[50vh] min-h-[200px] flex-col gap-1 overflow-y-auto p-2"
               ref={scrollableElement}
             >
               {data.map((result) => {
@@ -254,33 +221,35 @@ function SearchModalContent(props: { closeModal: () => void }) {
                   .slice(0, 2);
 
                 return (
-                  <div key={result.pageHref} className="flex flex-col gap-2">
+                  <div className="flex flex-col gap-1" key={result.pageHref}>
                     <SearchResultItem
-                      type="page"
                       href={result.pageHref}
-                      title={result.pageTitle}
-                      tags={tags}
                       onClick={handleLinkClick}
+                      tags={tags}
+                      title={result.pageTitle}
+                      type="page"
                     />
 
                     {sections && sections.length > 0 && (
-                      <div className="flex flex-col gap-2 border-l pl-3">
-                        {sections.map((sectionData) => {
-                          return (
-                            <SearchResultItem
-                              type="section"
-                              href={result.pageHref + sectionData.href}
-                              key={sectionData.href}
-                              title={sectionData.title}
-                              content={
-                                sectionData.content.length < 100
-                                  ? sectionData.content
-                                  : `${sectionData.content.slice(0, 100)} ...`
-                              }
-                              onClick={handleLinkClick}
-                            />
-                          );
-                        })}
+                      <div className="pl-4">
+                        <div className="flex flex-col gap-1 border-l pl-3 border-dashed">
+                          {sections.map((sectionData) => {
+                            return (
+                              <SearchResultItem
+                                content={
+                                  sectionData.content.length < 100
+                                    ? sectionData.content
+                                    : `${sectionData.content.slice(0, 100)} ...`
+                                }
+                                href={result.pageHref + sectionData.href}
+                                key={sectionData.href}
+                                onClick={handleLinkClick}
+                                title={sectionData.title}
+                                type="section"
+                              />
+                            );
+                          })}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -307,15 +276,15 @@ function SearchModalContent(props: { closeModal: () => void }) {
 
 function NoSearchLinks(props: { onClick?: () => void }) {
   return (
-    <div className="flex flex-col gap-2 p-4">
+    <div className="flex flex-col gap-1 p-2">
       {suggestedLinks.map((link) => {
         return (
           <SearchResultItem
-            type="page"
             href={link.href}
-            title={link.title}
             key={link.href}
             onClick={props.onClick}
+            title={link.title}
+            type="page"
           />
         );
       })}
@@ -382,17 +351,17 @@ export function DocSearch(props: { variant: "icon" | "search" }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog onOpenChange={setOpen} open={open}>
         {/* Desktop */}
 
         {forDesktop && (
           <DialogTrigger asChild>
             <Button
+              className="flex w-64 justify-between gap-6 px-4 text-muted-foreground bg-background rounded-xl"
               variant="outline"
-              className="flex w-56 justify-between px-3"
             >
-              Search Docs
-              <div className="flex items-center gap-1 rounded-sm border bg-b-900 px-2 py-1 text-f-300 text-xs">
+              <span className="text-sm font-normal">Search Docs</span>
+              <div className="flex items-center gap-1 rounded-sm p-1 text-muted-foreground text-xs">
                 <CommandIcon className="size-3" />K
               </div>
             </Button>
@@ -401,13 +370,13 @@ export function DocSearch(props: { variant: "icon" | "search" }) {
 
         {!forDesktop && (
           <DialogTrigger asChild>
-            <Button variant="ghost" className="px-3">
-              <SearchIcon className="size-6 text-f-100" />
+            <Button className="px-3" variant="ghost">
+              <SearchIcon className="size-6 text-foreground" />
             </Button>
           </DialogTrigger>
         )}
 
-        <DialogContent className="bg-b-900 sm:max-w-[550px]">
+        <DialogContent className="bg-background sm:max-w-[550px] rounded-xl">
           <SearchModalContent
             closeModal={() => {
               setOpen(false);
@@ -419,22 +388,6 @@ export function DocSearch(props: { variant: "icon" | "search" }) {
   );
 }
 
-function isOldSDK(href: string) {
-  return (
-    href.includes("/react-native/v0") ||
-    href.includes("/typescript/v4") ||
-    href.includes("/react/v4") ||
-    href.includes("/wallet-sdk/v2") ||
-    href.includes("/wallets/v2") ||
-    href.includes("/storage-sdk/v2") ||
-    href.includes("/storage/v2")
-  );
-}
-
-// function isNewSDK(href: string) {
-// 	return href.includes("/typescript/v5");
-// }
-
 function getTagsFromHref(href: string): Tag[] | undefined {
   if (href.includes("/react-native/v0")) {
     if (href.includes("/references")) {
@@ -442,24 +395,14 @@ function getTagsFromHref(href: string): Tag[] | undefined {
     }
     return ["React Native"];
   }
-  if (href.includes("/react/v4")) {
-    if (href.includes("/references")) {
-      return ["Reference", "React"];
-    }
-    return ["React"];
-  }
+
   if (href.includes("/typescript/v4")) {
     if (href.includes("/references")) {
       return ["Reference", "TypeScript"];
     }
     return ["TypeScript"];
   }
-  if (href.includes("/wallet-sdk/v2")) {
-    if (href.includes("/references")) {
-      return ["Reference", "Wallet SDK"];
-    }
-    return ["Wallet SDK"];
-  }
+
   if (href.includes("/unity")) {
     return ["Unity"];
   }
@@ -472,11 +415,14 @@ function getTagsFromHref(href: string): Tag[] | undefined {
   if (href.includes("/react/v5")) {
     return ["React"];
   }
-  if (href.includes("/connect")) {
-    return ["Connect"];
+  if (href.includes("/wallets")) {
+    return ["Wallets"];
   }
   if (href.includes("/engine")) {
     return ["Engine"];
+  }
+  if (href.includes("/transactions")) {
+    return ["Transactions"];
   }
   if (href.includes("/infrastructure")) {
     return ["Infra"];
@@ -505,21 +451,23 @@ function SearchResultItem(props: {
 }) {
   return (
     <Link
-      className="flex gap-3 rounded-sm bg-b-700 px-4 py-3 text-f-300 transition-colors hover:bg-b-600 hover:text-f-100"
+      className="flex gap-3 rounded-lg px-3 py-2.5 text-muted-foreground transition-colors hover:bg-accent/50"
       href={props.href}
       onClick={props.onClick}
     >
       <div className="flex w-full flex-col gap-1">
         {props.title && (
-          <div className="flex flex-wrap items-center justify-between gap-2 break-all text-base text-f-100">
+          <div className="flex flex-wrap items-center justify-between gap-2 break-all text-sm text-foreground">
             <div
               className={cn(
                 "flex items-center gap-2",
-                props.type === "page" ? "text-f-100" : "text-f-200",
+                props.type === "page"
+                  ? "text-foreground"
+                  : "text-muted-foreground",
               )}
             >
               {props.type === "page" && (
-                <FileTextIcon className="size-5 text-f-300" />
+                <FileTextIcon className="size-4 text-muted-foreground/70" />
               )}
 
               {props.title}
@@ -530,10 +478,10 @@ function SearchResultItem(props: {
                 {props.tags.map((tag) => {
                   return (
                     <span
-                      key={tag}
                       className={cn(
-                        "shrink-0 rounded-lg border bg-b-700 px-1.5 py-1 text-f-300 text-xs",
+                        "shrink-0 rounded-lg border border-border/50 bg-muted/50 px-1.5 py-1 text-muted-foreground text-xs",
                       )}
+                      key={tag}
                     >
                       {tag}
                     </span>
@@ -543,29 +491,8 @@ function SearchResultItem(props: {
             )}
           </div>
         )}
-        {props.content && <div className="text-sm">{props.content}</div>}
+        {props.content && <div className="text-xs">{props.content}</div>}
       </div>
     </Link>
   );
 }
-
-// const HighlightMatches = memo(function _HighlightMatches(props: {
-// 	value: string;
-// 	match: string;
-// }) {
-// 	const tokens = getMatches(props);
-// 	return (
-// 		<div>
-// 			{tokens.map((t) => {
-// 				return (
-// 					<span
-// 						key={t.text}
-// 						className={t.highlight ? "bg-b-700 text-f-100" : "text-f-300"}
-// 					>
-// 						{t.text}
-// 					</span>
-// 				);
-// 			})}
-// 		</div>
-// 	);
-// });

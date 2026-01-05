@@ -1,11 +1,16 @@
 "use client";
 
-import { THIRDWEB_CLIENT } from "@/lib/client";
 import { useTheme } from "next-themes";
 import {
+  abstract,
+  arbitrum,
   arbitrumSepolia,
+  base,
   baseSepolia,
+  ethereum,
+  optimism,
   optimismSepolia,
+  polygon,
   polygonAmoy,
   sepolia,
 } from "thirdweb/chains";
@@ -14,6 +19,7 @@ import {
   type ConnectEmbedProps,
   useActiveAccount,
 } from "thirdweb/react";
+import { THIRDWEB_CLIENT } from "@/lib/client";
 import { WALLETS } from "../lib/constants";
 import { StyledConnectButton } from "./styled-connect-button";
 
@@ -30,15 +36,21 @@ export function StyledConnectEmbed(
   ) : (
     <ConnectEmbed
       chains={[
+        base,
+        ethereum,
+        polygon,
+        optimism,
+        arbitrum,
         sepolia,
         baseSepolia,
         optimismSepolia,
         polygonAmoy,
         arbitrumSepolia,
+        abstract,
       ]}
-      wallets={WALLETS}
       client={THIRDWEB_CLIENT}
       theme={theme === "light" ? "light" : "dark"}
+      wallets={WALLETS}
       {...props}
     />
   );

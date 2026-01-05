@@ -1,19 +1,14 @@
-import type { Hash } from "viem";
+import { Value } from "ox";
+import * as ox__AbiFunction from "ox/AbiFunction";
+import { Transfer } from "../../bridge/index.js";
 import { getCachedChain } from "../../chains/utils.js";
 import type { ThirdwebClient } from "../../client/client.js";
+import { NATIVE_TOKEN_ADDRESS } from "../../constants/addresses.js";
 import { getContract } from "../../contract/contract.js";
-import { approve } from "../../extensions/erc20/write/approve.js";
+import { decimals } from "../../extensions/erc20/read/decimals.js";
 import type { PrepareTransactionOptions } from "../../transaction/prepare-transaction.js";
-import type { Address } from "../../utils/address.js";
-import { getClientFetch } from "../../utils/fetch.js";
-import { stringify } from "../../utils/json.js";
-import { getPayBuyWithCryptoTransferEndpoint } from "../utils/definitions.js";
-import type {
-  QuoteApprovalInfo,
-  QuotePaymentToken,
-  QuoteTokenInfo,
-  QuoteTransactionRequest,
-} from "./commonTypes.js";
+import type { PurchaseData } from "../types.js";
+import type { QuoteApprovalInfo, QuotePaymentToken } from "./commonTypes.js";
 
 /**
  * The parameters for [`getBuyWithCryptoTransfer`](https://portal.thirdweb.com/references/typescript/v5/getBuyWithCryptoTransfer) function
@@ -60,22 +55,17 @@ export type GetBuyWithCryptoTransferParams = {
    *
    * This details will be stored with the purchase and can be retrieved later via the status API or Webhook
    */
-  purchaseData?: object;
-};
+  purchaseData?: PurchaseData;
 
-/**
- * @buyCrypto
- */
-type BuyWithCryptoTransferResponse = {
-  quoteId: string;
-  transactionRequest: QuoteTransactionRequest;
-  approval?: QuoteApprovalInfo;
-  fromAddress: string;
-  toAddress: string;
-  token: QuoteTokenInfo;
-  paymentToken: QuotePaymentToken;
-  processingFee: QuotePaymentToken;
-  estimatedGasCostUSDCents: number;
+  /**
+   * For direct transfers, specify who will pay for the transfer fee. Can be "sender" or "receiver".
+   */
+  feePayer?: "sender" | "receiver";
+
+  /**
+   * @hidden
+   */
+  paymentLinkId?: string;
 };
 
 /**
@@ -83,7 +73,7 @@ type BuyWithCryptoTransferResponse = {
  */
 export type BuyWithCryptoTransfer = {
   transactionRequest: PrepareTransactionOptions;
-  approval?: PrepareTransactionOptions;
+  approvalData?: QuoteApprovalInfo;
   fromAddress: string;
   toAddress: string;
   paymentToken: QuotePaymentToken;
@@ -116,66 +106,147 @@ export type BuyWithCryptoTransfer = {
  *  }
  * });
  * ```
+ * @deprecated
  * @buyCrypto
  */
 export async function getBuyWithCryptoTransfer(
   params: GetBuyWithCryptoTransferParams,
 ): Promise<BuyWithCryptoTransfer> {
   try {
-    const clientFetch = getClientFetch(params.client);
-
-    const response = await clientFetch(getPayBuyWithCryptoTransferEndpoint(), {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      body: stringify({
-        fromAddress: params.fromAddress,
-        toAddress: params.toAddress,
-        chainId: params.chainId,
-        tokenAddress: params.tokenAddress,
-        amount: params.amount,
-        purchaseData: params.purchaseData,
-      }),
+    const tokenContract = getContract({
+      address: params.tokenAddress,
+      chain: getCachedChain(params.chainId),
+      client: params.client,
+    });
+    const tokenDecimals =
+      tokenContract.address.toLowerCase() === NATIVE_TOKEN_ADDRESS
+        ? 18
+        : await decimals({
+            contract: tokenContract,
+          });
+    const amount = Value.from(params.amount, tokenDecimals);
+    const quote = await Transfer.prepare({
+      amount,
+      chainId: params.chainId,
+      client: params.client,
+      feePayer: params.feePayer,
+      paymentLinkId: params.paymentLinkId,
+      purchaseData: params.purchaseData,
+      receiver: params.toAddress,
+      sender: params.fromAddress,
+      tokenAddress: params.tokenAddress,
     });
 
-    if (!response.ok) {
-      const errorObj = await response.json();
-      if (errorObj && "error" in errorObj) {
-        throw errorObj;
-      }
-      throw new Error(`HTTP error! status: ${response.status}`);
+    const firstStep = quote.steps[0];
+    if (!firstStep) {
+      throw new Error(
+        "This quote is incompatible with getBuyWithCryptoTransfer. Please use Bridge.Transfer.prepare instead.",
+      );
     }
 
-    const data: BuyWithCryptoTransferResponse = (await response.json()).result;
+    const approvalTxs = firstStep.transactions.filter(
+      (tx) => tx.action === "approval",
+    );
+    if (approvalTxs.length > 1) {
+      throw new Error(
+        "This quote is incompatible with getBuyWithCryptoTransfer. Please use Bridge.Transfer.prepare instead.",
+      );
+    }
+    const approvalTx = approvalTxs[0];
+
+    let approvalData: QuoteApprovalInfo | undefined;
+    if (approvalTx) {
+      const abiFunction = ox__AbiFunction.from([
+        "function approve(address spender, uint256 amount)",
+      ]);
+      const [spender, amount] = ox__AbiFunction.decodeData(
+        abiFunction,
+        approvalTx.data,
+      );
+      approvalData = {
+        amountWei: amount.toString(),
+        chainId: firstStep.originToken.chainId,
+        spenderAddress: spender,
+        tokenAddress: firstStep.originToken.address,
+      };
+    }
+
+    const txs = firstStep.transactions.filter((tx) => tx.action !== "approval");
+    if (txs.length > 1) {
+      throw new Error(
+        "This quote is incompatible with getBuyWithCryptoTransfer. Please use Bridge.Transfer.prepare instead.",
+      );
+    }
+    const tx = txs[0];
+    if (!tx) {
+      throw new Error(
+        "This quote is incompatible with getBuyWithCryptoTransfer. Please use Bridge.Transfer.prepare instead.",
+      );
+    }
 
     const transfer: BuyWithCryptoTransfer = {
-      transactionRequest: {
-        chain: getCachedChain(data.transactionRequest.chainId),
-        client: params.client,
-        data: data.transactionRequest.data as Hash,
-        to: data.transactionRequest.to as Address,
-        value: BigInt(data.transactionRequest.value),
-        gas: BigInt(data.transactionRequest.gasLimit),
-      },
-      approval: data.approval
-        ? approve({
-            contract: getContract({
-              client: params.client,
-              address: data.approval.tokenAddress,
-              chain: getCachedChain(data.approval.chainId),
-            }),
-            spender: data.approval.spenderAddress as Address,
-            amountWei: BigInt(data.approval.amountWei),
-          })
-        : undefined,
-      fromAddress: data.fromAddress,
-      toAddress: data.toAddress,
-      paymentToken: data.paymentToken,
-      processingFee: data.processingFee,
-      estimatedGasCostUSDCents: data.estimatedGasCostUSDCents,
+      approvalData,
       client: params.client,
+      estimatedGasCostUSDCents: 0,
+      fromAddress: params.fromAddress,
+      paymentToken: {
+        amount: Value.format(
+          quote.originAmount,
+          firstStep.originToken.decimals,
+        ).toString(),
+        amountUSDCents:
+          Number(
+            Value.format(quote.originAmount, firstStep.originToken.decimals),
+          ) *
+          (firstStep.originToken.prices.USD || 0) *
+          100,
+        amountWei: quote.originAmount.toString(),
+        token: {
+          chainId: firstStep.originToken.chainId,
+          decimals: firstStep.originToken.decimals,
+          name: firstStep.originToken.name,
+          priceUSDCents: (firstStep.originToken.prices.USD || 0) * 100,
+          symbol: firstStep.originToken.symbol,
+          tokenAddress: firstStep.originToken.address,
+        },
+      },
+      processingFee: {
+        amount:
+          params.feePayer === "sender"
+            ? Value.format(
+                quote.originAmount - quote.destinationAmount,
+                firstStep.originToken.decimals,
+              ).toString()
+            : "0",
+        amountUSDCents:
+          params.feePayer === "sender"
+            ? Number(
+                Value.format(
+                  quote.originAmount - quote.destinationAmount,
+                  firstStep.originToken.decimals,
+                ),
+              ) *
+              (firstStep.originToken.prices.USD || 0) *
+              100
+            : 0,
+        amountWei:
+          params.feePayer === "sender"
+            ? (quote.originAmount - quote.destinationAmount).toString()
+            : "0",
+        token: {
+          chainId: firstStep.originToken.chainId,
+          decimals: firstStep.originToken.decimals,
+          name: firstStep.originToken.name,
+          priceUSDCents: (firstStep.originToken.prices.USD || 0) * 100,
+          symbol: firstStep.originToken.symbol,
+          tokenAddress: firstStep.originToken.address,
+        },
+      },
+      toAddress: params.toAddress,
+      transactionRequest: {
+        ...tx,
+        extraGas: 50000n, // extra gas buffer
+      },
     };
 
     return transfer;

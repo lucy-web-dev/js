@@ -1,15 +1,15 @@
 "use client";
 
-import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { cn } from "@/lib/utils";
 
 /**
  * Automatically query all the heading anchors inside the <main> and creates a table of contents
  */
 
-export type TableOfContentNode = {
+type TableOfContentNode = {
   name: string;
   href: string;
   level: number;
@@ -60,6 +60,8 @@ export function TableOfContentsSideBar(props: {
       return;
     }
 
+    setHideNav(false);
+
     // when heading's intersection changes, update corresponding link's data-active attribute to true/false
     const observer = new IntersectionObserver(
       (entries) => {
@@ -99,9 +101,9 @@ export function TableOfContentsSideBar(props: {
       }
 
       anchorNodes.push({
-        name: heading?.textContent || "",
         href: anchorEl.getAttribute("href") || "",
         level: Number.parseInt(heading?.tagName.slice(1) || "6"),
+        name: heading?.textContent || "",
       });
     }
 
@@ -111,31 +113,39 @@ export function TableOfContentsSideBar(props: {
     };
   }, [filterHeading, pathname]);
 
+  if (nodes.length === 0) {
+    return null;
+  }
+
   return (
     <nav
       className={cn(
-        "hrink-0 hidden pt-6 text-sm xl:block",
+        "shrink-0 hidden pt-6 text-sm xl:block animate-in fade-in-0",
         "styled-scrollbar sticky top-sticky-top-height h-sidebar-height flex-col overflow-y-auto",
       )}
       style={{
         visibility: hideNav ? "hidden" : "visible",
       }}
     >
-      <div className="mb-5 font-semibold text-base">On this page</div>
-      <div
-        ref={tocRef}
-        style={{
-          opacity: nodes.length > 0 ? 1 : 0,
-          transition: "opacity 0.5s ease",
-        }}
-      >
-        <TableOfContents nodes={nodes} linkClassName={props.linkClassName} />
+      <div className="text-sm">
+        <div className="font-medium mb-4 text-foreground text-base">
+          On this page
+        </div>
+        <div
+          ref={tocRef}
+          style={{
+            opacity: nodes.length > 0 ? 1 : 0,
+            transition: "opacity 0.5s ease",
+          }}
+        >
+          <TableOfContents linkClassName={props.linkClassName} nodes={nodes} />
+        </div>
       </div>
     </nav>
   );
 }
 
-export function TableOfContents(props: {
+function TableOfContents(props: {
   nodes: TableOfContentNode[];
   linkClassName?: string;
 }) {
@@ -145,9 +155,9 @@ export function TableOfContents(props: {
         if (node.children.length > 0) {
           return (
             <li key={node.href}>
-              <TOCLink name={node.name} href={node.href} />
+              <TOCLink href={node.href} name={node.name} />
               <div className="pt-3 pl-3">
-                <TableOfContents nodes={node.children} key={node.href} />
+                <TableOfContents key={node.href} nodes={node.children} />
               </div>
             </li>
           );
@@ -156,9 +166,9 @@ export function TableOfContents(props: {
         return (
           <li key={node.href}>
             <TOCLink
-              name={node.name}
               href={node.href}
               linkClassName={props.linkClassName}
+              name={node.name}
             />
           </li>
         );
@@ -175,7 +185,7 @@ function TOCLink(props: {
   return (
     <Link
       className={cn(
-        "block overflow-hidden text-ellipsis font-medium text-f-300 transition-colors hover:text-f-100 data-[active='true']:text-accent-500",
+        "block overflow-hidden text-ellipsis text-muted-foreground transition-colors hover:text-foreground data-[active='true']:text-foreground",
         props.linkClassName,
       )}
       href={props.href}

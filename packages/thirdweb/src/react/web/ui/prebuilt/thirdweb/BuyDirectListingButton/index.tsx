@@ -8,8 +8,8 @@ import { getListing } from "../../../../../../extensions/marketplace/direct-list
 import type { BaseTransactionOptions } from "../../../../../../transaction/types.js";
 import { useReadContract } from "../../../../../core/hooks/contract/useReadContract.js";
 import type { TransactionButtonProps } from "../../../../../core/hooks/transaction/transaction-button-utils.js";
-import { useSendAndConfirmTransaction } from "../../../../../core/hooks/transaction/useSendAndConfirmTransaction.js";
 import { useActiveAccount } from "../../../../../core/hooks/wallets/useActiveAccount.js";
+import { useSendAndConfirmTransaction } from "../../../../hooks/transaction/useSendAndConfirmTransaction.js";
 import { TransactionButton } from "../../../TransactionButton/index.js";
 
 export type BuyDirectListingButtonProps = Omit<
@@ -57,10 +57,7 @@ export type BuyDirectListingButtonProps = Omit<
  * Since it uses the TransactionButton, it can take in any props that can be passed
  * to the [`TransactionButton`](https://portal.thirdweb.com/references/typescript/v5/TransactionButton)
  *
- *
- * @param props
- * @returns <TransactionButton />
- *
+ * @param props props of type [BuyDirectListingButtonProps](https://portal.thirdweb.com/references/typescript/v5/BuyDirectListingButtonProps)
  * @example
  * ```tsx
  * import { BuyDirectListingButton } from "thirdweb/react";
@@ -95,8 +92,8 @@ export function BuyDirectListingButton(props: BuyDirectListingButtonProps) {
   const account = useActiveAccount();
   const contract = getContract({
     address: contractAddress,
-    client,
     chain,
+    client,
   });
 
   const { data: payMetadata } = useReadContract(getPayMetadata, {
@@ -107,7 +104,15 @@ export function BuyDirectListingButton(props: BuyDirectListingButtonProps) {
     },
   });
 
-  const { mutateAsync } = useSendAndConfirmTransaction();
+  const { mutateAsync } = useSendAndConfirmTransaction({
+    payModal:
+      typeof payModal === "object"
+        ? {
+            ...payModal,
+            metadata: payModal.metadata || payMetadata,
+          }
+        : payModal,
+  });
 
   const prepareBuyTransaction = useCallback(async () => {
     if (!account) {
@@ -161,8 +166,8 @@ export function BuyDirectListingButton(props: BuyDirectListingButtonProps) {
     });
 
     const approveTx = await getApprovalForTransaction({
-      transaction: buyTx,
       account,
+      transaction: buyTx,
     });
 
     if (approveTx) {
@@ -194,10 +199,10 @@ async function getPayMetadata(
 ): Promise<{ name?: string; image?: string }> {
   const listing = await getListing(options);
   if (!listing) {
-    return { name: undefined, image: undefined };
+    return { image: undefined, name: undefined };
   }
   return {
-    name: listing.asset?.metadata?.name,
     image: listing.asset?.metadata?.image,
+    name: listing.asset?.metadata?.name,
   };
 }

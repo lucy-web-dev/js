@@ -1,11 +1,12 @@
 import { maxUint256, padHex } from "viem";
 import {
-  ZERO_ADDRESS,
   isNativeTokenAddress,
+  ZERO_ADDRESS,
 } from "../../../constants/addresses.js";
 import type { ThirdwebContract } from "../../../contract/contract.js";
 import { getContractMetadata } from "../../../extensions/common/read/getContractMetadata.js";
 import type { Hex } from "../../encoding/hex.js";
+import { isRecord } from "../../type-guards.js";
 import type { ClaimCondition, OverrideProof } from "./types.js";
 
 export type GetClaimParamsOptions = {
@@ -32,7 +33,6 @@ export type GetClaimParamsOptions = {
  * Get the claim parameters for a given drop
  * @param options - The options for getting the claim parameters
  * @returns The claim parameters
- * @extension ERC1155
  * @example
  * ```ts
  * import { getClaimParams } from "thirdweb/utils";
@@ -45,21 +45,12 @@ export type GetClaimParamsOptions = {
  *  tokenId: 0n,
  * });
  * ```
- * @extension COMMON
+ * @utils
  */
 export async function getClaimParams(options: GetClaimParamsOptions) {
   const cc: ClaimCondition = await (async () => {
     if (options.type === "erc1155") {
       // lazy-load the getActiveClaimCondition function
-      if (options.singlePhaseDrop) {
-        const { claimCondition } = await import(
-          "../../../extensions/erc1155/__generated__/IDropSinglePhase1155/read/claimCondition.js"
-        );
-        return await claimCondition({
-          contract: options.contract,
-          tokenId: options.tokenId,
-        });
-      }
       const { getActiveClaimCondition } = await import(
         "../../../extensions/erc1155/drops/read/getActiveClaimCondition.js"
       );
@@ -114,9 +105,9 @@ export async function getClaimParams(options: GetClaimParamsOptions) {
     if (!cc.merkleRoot || cc.merkleRoot === padHex("0x", { size: 32 })) {
       return {
         currency: ZERO_ADDRESS,
+        pricePerToken: maxUint256,
         proof: [],
         quantityLimitPerWallet: 0n,
-        pricePerToken: maxUint256,
       } satisfies OverrideProof;
     }
     // lazy-load the fetchProofsForClaimer function if we need it
@@ -128,21 +119,22 @@ export async function getClaimParams(options: GetClaimParamsOptions) {
     const metadata = await getContractMetadata({
       contract: options.contract,
     });
-    const merkleData: Record<string, string> = metadata.merkle || {};
+
+    const merkleData = isRecord(metadata.merkle) ? metadata.merkle : {};
     const snapshotUri = merkleData[cc.merkleRoot];
 
     if (!snapshotUri) {
       return {
         currency: ZERO_ADDRESS,
+        pricePerToken: maxUint256,
         proof: [],
         quantityLimitPerWallet: 0n,
-        pricePerToken: maxUint256,
       } satisfies OverrideProof;
     }
 
     const allowListProof = await fetchProofsForClaimer({
-      contract: options.contract,
-      claimer: options.from || options.to, // receiver and claimer can be different, always prioritize the claimer for allowlists
+      claimer: options.from || options.to,
+      contract: options.contract, // receiver and claimer can be different, always prioritize the claimer for allowlists
       merkleTreeUri: snapshotUri,
       tokenDecimals,
     });
@@ -150,9 +142,9 @@ export async function getClaimParams(options: GetClaimParamsOptions) {
     if (!allowListProof) {
       return {
         currency: ZERO_ADDRESS,
+        pricePerToken: maxUint256,
         proof: [],
         quantityLimitPerWallet: 0n,
-        pricePerToken: maxUint256,
       } satisfies OverrideProof;
     }
     // otherwise return the proof
@@ -183,16 +175,16 @@ export async function getClaimParams(options: GetClaimParamsOptions) {
       : undefined;
 
   return {
-    receiver: options.to,
-    tokenId: options.type === "erc1155" ? options.tokenId : undefined,
-    quantity: options.quantity,
-    currency,
-    pricePerToken,
     allowlistProof,
+    currency,
     data: "0x" as Hex,
     overrides: {
-      value,
       erc20Value,
+      value,
     },
+    pricePerToken,
+    quantity: options.quantity,
+    receiver: options.to,
+    tokenId: options.type === "erc1155" ? options.tokenId : undefined,
   };
 }

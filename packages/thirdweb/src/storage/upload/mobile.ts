@@ -41,7 +41,7 @@ export async function uploadBatchMobile(
             "Request to upload timed out! No upload progress received in 30s",
           ),
         );
-      }, 30000);
+      }, client.config?.storage?.fetch?.requestTimeoutMs ?? 30000);
 
       xhr.upload.addEventListener("progress", (event) => {
         clearTimeout(timer);
@@ -104,7 +104,7 @@ export async function uploadBatchMobile(
           );
         }
 
-        return reject(new Error("Unknown upload error occured"));
+        return reject(new Error("Unknown upload error occurred"));
       });
 
       xhr.open("POST", `https://${getThirdwebDomains().storage}/ipfs/upload`);
@@ -122,24 +122,24 @@ export async function uploadBatchMobile(
   // assume an array of things
 
   const metadata = {
-    name: METADATA_NAME,
     keyvalues: { ...options?.metadata },
+    name: METADATA_NAME,
   };
 
   const fetchBody = JSON.stringify({
-    metadata: metadata,
     content: data,
+    metadata: metadata,
   });
 
   try {
     const res = await getClientFetch(client)(
       `https://${getThirdwebDomains().storage}/ipfs/batch-pin-json`,
       {
-        method: "POST",
+        body: fetchBody,
         headers: {
           "Content-Type": "application/json",
         },
-        body: fetchBody,
+        method: "POST",
       },
     );
 
@@ -178,7 +178,7 @@ function buildFormData(
   >();
   const fileNames: string[] = [];
   for (let i = 0; i < files.length; i++) {
-    // biome-ignore lint/style/noNonNullAssertion: <explanation>
+    // biome-ignore lint/style/noNonNullAssertion: TODO
     const file = files[i]!;
     let fileName = "";
 
@@ -219,8 +219,8 @@ function buildFormData(
   }
 
   const metadata = {
-    name: METADATA_NAME,
     keyvalues: { ...options?.metadata },
+    name: METADATA_NAME,
   };
   form.append("pinataMetadata", JSON.stringify(metadata));
 
@@ -232,8 +232,8 @@ function buildFormData(
   );
 
   return {
-    form,
     // encode the file names on the way out (which is what the upload backend expects)
     fileNames: fileNames.map((fName) => encodeURIComponent(fName)),
+    form,
   };
 }

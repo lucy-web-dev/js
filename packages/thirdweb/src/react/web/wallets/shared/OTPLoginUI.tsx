@@ -12,12 +12,12 @@ import type { Wallet } from "../../../../wallets/interfaces/wallet.js";
 import { useCustomTheme } from "../../../core/design-system/CustomThemeProvider.js";
 import { fontSize } from "../../../core/design-system/index.js";
 import { setLastAuthProvider } from "../../../core/utils/storage.js";
+import { Container, Line, ModalHeader } from "../../ui/components/basic.js";
+import { Button } from "../../ui/components/buttons.js";
 import { FadeIn } from "../../ui/components/FadeIn.js";
 import { OTPInput } from "../../ui/components/OTPInput.js";
 import { Spacer } from "../../ui/components/Spacer.js";
 import { Spinner } from "../../ui/components/Spinner.js";
-import { Container, Line, ModalHeader } from "../../ui/components/basic.js";
-import { Button } from "../../ui/components/buttons.js";
 import { Text } from "../../ui/components/text.js";
 import { StyledButton } from "../../ui/design-system/elements.js";
 import type { InAppWalletLocale } from "./locale/types.js";
@@ -29,7 +29,10 @@ type VerificationStatus =
   | "valid"
   | "idle"
   | "payment_required";
-type AccountStatus = "sending" | "sent" | "error";
+type AccountStatus =
+  | { type: "sending" }
+  | { type: "sent" }
+  | { type: "error"; message: string | undefined };
 type ScreenToShow = "base" | "enter-password-or-recovery-code";
 
 /**
@@ -52,7 +55,10 @@ export function OTPLoginUI(props: {
   const [otpInput, setOtpInput] = useState("");
   const [verifyStatus, setVerifyStatus] = useState<VerificationStatus>("idle");
   const [error, setError] = useState<string | undefined>();
-  const [accountStatus, setAccountStatus] = useState<AccountStatus>("sending");
+  const [accountStatus, setAccountStatus] = useState<AccountStatus>({
+    type: "sending",
+  });
+  const [countdown, setCountdown] = useState(0);
   const ecosystem = isEcosystemWallet(wallet)
     ? {
         id: wallet.id,
@@ -65,32 +71,37 @@ export function OTPLoginUI(props: {
   const sendEmailOrSms = useCallback(async () => {
     setOtpInput("");
     setVerifyStatus("idle");
-    setAccountStatus("sending");
+    setAccountStatus({ type: "sending" });
 
     try {
       if ("email" in userInfo) {
         await preAuthenticate({
+          client: props.client,
           ecosystem,
           email: userInfo.email,
           strategy: "email",
-          client: props.client,
         });
-        setAccountStatus("sent");
+        setAccountStatus({ type: "sent" });
+        setCountdown(60); // Start 60-second countdown
       } else if ("phone" in userInfo) {
         await preAuthenticate({
+          client: props.client,
           ecosystem,
           phoneNumber: userInfo.phone,
           strategy: "phone",
-          client: props.client,
         });
-        setAccountStatus("sent");
+        setAccountStatus({ type: "sent" });
+        setCountdown(60); // Start 60-second countdown
       } else {
         throw new Error("Invalid userInfo");
       }
     } catch (e) {
       console.error(e);
       setVerifyStatus("idle");
-      setAccountStatus("error");
+      setAccountStatus({
+        type: "error",
+        message: e instanceof Error ? e.message : undefined,
+      });
     }
   }, [props.client, userInfo, ecosystem]);
 
@@ -98,19 +109,19 @@ export function OTPLoginUI(props: {
     if ("email" in userInfo) {
       await wallet.connect({
         chain: props.chain,
-        strategy: "email",
-        email: userInfo.email,
-        verificationCode: otp,
         client: props.client,
+        email: userInfo.email,
+        strategy: "email",
+        verificationCode: otp,
       });
       await setLastAuthProvider("email", webLocalStorage);
     } else if ("phone" in userInfo) {
       await wallet.connect({
         chain: props.chain,
-        strategy: "phone",
-        phoneNumber: userInfo.phone,
-        verificationCode: otp,
         client: props.client,
+        phoneNumber: userInfo.phone,
+        strategy: "phone",
+        verificationCode: otp,
       });
       await setLastAuthProvider("phone", webLocalStorage);
     } else {
@@ -122,18 +133,18 @@ export function OTPLoginUI(props: {
     if ("email" in userInfo) {
       await linkProfile({
         client: props.client,
-        strategy: "email",
-        email: userInfo.email,
-        verificationCode: otp,
         ecosystem,
+        email: userInfo.email,
+        strategy: "email",
+        verificationCode: otp,
       });
     } else if ("phone" in userInfo) {
       await linkProfile({
         client: props.client,
-        strategy: "phone",
-        phoneNumber: userInfo.phone,
-        verificationCode: otp,
         ecosystem,
+        phoneNumber: userInfo.phone,
+        strategy: "phone",
+        verificationCode: otp,
       });
     }
   }
@@ -184,22 +195,46 @@ export function OTPLoginUI(props: {
     }
   }, [sendEmailOrSms]);
 
+  // Handle countdown timer
+  useEffect(() => {
+    if (countdown <= 0) return;
+
+    const timer = setInterval(() => {
+      setCountdown((current) => {
+        if (current <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return current - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [countdown]);
+
   if (screen === "base") {
     return (
-      <Container fullHeight flex="column" animate="fadein">
+      <Container
+        animate="fadein"
+        flex="column"
+        fullHeight
+        className="tw-otp-login-screen"
+      >
         <Container p="lg">
-          <ModalHeader title={locale.signIn} onBack={goBack} />
+          <ModalHeader onBack={goBack} title={locale.signIn} />
         </Container>
 
-        <Container expand flex="column" center="y">
+        <Container center="y" expand flex="column">
           <form
             onSubmit={(e) => {
               e.preventDefault();
             }}
           >
-            <Container flex="column" center="x" px="lg">
+            <Container center="x" flex="column" px="lg">
               {!isWideModal && <Spacer y="xl" />}
-              <Text>{locale.emailLoginScreen.enterCodeSendTo}</Text>
+              <Text className="tw-screen-title">
+                {locale.emailLoginScreen.enterCodeSendTo}
+              </Text>
               <Spacer y="sm" />
               <Text color="primaryText">
                 {"email" in userInfo ? userInfo.email : userInfo.phone}
@@ -208,22 +243,27 @@ export function OTPLoginUI(props: {
             </Container>
 
             <OTPInput
-              isInvalid={verifyStatus === "invalid"}
               digits={6}
-              value={otpInput}
+              isInvalid={verifyStatus === "invalid"}
+              onEnter={() => {
+                verify(otpInput);
+              }}
               setValue={(value) => {
                 setOtpInput(value);
                 setVerifyStatus("idle"); // reset error
               }}
-              onEnter={() => {
-                verify(otpInput);
-              }}
+              value={otpInput}
             />
 
             {verifyStatus === "invalid" && (
               <FadeIn>
                 <Spacer y="md" />
-                <Text size="sm" color="danger" center>
+                <Text
+                  center
+                  color="danger"
+                  size="sm"
+                  className="tw-invalid-code-text"
+                >
                   {locale.emailLoginScreen.invalidCode}
                 </Text>
               </FadeIn>
@@ -232,7 +272,12 @@ export function OTPLoginUI(props: {
             {verifyStatus === "linking_error" && (
               <FadeIn>
                 <Spacer y="md" />
-                <Text size="sm" color="danger" center>
+                <Text
+                  center
+                  color="danger"
+                  size="sm"
+                  className="tw-screen-error"
+                >
                   {error || "Failed to verify code"}
                 </Text>
               </FadeIn>
@@ -241,7 +286,12 @@ export function OTPLoginUI(props: {
             {verifyStatus === "payment_required" && (
               <FadeIn>
                 <Spacer y="md" />
-                <Text size="sm" color="danger" center>
+                <Text
+                  center
+                  color="danger"
+                  size="sm"
+                  className="tw-screen-error"
+                >
                   {locale.maxAccountsExceeded}
                 </Text>
               </FadeIn>
@@ -251,20 +301,19 @@ export function OTPLoginUI(props: {
 
             <Container px={isWideModal ? "xxl" : "lg"}>
               {verifyStatus === "verifying" ? (
-                <>
-                  <Container flex="row" center="x" animate="fadein">
-                    <Spinner size="lg" color="accentText" />
-                  </Container>
-                </>
+                <Container animate="fadein" center="x" flex="row">
+                  <Spinner color="accentText" size="lg" />
+                </Container>
               ) : (
                 <Container animate="fadein" key="btn-container">
                   <Button
                     onClick={() => verify(otpInput)}
-                    variant="accent"
-                    type="submit"
                     style={{
                       width: "100%",
                     }}
+                    type="submit"
+                    variant="accent"
+                    className="tw-verify-button"
                   >
                     {locale.emailLoginScreen.verify}
                   </Button>
@@ -276,30 +325,50 @@ export function OTPLoginUI(props: {
 
             {!isWideModal && <Line />}
 
-            <Container p={isWideModal ? undefined : "lg"}>
-              {accountStatus === "error" && (
-                <Text size="sm" center color="danger">
-                  {locale.emailLoginScreen.failedToSendCode}
+            <Container
+              gap="sm"
+              p={isWideModal ? undefined : "lg"}
+              flex="column"
+            >
+              {accountStatus.type === "error" && (
+                <Text
+                  center
+                  color="danger"
+                  size="sm"
+                  className="tw-screen-error"
+                >
+                  {accountStatus.message ||
+                    locale.emailLoginScreen.failedToSendCode}
                 </Text>
               )}
 
-              {accountStatus === "sending" && (
+              {accountStatus.type === "sending" && (
                 <Container
-                  flex="row"
                   center="both"
+                  flex="row"
                   gap="xs"
                   style={{
                     textAlign: "center",
                   }}
                 >
                   <Text size="sm">{locale.emailLoginScreen.sendingCode}</Text>
-                  <Spinner size="xs" color="secondaryText" />
+                  <Spinner color="secondaryText" size="xs" />
                 </Container>
               )}
 
-              {accountStatus === "sent" && (
-                <LinkButton onClick={sendEmailOrSms} type="button">
-                  {locale.emailLoginScreen.resendCode}
+              {accountStatus.type !== "sending" && (
+                <LinkButton
+                  onClick={countdown === 0 ? sendEmailOrSms : undefined}
+                  style={{
+                    cursor: countdown > 0 ? "default" : "pointer",
+                    opacity: countdown > 0 ? 0.5 : 1,
+                  }}
+                  className="tw-resend-button"
+                  type="button"
+                >
+                  {countdown > 0
+                    ? `Resend code in ${countdown} seconds`
+                    : locale.emailLoginScreen.resendCode}
                 </LinkButton>
               )}
             </Container>
@@ -316,14 +385,14 @@ const LinkButton = /* @__PURE__ */ StyledButton((_) => {
   const theme = useCustomTheme();
   return {
     all: "unset",
-    color: theme.colors.accentText,
-    fontSize: fontSize.sm,
-    cursor: "pointer",
-    textAlign: "center",
-    fontWeight: 500,
-    width: "100%",
     "&:hover": {
       color: theme.colors.primaryText,
     },
+    color: theme.colors.accentText,
+    cursor: "pointer",
+    fontSize: fontSize.sm,
+    fontWeight: 500,
+    textAlign: "center",
+    width: "100%",
   };
 });

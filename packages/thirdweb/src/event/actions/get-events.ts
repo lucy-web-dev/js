@@ -1,25 +1,25 @@
-/**
- * 1. blockTime + contract (with abi) + no events -> logs with types and parsing *if* contract has abi defined
- * 2. blockTime + contract (no abi) + no events -> logs with NO types but *with* parsing
- * 3. blockTime + no contract + events -> logs with types and parsing (across all "addresses") (no contract filter)
- * 4. blockTime + contract + events -> logs with types and parsing (filtered by contract address +  event topics)
- */
-
 import type {
   Abi,
   AbiEvent,
   ExtractAbiEvent,
   ExtractAbiEventNames,
 } from "abitype";
+import { formatLog, type Log } from "viem";
 import { resolveContractAbi } from "../../contract/actions/resolve-abi.js";
 import type { ThirdwebContract } from "../../contract/contract.js";
+import {
+  type ContractEvent,
+  getContractEvents as getContractEventsInsight,
+} from "../../insight/get-events.js";
 import { eth_blockNumber } from "../../rpc/actions/eth_blockNumber.js";
 import {
+  eth_getLogs,
   type GetLogsBlockParams,
   type GetLogsParams,
-  eth_getLogs,
 } from "../../rpc/actions/eth_getLogs.js";
 import { getRpcClient } from "../../rpc/rpc.js";
+import { getAddress } from "../../utils/address.js";
+import { type Hex, numberToHex } from "../../utils/encoding/hex.js";
 import type { Prettify } from "../../utils/type-utils.js";
 import { type PreparedEvent, prepareEvent } from "../prepare-event.js";
 import { isAbiEvent } from "../utils.js";
@@ -33,6 +33,7 @@ export type GetContractEventsOptionsDirect<
   contract: ThirdwebContract<abi>;
   events?: abiEvents;
   strict?: TStrict;
+  useIndexer?: boolean;
 };
 
 export type GetContractEventsOptions<
@@ -47,6 +48,10 @@ export type GetContractEventsResult<
   abiEvents extends PreparedEvent<AbiEvent>[],
   TStrict extends boolean,
 > = ParseEventLogsResult<abiEvents, TStrict>;
+
+type GetLogsParamsExtra = {
+  signature?: string;
+} & GetLogsParams;
 
 /**
  * Retrieves events from a contract based on the provided options.
@@ -105,7 +110,13 @@ export async function getContractEvents<
 >(
   options: GetContractEventsOptions<abi, abiEvents, TStrict>,
 ): Promise<GetContractEventsResult<abiEvents, TStrict>> {
-  const { contract, events, blockRange, ...restParams } = options;
+  const {
+    contract,
+    events,
+    blockRange,
+    useIndexer = true,
+    ...restParams
+  } = options;
 
   const rpcRequest = getRpcClient(contract);
 
@@ -148,6 +159,28 @@ export async function getContractEvents<
 
   // if we have an abi on the contract, we can encode the topics with it
   if (!events?.length && !!contract) {
+    if (useIndexer) {
+      // fetch all events from the indexer, no need to get events from ABI
+      const events = await getContractEventsInsight({
+        chains: [contract.chain],
+        client: contract.client,
+        contractAddress: contract.address,
+        decodeLogs: true,
+        queryOptions: {
+          filter_block_hash: restParams.blockHash,
+          filter_block_number_gte: restParams.fromBlock,
+          filter_block_number_lte: restParams.toBlock,
+          limit: 500,
+        },
+      }).catch(() => {
+        // chain might not support indexer
+        return null;
+      });
+      if (events) {
+        return toLog(events) as GetContractEventsResult<abiEvents, TStrict>;
+      }
+    }
+
     // if we have a contract *WITH* an abi we can use that
     if (contract.abi?.length) {
       // @ts-expect-error - we can't make typescript happy here, but we know this is an abi event
@@ -163,25 +196,108 @@ export async function getContractEvents<
     }
   }
 
-  const logsParams: GetLogsParams[] =
+  const logsParams: GetLogsParamsExtra[] =
     events && events.length > 0
       ? // if we have events passed in then we use those
         events.map((e) => ({
           ...restParams,
-          address: contract?.address,
+          address: getAddress(contract.address),
           topics: e.topics,
         }))
       : // otherwise we want "all" events (aka not pass any topics at all)
-        [{ ...restParams, address: contract?.address }];
+        [{ ...restParams, address: getAddress(contract.address) }];
 
-  const logs = await Promise.all(
-    logsParams.map((ethLogParams) => eth_getLogs(rpcRequest, ethLogParams)),
-  );
+  let logs: Log[][] = [];
+
+  // try fetching from insight if available
+  if (useIndexer) {
+    try {
+      logs = await Promise.all(
+        logsParams.map((p) =>
+          getLogsFromInsight({
+            contract,
+            params: p,
+          }),
+        ),
+      );
+    } catch (e) {
+      console.warn("Error fetching from insight, falling back to rpc", e);
+      // fetch from rpc
+      logs = await Promise.all(
+        logsParams.map((ethLogParams) => eth_getLogs(rpcRequest, ethLogParams)),
+      );
+    }
+  } else {
+    // fetch from rpc
+    logs = await Promise.all(
+      logsParams.map((ethLogParams) => eth_getLogs(rpcRequest, ethLogParams)),
+    );
+  }
+
   const flattenLogs = logs
     .flat()
     .sort((a, b) => Number((a.blockNumber ?? 0n) - (b.blockNumber ?? 0n)));
   return parseEventLogs({
-    logs: flattenLogs,
     events: resolvedEvents,
+    logs: flattenLogs,
   });
+}
+
+async function getLogsFromInsight(options: {
+  params: GetLogsParamsExtra;
+  contract: ThirdwebContract<Abi>;
+}): Promise<Log[]> {
+  const { params, contract } = options;
+
+  const fromBlock =
+    typeof params.fromBlock === "bigint" ? Number(params.fromBlock) : undefined;
+
+  const toBlock =
+    typeof params.toBlock === "bigint" ? Number(params.toBlock) : undefined;
+
+  const r = await getContractEventsInsight({
+    chains: [contract.chain],
+    client: contract.client,
+    contractAddress: contract.address,
+    queryOptions: {
+      filter_block_hash: params.blockHash,
+      filter_block_number_gte: fromBlock,
+      filter_block_number_lte: toBlock,
+      filter_topic_0: params.topics?.[0] as Hex | undefined,
+      filter_topic_1: params.topics?.[1] as Hex | undefined,
+      filter_topic_2: params.topics?.[2] as Hex | undefined,
+      filter_topic_3: params.topics?.[3] as Hex | undefined,
+      limit: 500,
+    },
+  });
+
+  return toLog(r);
+}
+
+function toLog(r: ContractEvent[]) {
+  const cleanedEventData = r.map((tx) => ({
+    address: tx.address as Hex,
+    blockHash: tx.block_hash as Hex,
+    blockNumber: numberToHex(Number(tx.block_number)),
+    blockTimestamp: tx.block_timestamp,
+    chainId: tx.chain_id,
+    data: tx.data as Hex,
+    logIndex: numberToHex(tx.log_index),
+    topics: tx.topics as [`0x${string}`, ...`0x${string}`[]] | [] | undefined,
+    transactionHash: tx.transaction_hash as Hex,
+    transactionIndex: numberToHex(tx.transaction_index),
+    ...(tx.decoded
+      ? {
+          args: {
+            ...tx.decoded.indexed_params,
+            ...tx.decoded.non_indexed_params,
+          },
+          eventName: tx.decoded.name,
+        }
+      : {}),
+  }));
+
+  return cleanedEventData
+    .map((e) => formatLog(e))
+    .sort((a, b) => Number((a.blockNumber ?? 0n) - (b.blockNumber ?? 0n)));
 }

@@ -6,8 +6,11 @@ import {
   type TokenURIParams,
   tokenURI,
 } from "../__generated__/IERC721A/read/tokenURI.js";
+import { tokenByIndex } from "../__generated__/IERC721Enumerable/read/tokenByIndex.js";
 
 export { isTokenURISupported as isGetNFTSupported } from "../__generated__/IERC721A/read/tokenURI.js";
+
+import { getNFT as getNFTInsight } from "../../../insight/index.js";
 
 /**
  * Parameters for getting an NFT.
@@ -19,6 +22,18 @@ export type GetNFTParams = Prettify<
      * Whether to include the owner of the NFT.
      */
     includeOwner?: boolean;
+    /**
+     * Whether to check and fetch tokenID by index, in case of non-sequential IDs.
+     *
+     * It should be set to true if it's an ERC721Enumerable contract, and has `tokenByIndex` function.
+     * In this case, the provided tokenId will be considered as token-index and actual tokenId will be fetched from the contract.
+     */
+    tokenByIndex?: boolean;
+    /**
+     * Whether to use the insight API to fetch the NFT.
+     * @default true
+     */
+    useIndexer?: boolean;
   }
 >;
 
@@ -35,15 +50,68 @@ export type GetNFTParams = Prettify<
  *  tokenId: 1n,
  * });
  * ```
+ *
+ * * @example
+ * ```ts
+ * import { getNFT } from "thirdweb/extensions/erc721";
+ *
+ *
+ * const nft = await getNFT({
+ *  contract,
+ *  tokenId: 1n,
+ *  tokenByIndex: true // use this flag if the contract supports `tokenByIndex` and the above tokenId should be treated as an index.
+ * });
+ * ```
  */
 export async function getNFT(
   options: BaseTransactionOptions<GetNFTParams>,
 ): Promise<NFT> {
+  const { useIndexer = true } = options;
+  if (useIndexer) {
+    try {
+      return await getNFTFromInsight(options);
+    } catch {
+      return await getNFTFromRPC(options);
+    }
+  }
+  return await getNFTFromRPC(options);
+}
+
+async function getNFTFromInsight(
+  options: BaseTransactionOptions<GetNFTParams>,
+): Promise<NFT> {
+  const nft = await getNFTInsight({
+    chain: options.contract.chain,
+    client: options.contract.client,
+    contractAddress: options.contract.address,
+    includeOwners: options.includeOwner,
+    tokenId: options.tokenId,
+  });
+  if (!nft) {
+    // fresh contracts might be delayed in indexing, so we fallback to RPC
+    return getNFTFromRPC(options);
+  }
+  return nft;
+}
+
+async function getNFTFromRPC(
+  options: BaseTransactionOptions<GetNFTParams>,
+): Promise<NFT> {
+  let tokenId = options.tokenId;
+  if (options.tokenByIndex) {
+    try {
+      tokenId = await tokenByIndex({
+        contract: options.contract,
+        index: options.tokenId,
+      });
+    } catch {}
+  }
+
   const [uri, owner] = await Promise.all([
-    tokenURI(options).catch(() => null),
+    tokenURI({ contract: options.contract, tokenId }).catch(() => null),
     options.includeOwner
       ? import("../__generated__/IERC721A/read/ownerOf.js")
-          .then((m) => m.ownerOf(options))
+          .then((m) => m.ownerOf({ contract: options.contract, tokenId }))
           .catch(() => null)
       : null,
   ]);
@@ -51,15 +119,17 @@ export async function getNFT(
   if (!uri?.trim()) {
     return parseNFT(
       {
-        id: options.tokenId,
+        id: tokenId,
         type: "ERC721",
         uri: "",
       },
       {
-        tokenId: options.tokenId,
+        chainId: options.contract.chain.id,
+        owner,
+        tokenAddress: options.contract.address,
+        tokenId,
         tokenUri: "",
         type: "ERC721",
-        owner,
       },
     );
   }
@@ -67,18 +137,32 @@ export async function getNFT(
   return parseNFT(
     await fetchTokenMetadata({
       client: options.contract.client,
-      tokenId: options.tokenId,
+      tokenId,
       tokenUri: uri,
-    }).catch(() => ({
-      id: options.tokenId,
-      type: "ERC721",
-      uri,
-    })),
+    })
+      .then((metadata) => {
+        // if the metadata is null-ish, return a default metadata object
+        if (!metadata) {
+          return {
+            id: tokenId,
+            type: "ERC721",
+            uri,
+          };
+        }
+        return metadata;
+      })
+      .catch(() => ({
+        id: tokenId,
+        type: "ERC721",
+        uri,
+      })),
     {
-      tokenId: options.tokenId,
+      chainId: options.contract.chain.id,
+      owner,
+      tokenAddress: options.contract.address,
+      tokenId: tokenId,
       tokenUri: uri,
       type: "ERC721",
-      owner,
     },
   );
 }

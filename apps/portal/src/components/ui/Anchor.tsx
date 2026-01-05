@@ -1,7 +1,7 @@
 "use client";
 
+import { HashIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Link as LinkIcon } from "lucide-react";
 
 export function Anchor(props: {
   id: string;
@@ -11,7 +11,7 @@ export function Anchor(props: {
   return (
     <div
       className={cn(
-        "group/anchor flex scroll-mt-offset-top-mobile items-center gap-2 xl:scroll-mt-offset-top ",
+        "group/anchor flex scroll-mt-offset-top-mobile items-center gap-2 xl:scroll-mt-offset-top",
         props.className,
       )}
       id={props.id}
@@ -19,13 +19,13 @@ export function Anchor(props: {
       {props.children}
       {props.id && (
         <a
+          className="text-muted-foreground no-underline opacity-0 transition-opacity group-hover/anchor:opacity-100"
           href={`#${props.id}`}
-          className="text-accent-500 no-underline opacity-0 transition-opacity group-hover/anchor:opacity-100"
           onClick={(e) => {
             e.stopPropagation();
           }}
         >
-          <LinkIcon className="size-4" />
+          <HashIcon className="size-4" />
         </a>
       )}
     </div>

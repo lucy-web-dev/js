@@ -18,19 +18,20 @@ export async function mapOffer(
   const { latestBlock, rawOffer } = options;
   // process the listing
   const status = computeStatus({
-    listingStatus: rawOffer.status,
     blockTimeStamp: latestBlock.timestamp,
+    endTimestamp: rawOffer.expirationTimestamp,
+    listingStatus: rawOffer.status,
     // startTimestamp is always 0 for offers (they only have an expiration time not a start time)
     startTimestamp: 0n,
-    endTimestamp: rawOffer.expirationTimestamp,
   });
 
+  const currencyContract = getContract({
+    ...options.contract,
+    address: rawOffer.currency,
+  });
   const [currencyValuePerToken, nftAsset] = await Promise.all([
     getCurrencyMetadata({
-      contract: getContract({
-        ...options.contract,
-        address: rawOffer.currency,
-      }),
+      contract: currencyContract,
     }),
     getNFTAsset({
       ...options,
@@ -43,23 +44,25 @@ export async function mapOffer(
   ]);
 
   return {
-    id: rawOffer.offerId,
-    offerorAddress: rawOffer.offeror,
+    asset: nftAsset,
     assetContractAddress: rawOffer.assetContract,
-    tokenId: rawOffer.tokenId,
-    quantity: rawOffer.quantity,
     currencyContractAddress: rawOffer.currency,
     currencyValue: {
       ...currencyValuePerToken,
-      value: rawOffer.totalPrice,
+      chainId: currencyContract.chain.id,
       displayValue: toTokens(
         rawOffer.totalPrice,
         currencyValuePerToken.decimals,
       ),
+      tokenAddress: currencyContract.address,
+      value: rawOffer.totalPrice,
     },
-    totalPrice: rawOffer.totalPrice,
-    asset: nftAsset,
     endTimeInSeconds: rawOffer.expirationTimestamp,
+    id: rawOffer.offerId,
+    offerorAddress: rawOffer.offeror,
+    quantity: rawOffer.quantity,
     status,
+    tokenId: rawOffer.tokenId,
+    totalPrice: rawOffer.totalPrice,
   };
 }

@@ -1,4 +1,6 @@
+import type { SupportedFiatCurrency } from "../../../../../pay/convert/type.js";
 import { formatNumber } from "../../../../../utils/formatNumber.js";
+import { toTokens } from "../../../../../utils/units.js";
 
 /**
  * @internal
@@ -19,4 +21,35 @@ export function formatTokenBalance(
     formatNumber(Number(balanceData.displayValue), decimals) +
     (showSymbol ? ` ${balanceData.symbol}` : "")
   );
+}
+
+export function formatTokenAmount(
+  amount: bigint,
+  decimals: number,
+  decimalsToShow = 5,
+) {
+  return formatNumber(
+    Number.parseFloat(toTokens(amount, decimals)),
+    decimalsToShow,
+  ).toString();
+}
+
+export function formatCurrencyAmount(
+  currency: SupportedFiatCurrency,
+  amount: number,
+) {
+  return formatMoney(amount, "en-US", currency);
+}
+
+function formatMoney(
+  value: number,
+  locale: string,
+  currencyCode: string,
+): string {
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency: currencyCode,
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 0,
+  }).format(value);
 }

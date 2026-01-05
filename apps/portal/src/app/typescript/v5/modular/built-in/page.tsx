@@ -1,11 +1,14 @@
-import { TBody, Table, Td, Th, Tr } from "@/components/Document/Table";
-import Link from "next/link";
-import { Heading, Paragraph } from "../../../../../components/Document";
+import { Table, TBody, Td, Th, Tr } from "@/components/Document/Table";
+import {
+  DocLink,
+  Heading,
+  Paragraph,
+} from "../../../../../components/Document";
 import { fetchTypeScriptDoc } from "../../../../references/components/TDoc/fetchDocs/fetchTypeScriptDoc";
 import { getCustomTag } from "../../../../references/components/TDoc/utils/getSidebarLinkgroups";
 
 export default async function ModulesPage() {
-  const docs = await fetchTypeScriptDoc("v5");
+  const docs = await fetchTypeScriptDoc();
   const extensions = [
     ...new Set(
       docs.functions
@@ -22,7 +25,7 @@ export default async function ModulesPage() {
   ];
   return (
     <>
-      <Heading level={1} id="built-in-extensions">
+      <Heading anchorId="built-in-extensions" level={1}>
         Built-in modules
       </Heading>
       <Paragraph>
@@ -40,12 +43,11 @@ export default async function ModulesPage() {
             return (
               <Tr key={item}>
                 <Td>
-                  <Link
+                  <DocLink
                     href={`/references/typescript/v5/functions#${item.toLowerCase()}`}
-                    className="flex flex-nowrap items-center gap-4 whitespace-nowrap font-medium text-accent-500 transition-colors hover:text-f-100"
                   >
                     {item}
-                  </Link>
+                  </DocLink>
                 </Td>
                 {/* <Td>{`${item}`}</Td> */}
               </Tr>
@@ -53,14 +55,13 @@ export default async function ModulesPage() {
           })}
         </TBody>
       </Table>
-      More modules are being added regularly. You can also
-      <Link
-        className="font-medium text-accent-500 transition-colors hover:text-f-100"
-        href="/contracts/modular-contracts/get-started/create-module-contract"
-      >
-        create your own modules
-      </Link>
-      .
+      <Paragraph>
+        More modules are being added regularly. You can also{" "}
+        <DocLink href="/contracts/modular-contracts/get-started/create-module-contract">
+          create your own modules
+        </DocLink>
+        .
+      </Paragraph>
     </>
   );
 }

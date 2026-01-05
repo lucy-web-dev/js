@@ -60,34 +60,25 @@ export async function fetchRpc(
   options: FetchRpcOptions,
 ): Promise<RpcResponse[]> {
   const response = await getClientFetch(client)(rpcUrl, {
+    body: stringify(options.requests),
     headers: {
       ...client.config?.rpc?.fetch?.headers,
       "Content-Type": "application/json",
     },
-    body: stringify(options.requests),
+    keepalive: client.config?.rpc?.fetch?.keepalive,
     method: "POST",
     requestTimeoutMs:
       options.requestTimeoutMs ?? client.config?.rpc?.fetch?.requestTimeoutMs,
-    keepalive: client.config?.rpc?.fetch?.keepalive,
   });
 
   if (!response.ok) {
-    response.body?.cancel();
+    const error = await response.text().catch(() => null);
     throw new Error(
-      `RPC request failed with status ${response.status} - ${response.statusText}`,
+      `RPC request failed with status ${response.status} - ${response.statusText}: ${error || "unknown error"}`,
     );
   }
 
-  if (response.headers.get("Content-Type")?.startsWith("application/json")) {
-    return await response.json();
-  }
-  const text = await response.text();
-  try {
-    return JSON.parse(text);
-  } catch (err) {
-    console.error("Error parsing response", err, text);
-    throw err;
-  }
+  return await response.json();
 }
 
 type FetchSingleRpcOptions = {
@@ -104,29 +95,22 @@ export async function fetchSingleRpc(
   options: FetchSingleRpcOptions,
 ): Promise<RpcResponse> {
   const response = await getClientFetch(client)(rpcUrl, {
+    body: stringify(options.request),
     headers: {
       ...(client.config?.rpc?.fetch?.headers || {}),
       "Content-Type": "application/json",
     },
-    body: stringify(options.request),
+    keepalive: client.config?.rpc?.fetch?.keepalive,
     method: "POST",
     requestTimeoutMs:
       options.requestTimeoutMs ?? client.config?.rpc?.fetch?.requestTimeoutMs,
-    keepalive: client.config?.rpc?.fetch?.keepalive,
   });
 
   if (!response.ok) {
-    response.body?.cancel();
-    throw new Error(`RPC request failed with status ${response.status}`);
+    const error = await response.text().catch(() => null);
+    throw new Error(
+      `RPC request failed with status ${response.status} - ${response.statusText}: ${error || "unknown error"}`,
+    );
   }
-  if (response.headers.get("Content-Type")?.startsWith("application/json")) {
-    return await response.json();
-  }
-  const text = await response.text();
-  try {
-    return JSON.parse(text);
-  } catch (err) {
-    console.error("Error parsing response", err, text);
-    throw err;
-  }
+  return await response.json();
 }

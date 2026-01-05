@@ -1,9 +1,9 @@
-import { sliceHex } from "viem";
+import * as ox__Hex from "ox/Hex";
 import type { Hex } from "../utils/encoding/hex.js";
 import { ERC_6492_MAGIC_VALUE } from "./constants.js";
 
 /**
- * @description Determines if a signature is compatible with [ERC6492](https://eips.ethereum.org/EIPS/eip-6492)
+ * Determines if a signature is compatible with [ERC6492](https://eips.ethereum.org/EIPS/eip-6492)
  *
  * @param {Hex} signature The signature to check for ERC6492 compatibility
  *
@@ -19,5 +19,5 @@ import { ERC_6492_MAGIC_VALUE } from "./constants.js";
  * @auth
  */
 export function isErc6492Signature(signature: Hex): boolean {
-  return sliceHex(signature, -32) === ERC_6492_MAGIC_VALUE;
+  return ox__Hex.slice(signature, -32) === ERC_6492_MAGIC_VALUE;
 }

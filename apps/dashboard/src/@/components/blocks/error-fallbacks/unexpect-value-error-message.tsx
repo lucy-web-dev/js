@@ -1,6 +1,6 @@
-import { CopyTextButton } from "@/components/ui/CopyTextButton";
-import { ScrollShadow } from "@/components/ui/ScrollShadow/ScrollShadow";
 import { useMemo } from "react";
+import { CopyTextButton } from "@/components/ui/CopyTextButton";
+import { ScrollShadow } from "@/components/ui/ScrollShadow";
 
 export function UnexpectedValueErrorMessage(props: {
   value: unknown;
@@ -23,18 +23,18 @@ export function UnexpectedValueErrorMessage(props: {
       {stringifiedValue && (
         <div className="mt-3">
           <p className="mb-0.5 text-muted-foreground text-sm">Value Received</p>
-          <ScrollShadow className="rounded-lg bg-muted/50">
+          <ScrollShadow className="rounded-lg bg-card">
             <code className="block whitespace-pre p-4 font-mono text-xs">
               {stringifiedValue}
             </code>
           </ScrollShadow>
 
           <CopyTextButton
-            copyIconPosition="left"
-            textToShow="Copy value"
-            textToCopy={stringifiedValue}
-            tooltip="Copy value"
             className="-translate-x-2 mt-1 text-muted-foreground"
+            copyIconPosition="left"
+            textToCopy={stringifiedValue}
+            textToShow="Copy value"
+            tooltip="Copy value"
             variant="ghost"
           />
         </div>

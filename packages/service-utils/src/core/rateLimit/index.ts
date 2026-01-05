@@ -1,97 +1,53 @@
-import {
-  type CoreServiceConfig,
-  type ProjectResponse,
-  updateRateLimitedAt,
-} from "../api.js";
+import type { CoreServiceConfig, TeamResponse } from "../api.js";
+import type { IRedis } from "./strategies/shared.js";
+import { rateLimitSlidingWindow } from "./strategies/sliding-window.js";
 import type { RateLimitResult } from "./types.js";
 
-const RATE_LIMIT_WINDOW_SECONDS = 10;
+const SLIDING_WINDOW_SECONDS = 10;
 
-// Redis interface compatible with ioredis (Node) and upstash (Cloudflare Workers).
-type IRedis = {
-  incr: (key: string) => Promise<number>;
-  expire: (key: string, ttlSeconds: number) => Promise<0 | 1>;
-};
-
+/**
+ * Increments the request count for this team and returns whether the team has hit their rate limit.
+ * Uses a sliding 10 second window.
+ * @param args
+ * @returns
+ */
 export async function rateLimit(args: {
-  project?: ProjectResponse;
+  team: TeamResponse;
   limitPerSecond: number;
   serviceConfig: CoreServiceConfig;
   redis: IRedis;
   /**
-   * Sample requests to reduce load on Redis.
-   * This scales down the request count and the rate limit threshold.
-   * @default 1.0
+   * The number of requests to increment by.
+   * @default 1
    */
-  sampleRate?: number;
+  increment?: number;
 }): Promise<RateLimitResult> {
-  const {
-    project,
+  const { team, limitPerSecond, serviceConfig, redis, increment = 1 } = args;
+  const { serviceScope } = serviceConfig;
+
+  const rateLimitResult = await rateLimitSlidingWindow({
+    increment,
+    key: `rate-limit:${serviceScope}:${team.id}`,
     limitPerSecond,
-    serviceConfig,
     redis,
-    sampleRate = 1.0,
-  } = args;
+    windowSeconds: SLIDING_WINDOW_SECONDS,
+  });
 
-  const shouldSampleRequest = Math.random() < sampleRate;
-  if (!shouldSampleRequest) {
+  // if the request is rate limited, return the rate limit result.
+  if (rateLimitResult.rateLimited) {
     return {
-      rateLimited: false,
-      requestCount: 0,
-      rateLimit: 0,
+      errorCode: "RATE_LIMIT_EXCEEDED",
+      errorMessage: `You've exceeded your ${serviceScope} rate limit at ${limitPerSecond} requests per second. Please upgrade your plan to increase your limits: https://thirdweb.com/team/${team.slug}/~/settings/billing`,
+      rateLimit: rateLimitResult.rateLimit,
+      rateLimited: true,
+      requestCount: rateLimitResult.requestCount,
+      status: 429,
     };
   }
-
-  if (limitPerSecond === 0) {
-    // No rate limit is provided. Assume the request is not rate limited.
-    return {
-      rateLimited: false,
-      requestCount: 0,
-      rateLimit: 0,
-    };
-  }
-
-  const serviceScope = serviceConfig.serviceScope;
-
-  // Gets the 10-second window for the current timestamp.
-  const timestampWindow =
-    Math.floor(Date.now() / (1000 * RATE_LIMIT_WINDOW_SECONDS)) *
-    RATE_LIMIT_WINDOW_SECONDS;
-  const key = `rate-limit:${serviceScope}:${project?.id}:${timestampWindow}`;
-
-  // Increment and get the current request count in this window.
-  const requestCount = await redis.incr(key);
-  if (requestCount === 1) {
-    // For the first increment, set an expiration to clean up this key.
-    await redis.expire(key, RATE_LIMIT_WINDOW_SECONDS);
-  }
-
-  // Get the limit for this window accounting for the sample rate.
-  const limitPerWindow =
-    limitPerSecond * sampleRate * RATE_LIMIT_WINDOW_SECONDS;
-
-  if (requestCount > limitPerWindow) {
-    // Report rate limit hits.
-    if (project?.id) {
-      await updateRateLimitedAt(project.id, serviceConfig);
-    }
-
-    // Reject requests when they've exceeded 2x the rate limit.
-    if (requestCount > 2 * limitPerWindow) {
-      return {
-        rateLimited: true,
-        requestCount,
-        rateLimit: limitPerWindow,
-        status: 429,
-        errorMessage: `You've exceeded your ${serviceScope} rate limit at ${limitPerSecond} reqs/sec. To get higher rate limits, contact us at https://thirdweb.com/contact-us.`,
-        errorCode: "RATE_LIMIT_EXCEEDED",
-      };
-    }
-  }
-
+  // otherwise, the request is not rate limited.
   return {
+    rateLimit: rateLimitResult.rateLimit,
     rateLimited: false,
-    requestCount,
-    rateLimit: limitPerWindow,
+    requestCount: rateLimitResult.requestCount,
   };
 }

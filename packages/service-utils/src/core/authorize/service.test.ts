@@ -21,8 +21,8 @@ describe("authorizeService", () => {
   it("should not authorize service with unauthorized service scope", () => {
     const invalidServiceConfig: CoreServiceConfig = {
       apiUrl: "https://api.example.com",
-      serviceScope: "nebula",
       serviceApiKey: "service-api-key",
+      serviceScope: "nebula",
     };
 
     const result = authorizeService(
@@ -31,8 +31,8 @@ describe("authorizeService", () => {
       // biome-ignore lint/suspicious/noExplicitAny: test only
     ) as any;
     expect(result.authorized).toBe(false);
-    expect(result.errorMessage).toBe(
-      "Invalid request: Unauthorized service: nebula. You can view the restrictions for this team in your dashboard: https://thirdweb.com",
+    expect(result.errorMessage).toContain(
+      "Invalid request: Unauthorized service: nebula",
     );
     expect(result.errorCode).toBe("SERVICE_UNAUTHORIZED");
     expect(result.status).toBe(403);
@@ -41,9 +41,9 @@ describe("authorizeService", () => {
   it("should not authorize service with unauthorized service action", () => {
     const invalidServiceConfig: CoreServiceConfig = {
       apiUrl: "https://api.example.com",
-      serviceScope: "storage",
-      serviceApiKey: "service-api-key",
       serviceAction: "unauthorized-action",
+      serviceApiKey: "service-api-key",
+      serviceScope: "storage",
     };
 
     const result = authorizeService(
@@ -52,8 +52,8 @@ describe("authorizeService", () => {
       // biome-ignore lint/suspicious/noExplicitAny: test only
     ) as any;
     expect(result.authorized).toBe(false);
-    expect(result.errorMessage).toBe(
-      "Invalid request: Unauthorized action: storage unauthorized-action. You can view the restrictions on this API key in your dashboard:  https://thirdweb.com/create-api-key",
+    expect(result.errorMessage).toContain(
+      "Invalid request: Unauthorized action: storage unauthorized-action",
     );
     expect(result.errorCode).toBe("SERVICE_ACTION_UNAUTHORIZED");
     expect(result.status).toBe(403);

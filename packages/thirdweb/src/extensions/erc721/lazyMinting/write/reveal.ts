@@ -14,7 +14,7 @@ export type RevealParams = {
 
 /**
  * Reveals a previously lazy minted batch of NFTs.
- *
+ * This method is only available on the `DropERC721` contract.
  * @param options {RevealParams} - The reveal parameters.
  * @param options.batchId {number} - The ID of the batch to reveal. Get this by calling `getBatchesToReveal`. {@see getBatchesToReveal}
  * @param options.password {string} - The password for the reveal, set when the batch was created. {@see createDelayedRevealBatch}
@@ -38,7 +38,6 @@ export function reveal(options: BaseTransactionOptions<RevealParams>) {
   }
 
   return generatedReveal({
-    contract: options.contract,
     asyncParams: async () => {
       const key = await hashDelayedRevealPassword(
         options.batchId,
@@ -50,5 +49,6 @@ export function reveal(options: BaseTransactionOptions<RevealParams>) {
         key,
       };
     },
+    contract: options.contract,
   });
 }

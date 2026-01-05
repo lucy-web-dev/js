@@ -1,17 +1,23 @@
 import { readFile } from "node:fs/promises";
 import {
+  parse,
   CommentNode as X_CommentNode,
   HTMLElement as X_HTMLElement,
   type Node as X_Node,
   TextNode as X_TextNode,
-  parse,
 } from "node-html-parser";
 import type { PageData, PageSectionData } from "../types";
 import { getFilesRecursive } from "./getFilesRecursive";
 import { ignoreHeadings } from "./settings";
 import { trimExtraSpace } from "./trimExtraSpace";
 
-export async function extractSearchData(rootDir: string): Promise<PageData[]> {
+type ExtractedContent = {
+  searchData: PageData[];
+};
+
+export async function extractContent(
+  rootDir: string,
+): Promise<ExtractedContent> {
   const nextOutputDir = `${rootDir}/.next/server/app`;
   const htmlFiles = getFilesRecursive(nextOutputDir, "html");
 
@@ -24,10 +30,10 @@ export async function extractSearchData(rootDir: string): Promise<PageData[]> {
     htmlFiles.map(async (filePath) => {
       const htmlContent = await readFile(filePath, "utf-8");
       const mainEl = parse(htmlContent, {
-        comment: false,
         blockTextElements: {
-          pre: false, // parse text inside <pre> elements instead of treating it as text
+          pre: true,
         },
+        comment: false,
       }).querySelector("main");
 
       if (!mainEl) {
@@ -37,25 +43,28 @@ export async function extractSearchData(rootDir: string): Promise<PageData[]> {
         return;
       }
 
-      const noIndex = mainEl.getAttribute("data-noindex");
-
-      if (noIndex) {
+      if (mainEl.getAttribute("data-noindex") === "true") {
         return;
       }
 
       const pageTitle = mainEl.querySelector("h1")?.text;
-
       if (!pageTitle) {
         noH1Found.push(
           filePath.split(".next/server/app")[1]?.replace(".html", "") || "",
         );
       }
 
-      pages.push({
-        href: filePath.replace(nextOutputDir, "").replace(".html", ""),
-        title: pageTitle ? trimExtraSpace(pageTitle) : "",
-        sections: getPageSections(mainEl),
-      });
+      // Important: do the search index collection first - we will modify the main element in the next step
+      // Extract search data
+      const pageData = extractPageSearchData(
+        mainEl,
+        filePath,
+        nextOutputDir,
+        pageTitle,
+      );
+      if (pageData) {
+        pages.push(pageData);
+      }
     }),
   );
 
@@ -77,13 +86,34 @@ export async function extractSearchData(rootDir: string): Promise<PageData[]> {
     console.warn("\n");
   }
 
-  return pages;
+  return {
+    searchData: pages,
+  };
 }
 
-function getPageSections(main: X_HTMLElement): PageSectionData[] {
+function extractPageSearchData(
+  main: X_HTMLElement,
+  filePath: string,
+  nextOutputDir: string,
+  pageTitle: string | undefined,
+): PageData | null {
+  if (main.getAttribute("data-noindex") === "true") {
+    return null;
+  }
+
+  return {
+    href: filePath.replace(nextOutputDir, "").replace(".html", ""),
+    sections: getPageSectionsForSearchIndex(main),
+    title: pageTitle ? trimExtraSpace(pageTitle) : "",
+  };
+}
+
+function getPageSectionsForSearchIndex(main: X_HTMLElement): PageSectionData[] {
   const sectionData: PageSectionData[] = [];
 
-  const ignoreTags = new Set(["code", "nav"].map((t) => t.toUpperCase()));
+  const ignoreTags = new Set(
+    ["code", "nav", "pre"].map((t) => t.toUpperCase()),
+  );
 
   function collector(node: X_Node) {
     if (node instanceof X_CommentNode) {
@@ -94,9 +124,7 @@ function getPageSections(main: X_HTMLElement): PageSectionData[] {
         return;
       }
 
-      const noIndexAttribute = node.getAttribute("data-noindex");
-
-      if (noIndexAttribute === "true") {
+      if (node.getAttribute("data-noindex") === "true") {
         return;
       }
 
@@ -111,9 +139,9 @@ function getPageSections(main: X_HTMLElement): PageSectionData[] {
         }
 
         sectionData.push({
-          title: node.text,
-          href: node.parentNode.querySelector("a")?.getAttribute("href") || "",
           content: "",
+          href: node.parentNode.querySelector("a")?.getAttribute("href") || "",
+          title: node.text,
         });
       } else {
         for (const child of node.childNodes) {

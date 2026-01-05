@@ -21,6 +21,11 @@ export type GetPostOnRampQuoteParams = {
    * The "Buy with fiat" transaction status object returned by [`getBuyWithFiatStatus`](https://portal.thirdweb.com/typescript/v5/getBuyWithFiatStatus) function
    */
   buyWithFiatStatus: BuyWithFiatStatus;
+
+  /**
+   * @hidden
+   */
+  paymentLinkId?: string;
 };
 
 /**
@@ -55,11 +60,13 @@ export type GetPostOnRampQuoteParams = {
  *  });
  * }
  * ```
+ * @deprecated
  * @buyCrypto
  */
 export async function getPostOnRampQuote({
   client,
   buyWithFiatStatus,
+  paymentLinkId,
 }: GetPostOnRampQuoteParams): Promise<BuyWithCryptoQuote> {
   if (buyWithFiatStatus.status === "NOT_FOUND") {
     throw new Error("Invalid buyWithFiatStatus");
@@ -67,14 +74,15 @@ export async function getPostOnRampQuote({
 
   return getBuyWithCryptoQuote({
     client,
-    intentId: buyWithFiatStatus.intentId,
     // onramp always happens to fromAddress, and then swap is done from - fromAddress to toAddress
     fromAddress: buyWithFiatStatus.fromAddress,
-    toAddress: buyWithFiatStatus.toAddress,
     fromChainId: buyWithFiatStatus.quote.onRampToken.chainId,
     fromTokenAddress: buyWithFiatStatus.quote.onRampToken.tokenAddress,
+    intentId: buyWithFiatStatus.intentId,
+    paymentLinkId: paymentLinkId,
+    toAddress: buyWithFiatStatus.toAddress,
+    toAmount: buyWithFiatStatus.quote.estimatedToTokenAmount,
     toChainId: buyWithFiatStatus.quote.toToken.chainId,
     toTokenAddress: buyWithFiatStatus.quote.toToken.tokenAddress,
-    toAmount: buyWithFiatStatus.quote.estimatedToTokenAmount,
   });
 }

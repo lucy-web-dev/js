@@ -1,18 +1,21 @@
-import type { Signature, TypedData, TypedDataDefinition } from "viem";
-import { hashTypedData } from "viem";
+import * as ox__Secp256k1 from "ox/Secp256k1";
+import * as ox__Signature from "ox/Signature";
+import * as ox__TypedData from "ox/TypedData";
 import type { Chain } from "../chains/types.js";
 import type { ThirdwebClient } from "../client/client.js";
-import type { Hex } from "../utils/encoding/hex.js";
+import { type Hex, isHex } from "../utils/encoding/hex.js";
 import type { HashTypedDataParams } from "../utils/hashing/hashTypedData.js";
 import { type VerifyHashParams, verifyHash } from "./verify-hash.js";
 
 export type VerifyTypedDataParams<
-  typedData extends TypedData | Record<string, unknown> = TypedData,
+  typedData extends
+    | ox__TypedData.TypedData
+    | Record<string, unknown> = ox__TypedData.TypedData,
   primaryType extends keyof typedData | "EIP712Domain" = keyof typedData,
 > = Omit<VerifyHashParams, "hash"> &
-  TypedDataDefinition<typedData, primaryType> & {
+  ox__TypedData.Definition<typedData, primaryType> & {
     address: string;
-    signature: string | Uint8Array | Signature;
+    signature: string | Uint8Array | ox__Signature.Signature;
     client: ThirdwebClient;
     chain: Chain;
     accountFactory?: {
@@ -22,7 +25,7 @@ export type VerifyTypedDataParams<
   };
 
 /**
- * @description Verify am [EIP-712](https://eips.ethereum.org/EIPS/eip-712) typed data signature. This function is interoperable with all wallet types (smart accounts or EOAs).
+ * Verify am [EIP-712](https://eips.ethereum.org/EIPS/eip-712) typed data signature. This function is interoperable with all wallet types (smart accounts or EOAs).
  *
  * @param {string} options.address The address that signed the typed data
  * @param {string | Uint8Array | Signature} options.signature The signature that was signed
@@ -36,7 +39,7 @@ export type VerifyTypedDataParams<
  * @param {typeof VerifyTypedDataParams.types} options.types The EIP-712 types that were signed.
  *
  * @returns {Promise<boolean>} A promise that resolves to `true` if the signature is valid, or `false` otherwise.
- * 
+ *
  * @example
  * ```ts
  * import { verifyTypedData } from "thirdweb/utils";
@@ -80,7 +83,7 @@ export type VerifyTypedDataParams<
  * @auth
  */
 export async function verifyTypedData<
-  typedData extends TypedData | Record<string, unknown>,
+  typedData extends ox__TypedData.TypedData | Record<string, unknown>,
   primaryType extends keyof typedData | "EIP712Domain",
 >({
   address,
@@ -93,18 +96,35 @@ export async function verifyTypedData<
   primaryType,
   types,
 }: VerifyTypedDataParams<typedData, primaryType>): Promise<boolean> {
-  const messageHash = hashTypedData({
-    message,
+  const messageHash = ox__TypedData.getSignPayload({
     domain,
+    message,
     primaryType,
     types,
   } as HashTypedDataParams);
+
+  if (!isHex(signature)) {
+    return false;
+  }
+
+  try {
+    const recoveredAddress = ox__Secp256k1.recoverAddress({
+      payload: messageHash,
+      signature: ox__Signature.fromHex(signature),
+    });
+
+    if (recoveredAddress.toLowerCase() === address.toLowerCase()) {
+      return true;
+    }
+  } catch {
+    // no-op, we skip to contract signature check
+  }
   return verifyHash({
-    hash: messageHash,
-    signature,
+    accountFactory,
     address,
     chain,
     client,
-    accountFactory,
+    hash: messageHash,
+    signature,
   });
 }

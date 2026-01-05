@@ -13,7 +13,8 @@ export const wallet = {
     mac: null,
     windows: null,
     linux: null,
-    chrome: null,
+    chrome:
+      "https://chromewebstore.google.com/detail/uniswap-extension/nnpmfplkfogfpmcngplhnbdnnilmcdcg",
     firefox: null,
     safari: null,
     edge: null,

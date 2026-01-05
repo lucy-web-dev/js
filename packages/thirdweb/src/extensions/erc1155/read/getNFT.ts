@@ -1,3 +1,4 @@
+import { getNFT as getNFTInsight } from "../../../insight/get-nfts.js";
 import type { BaseTransactionOptions } from "../../../transaction/types.js";
 import { fetchTokenMetadata } from "../../../utils/nft/fetchTokenMetadata.js";
 import { type NFT, parseNFT } from "../../../utils/nft/parseNft.js";
@@ -12,6 +13,11 @@ export { isUriSupported as isGetNFTSupported } from "../__generated__/IERC1155/r
  */
 export type GetNFTParams = {
   tokenId: bigint;
+  /**
+   * Whether to use the insight API to fetch the NFT.
+   * @default true
+   */
+  useIndexer?: boolean;
 };
 
 /**
@@ -31,6 +37,36 @@ export type GetNFTParams = {
 export async function getNFT(
   options: BaseTransactionOptions<GetNFTParams>,
 ): Promise<NFT> {
+  const { useIndexer = true } = options;
+  if (useIndexer) {
+    try {
+      return await getNFTFromInsight(options);
+    } catch {
+      return await getNFTFromRPC(options);
+    }
+  }
+  return await getNFTFromRPC(options);
+}
+
+async function getNFTFromInsight(
+  options: BaseTransactionOptions<GetNFTParams>,
+): Promise<NFT> {
+  const nft = await getNFTInsight({
+    chain: options.contract.chain,
+    client: options.contract.client,
+    contractAddress: options.contract.address,
+    tokenId: options.tokenId,
+  });
+  if (!nft) {
+    // fresh contracts might be delayed in indexing, so we fallback to RPC
+    return getNFTFromRPC(options);
+  }
+  return nft;
+}
+
+async function getNFTFromRPC(
+  options: BaseTransactionOptions<GetNFTParams>,
+): Promise<NFT> {
   const [tokenUri, supply] = await Promise.all([
     uri({
       contract: options.contract,
@@ -47,17 +83,31 @@ export async function getNFT(
       client: options.contract.client,
       tokenId: options.tokenId,
       tokenUri,
-    }).catch(() => ({
-      id: options.tokenId,
-      type: "ERC1155",
-      uri: tokenUri,
-    })),
+    })
+      .then((metadata) => {
+        // if the metadata is null-ish, return a default metadata object
+        if (!metadata) {
+          return {
+            id: options.tokenId,
+            type: "ERC1155",
+            uri: tokenUri,
+          };
+        }
+        return metadata;
+      })
+      .catch(() => ({
+        id: options.tokenId,
+        type: "ERC1155",
+        uri: tokenUri,
+      })),
     {
+      chainId: options.contract.chain.id,
+      owner: null,
+      supply,
+      tokenAddress: options.contract.address,
       tokenId: options.tokenId,
       tokenUri,
       type: "ERC1155",
-      owner: null,
-      supply,
     },
   );
 }

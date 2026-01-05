@@ -4,7 +4,9 @@ import type { Chain } from "../../../../../chains/types.js";
 import type { ThirdwebClient } from "../../../../../client/client.js";
 import type { Wallet } from "../../../../../wallets/interfaces/wallet.js";
 import type { SmartWalletOptions } from "../../../../../wallets/smart/types.js";
+import type { WalletId } from "../../../../../wallets/wallet-types.js";
 import type { SiweAuthOptions } from "../../../../core/hooks/auth/useSiweAuth.js";
+import type { OnConnectCallback } from "../../../../core/hooks/connection/types.js";
 import { useActiveAccount } from "../../../../core/hooks/wallets/useActiveAccount.js";
 import {
   useIsWalletModalOpen,
@@ -25,7 +27,7 @@ type ConnectModalOptions = {
   wallets: Wallet[];
   accountAbstraction: SmartWalletOptions | undefined;
   auth: SiweAuthOptions | undefined;
-  onConnect: ((wallet: Wallet) => void) | undefined;
+  onConnect: OnConnectCallback | undefined;
   size: "compact" | "wide";
   welcomeScreen: WelcomeScreen | undefined;
   meta: {
@@ -42,6 +44,7 @@ type ConnectModalOptions = {
   localeId: LocaleId;
   chain: Chain | undefined;
   showAllWallets: boolean | undefined;
+  hiddenWallets: WalletId[] | undefined;
   chains: Chain[] | undefined;
   walletConnect:
     | {
@@ -56,8 +59,8 @@ type ConnectModalOptions = {
 const ConnectModal = (props: ConnectModalOptions) => {
   const screenSetup = useSetupScreen({
     size: props.size,
-    welcomeScreen: props.welcomeScreen,
     wallets: props.wallets,
+    welcomeScreen: props.welcomeScreen,
   });
   const setSelectionData = useSetSelectionData();
   const { screen, setScreen, initialScreen } = screenSetup;
@@ -116,8 +119,9 @@ const ConnectModal = (props: ConnectModalOptions) => {
 
   return (
     <Modal
+      className="tw-modal__connect-wallet"
+      title="Connect Wallet"
       hide={hideModal}
-      size={props.size}
       open={isWalletModalOpen}
       setOpen={(value) => {
         if (hideModal) {
@@ -128,30 +132,31 @@ const ConnectModal = (props: ConnectModalOptions) => {
           closeModal();
         }
       }}
+      size={props.size}
     >
       <ConnectModalContent
-        shouldSetActive={props.shouldSetActive}
-        screenSetup={screenSetup}
-        setModalVisibility={setModalVisibility}
-        isOpen={isWalletModalOpen}
-        onClose={closeModal}
         accountAbstraction={props.accountAbstraction}
         auth={props.auth}
+        chain={props.chain}
+        chains={props.chains}
         client={props.client}
         connectLocale={props.connectLocale}
-        size={props.size}
-        welcomeScreen={props.welcomeScreen}
-        meta={props.meta}
         hideHeader={false}
+        isOpen={isWalletModalOpen}
+        meta={props.meta}
+        modalHeader={undefined}
+        onClose={closeModal}
         onConnect={props.onConnect}
         recommendedWallets={props.recommendedWallets}
-        wallets={props.wallets}
-        chain={props.chain}
+        screenSetup={screenSetup}
+        setModalVisibility={setModalVisibility}
+        shouldSetActive={props.shouldSetActive}
         showAllWallets={props.showAllWallets}
-        chains={props.chains}
+        size={props.size}
         walletConnect={props.walletConnect}
-        modalHeader={undefined}
-        walletIdsToHide={undefined}
+        walletIdsToHide={props.hiddenWallets}
+        wallets={props.wallets}
+        welcomeScreen={props.welcomeScreen}
       />
     </Modal>
   );

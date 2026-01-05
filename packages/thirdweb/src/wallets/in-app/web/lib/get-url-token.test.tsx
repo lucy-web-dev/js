@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { getUrlToken } from "./get-url-token.js";
 
-describe("getUrlToken", () => {
+describe.runIf(global.window !== undefined)("getUrlToken", () => {
   let originalLocation: Location;
 
   beforeEach(() => {
@@ -25,20 +25,20 @@ describe("getUrlToken", () => {
   });
 
   it("should return an empty object if not in web context", () => {
-    const originalWindow = window;
+    const originalDocument = document;
     // biome-ignore lint/suspicious/noExplicitAny: Test
-    (global as any).window = undefined;
+    (global as any).document = undefined;
 
     const result = getUrlToken();
     // biome-ignore lint/suspicious/noExplicitAny: Test
-    (global as any).window = originalWindow;
+    (global as any).document = originalDocument;
 
-    expect(result).toEqual({});
+    expect(result).toEqual(undefined);
   });
 
   it("should return an empty object if no parameters are present", () => {
     const result = getUrlToken();
-    expect(result).toEqual({});
+    expect(result).toEqual(undefined);
   });
 
   it("should parse walletId and authResult correctly", () => {
@@ -48,10 +48,10 @@ describe("getUrlToken", () => {
     const result = getUrlToken();
 
     expect(result).toEqual({
-      walletId: "123",
-      authResult: { token: "abc" },
-      authProvider: null,
       authCookie: null,
+      authProvider: null,
+      authResult: { token: "abc" },
+      walletId: "123",
     });
   });
 
@@ -61,10 +61,10 @@ describe("getUrlToken", () => {
     const result = getUrlToken();
 
     expect(result).toEqual({
-      walletId: "123",
-      authResult: undefined,
-      authProvider: null,
       authCookie: "myCookie",
+      authProvider: null,
+      authResult: undefined,
+      walletId: "123",
     });
 
     // Check if URL has been updated correctly
@@ -78,10 +78,10 @@ describe("getUrlToken", () => {
     const result = getUrlToken();
 
     expect(result).toEqual({
-      walletId: "123",
-      authResult: { token: "xyz" },
-      authProvider: "provider1",
       authCookie: "myCookie",
+      authProvider: "provider1",
+      authResult: { token: "xyz" },
+      walletId: "123",
     });
 
     // Check if URL has been updated correctly

@@ -20,7 +20,7 @@ export const wallet = {
     edge: null,
     opera: null,
   },
-  rdns: null,
+  rdns: "io.owallet",
   mobile: {
     native: "owallet://",
     universal: null,

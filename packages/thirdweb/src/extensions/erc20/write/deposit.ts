@@ -1,16 +1,20 @@
 import { prepareContractCall } from "../../../transaction/prepare-contract-call.js";
-import type { BaseTransactionOptions } from "../../../transaction/types.js";
+import type {
+  BaseTransactionOptions,
+  WithOverrides,
+} from "../../../transaction/types.js";
 import { toWei } from "../../../utils/units.js";
 import { FN_SELECTOR } from "../__generated__/IWETH/write/deposit.js";
 
 /**
  * @extension ERC20
  */
-export type DepositParams =
+export type DepositParams = WithOverrides<
   | {
       amount: string;
     }
-  | { amountWei: bigint };
+  | { amountWei: bigint }
+>;
 
 /**
  * Calls the "deposit" function on the contract (useful to wrap ETH).
@@ -32,11 +36,12 @@ export function deposit(options: BaseTransactionOptions<DepositParams>) {
     "amountWei" in options ? options.amountWei : toWei(options.amount);
   return prepareContractCall({
     contract: options.contract,
-    method: [FN_SELECTOR, [], []] as const,
-    value,
     erc20Value: {
       amountWei: value,
       tokenAddress: options.contract.address,
     },
+    method: [FN_SELECTOR, [], []] as const,
+    value,
+    ...options.overrides,
   });
 }

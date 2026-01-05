@@ -23,10 +23,10 @@ export const wallet = {
   rdns: "com.crypto.wallet",
   mobile: {
     native: "dfw://",
-    universal: "https://wallet.crypto.com",
+    universal: "https://wallet.crypto.com/deeplink",
   },
   desktop: {
-    native: null,
-    universal: null,
+    native: "",
+    universal: "",
   },
 } as const;

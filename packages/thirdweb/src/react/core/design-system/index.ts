@@ -1,48 +1,3 @@
-type ThemeColors = {
-  base1: string;
-  base2: string;
-  base3: string;
-  base4: string;
-  primaryText: string;
-  secondaryText: string;
-  danger: string;
-  success: string;
-  overlay: string;
-  accentText: string;
-  accentBg: string;
-  textOnAccent: string;
-};
-
-const darkColors = {
-  base1: "hsl(230 11.63% 8.43%)",
-  base2: "hsl(230 11.63% 12%)",
-  base3: "hsl(230 11.63% 15%)",
-  base4: "hsl(230 11.63% 17%)",
-  primaryText: "#eeeef0",
-  secondaryText: "#7c7a85",
-  danger: "#e5484D",
-  success: "#30A46C",
-  overlay: "rgba(0, 0, 0, 0.7)",
-  accentText: "#3385FF",
-  accentBg: "hsl(216 100% 50%)",
-  textOnAccent: "#eeeef0",
-} as const satisfies ThemeColors;
-
-const lightColors = {
-  base1: "#fdfcfd",
-  base2: "#f2eff3",
-  base3: "#e3dfe6",
-  base4: "#dbd8e0",
-  primaryText: "#211f26",
-  secondaryText: "#6f6d78",
-  accentText: "#3385FF",
-  success: "#30A46C",
-  danger: "#e5484D",
-  overlay: "rgba(0, 0, 0, 0.7)",
-  accentBg: "hsl(216 100% 50%)",
-  textOnAccent: "#fdfcfd",
-} as const satisfies ThemeColors;
-
 /**
  * @theme
  */
@@ -95,65 +50,77 @@ export type Theme = {
   fontFamily: string;
 };
 
-/**
- * @internal
- */
-function createThemeObj(type: "dark" | "light", colors: ThemeColors): Theme {
-  return {
-    type,
-    colors: {
-      primaryText: colors.primaryText,
-      secondaryText: colors.secondaryText,
-      accentText: colors.accentText,
+export const darkThemeObj: Theme = {
+  type: "dark",
+  colors: {
+    accentButtonBg: "hsl(221 83% 54%)",
+    accentButtonText: "hsl(0 0% 100%)",
+    accentText: "hsl(209.61deg 100% 65.31%)",
+    borderColor: "hsl(0 0% 15%)",
+    connectedButtonBg: "hsl(0 0% 3.92%)",
+    connectedButtonBgHover: "hsl(0 0% 11%)",
+    danger: "hsl(360 72% 55%)",
+    inputAutofillBg: "hsl(0 0% 11%)",
+    modalBg: "hsl(0 0% 3.92%)",
+    primaryButtonBg: "hsl(0 0% 100%)",
+    primaryButtonText: "hsl(0 0% 0%)",
+    primaryText: "hsl(0 0% 98%)",
+    scrollbarBg: "hsl(0 0% 11%)",
+    secondaryButtonBg: "hsl(0 0% 9%)",
+    modalOverlayBg: "rgba(0, 0, 0, 0.7)",
+    secondaryButtonHoverBg: "hsl(0 0% 9%/80%)",
+    secondaryButtonText: "hsl(0 0% 98%)",
+    secondaryIconColor: "hsl(0 0% 63%)",
+    secondaryIconHoverBg: "hsl(0 0% 11%)",
+    secondaryIconHoverColor: "hsl(0 0% 98%)",
+    secondaryText: "hsl(0 0% 63%)",
+    selectedTextBg: "hsl(0 0% 100%)",
+    selectedTextColor: "hsl(0 0% 0%)",
+    separatorLine: "hsl(0 0% 15%)",
+    skeletonBg: "hsl(0 0% 12%)",
+    success: "hsl(142 75% 50%)",
+    tertiaryBg: "hsl(0 0% 11%/50%)",
+    tooltipBg: "hsl(0 0% 11%)",
+    tooltipText: "hsl(0 0% 98%)",
+  },
+  fontFamily: "inherit",
+};
 
-      danger: colors.danger,
-      success: colors.success,
-
-      modalOverlayBg: colors.overlay,
-
-      accentButtonBg: colors.accentBg,
-      accentButtonText: colors.textOnAccent,
-
-      primaryButtonBg: colors.primaryText,
-      primaryButtonText: colors.base1,
-
-      secondaryButtonBg: colors.base3,
-      secondaryButtonText: colors.primaryText,
-      secondaryButtonHoverBg: colors.base4,
-
-      modalBg: colors.base1,
-
-      tooltipBg: colors.primaryText,
-      tooltipText: colors.base1,
-
-      inputAutofillBg: colors.base1,
-      scrollbarBg: colors.base2,
-      tertiaryBg: colors.base2,
-
-      separatorLine: colors.base4,
-
-      secondaryIconColor: colors.secondaryText,
-      secondaryIconHoverBg: colors.base3,
-      secondaryIconHoverColor: colors.primaryText,
-
-      borderColor: colors.base4,
-      skeletonBg: colors.base3,
-
-      selectedTextColor: colors.base1,
-      selectedTextBg: colors.primaryText,
-
-      connectedButtonBg: colors.base1,
-      connectedButtonBgHover: colors.base2,
-    },
-    fontFamily: "inherit",
-  };
-}
-
-export const darkThemeObj = /* @__PURE__ */ createThemeObj("dark", darkColors);
-export const lightThemeObj = /* @__PURE__ */ createThemeObj(
-  "light",
-  lightColors,
-);
+export const lightThemeObj: Theme = {
+  type: "light",
+  colors: {
+    accentButtonBg: "hsl(221 83% 54%)",
+    accentButtonText: "hsl(0 0% 100%)",
+    accentText: "hsl(211.23deg 100% 44.47%)",
+    borderColor: "hsl(0 0% 85%)",
+    connectedButtonBg: "hsl(0 0% 100%)",
+    connectedButtonBgHover: "hsl(0 0% 93%)",
+    danger: "hsl(360 72% 60%)",
+    inputAutofillBg: "hsl(0 0% 93%)",
+    modalBg: "hsl(0 0% 100%)",
+    primaryButtonBg: "hsl(0 0% 4%)",
+    primaryButtonText: "hsl(0 0% 100%)",
+    primaryText: "hsl(0 0% 4%)",
+    scrollbarBg: "hsl(0 0% 93%)",
+    secondaryButtonBg: "hsl(0 0% 93%)",
+    modalOverlayBg: "rgba(0, 0, 0, 0.7)",
+    secondaryButtonHoverBg: "hsl(0 0% 93%/80%)",
+    secondaryButtonText: "hsl(0 0% 4%)",
+    secondaryIconColor: "hsl(0 0% 40%)",
+    secondaryIconHoverBg: "hsl(0 0% 93%)",
+    secondaryIconHoverColor: "hsl(0 0% 4%)",
+    secondaryText: "hsl(0 0% 40%)",
+    selectedTextBg: "hsl(0 0% 4%)",
+    selectedTextColor: "hsl(0 0% 100%)",
+    separatorLine: "hsl(0 0% 85%)",
+    skeletonBg: "hsl(0 0% 85%)",
+    success: "hsl(142.09 70.56% 35.29%)",
+    tertiaryBg: "hsl(0 0% 93%/70%)",
+    tooltipBg: "hsl(0 0% 100%)",
+    tooltipText: "hsl(0 0% 4%)",
+  },
+  fontFamily: "inherit",
+};
 
 /**
  * @theme
@@ -163,46 +130,49 @@ export type ThemeOverrides = {
 };
 
 export const fontSize = {
-  xs: "12px",
-  sm: "14px",
-  md: "16px",
-  lg: "20px",
-  xl: "24px",
-  xxl: "32px",
   "3xl": "48px",
+  lg: "20px",
+  md: "16px",
+  sm: "14px",
+  xl: "24px",
+  xs: "12px",
+  xxl: "32px",
 };
 
 export const spacing = {
-  "4xs": "2px",
-  "3xs": "4px",
-  xxs: "6px",
-  xs: "8px",
-  sm: "12px",
-  md: "16px",
-  lg: "24px",
-  xl: "32px",
-  xxl: "48px",
   "3xl": "64px",
+  "3xs": "4px",
+  "4xs": "2px",
+  lg: "24px",
+  md: "16px",
+  "md+": "20px",
+  sm: "12px",
+  xl: "32px",
+  xs: "8px",
+  xxl: "48px",
+  xxs: "6px",
 };
 
 export const radius = {
-  xs: "4px",
-  sm: "6px",
-  md: "8px",
   lg: "12px",
+  md: "8px",
+  sm: "6px",
   xl: "20px",
+  xs: "4px",
   xxl: "32px",
+  full: "9999px",
 };
 
 export const iconSize = {
-  xs: "12",
-  sm: "16",
-  md: "24",
-  lg: "32",
-  xl: "48",
-  xxl: "64",
   "3xl": "96",
   "4xl": "128",
+  lg: "32",
+  md: "24",
+  "sm+": "20",
+  sm: "16",
+  xl: "48",
+  xs: "12",
+  xxl: "64",
 };
 
 // desktop first style media query
@@ -212,9 +182,9 @@ export const media = {
 
 // TODO - move to theme
 export const shadow = {
-  sm: "0 1px 2px 0 rgb(0 0 0 / 0.05)",
-  md: "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)",
   lg: "0 10px 15px -3px rgb(0 0 0 / 0.07), 0 4px 6px -4px rgb(0 0 0 / 0.1)",
+  md: "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)",
+  sm: "0 1px 2px 0 rgb(0 0 0 / 0.05)",
   xl: "0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)",
 };
 

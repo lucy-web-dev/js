@@ -1,11 +1,13 @@
 "use client";
 
-import { cn } from "@/lib/utils";
-import { ChevronDown } from "lucide-react";
+import { ChevronDownIcon } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
+import { cn } from "@/lib/utils";
+import { Anchor } from "./Anchor";
 import { DynamicHeight } from "./DynamicHeight";
 
 type CustomAccordionProps = {
+  id?: string;
   chevronPosition?: "left" | "right";
   trigger: React.ReactNode;
   children: React.ReactNode;
@@ -18,62 +20,77 @@ type CustomAccordionProps = {
 
 export function CustomAccordion(props: CustomAccordionProps) {
   const [isOpen, setIsOpen] = useState(props.defaultOpen || false);
-  const elRef = useRef<HTMLDivElement>(null);
   const contentId = useId();
   const buttonId = useId();
+  const accordionContentRef = useRef<HTMLDivElement>(null);
 
-  // when another accordion is opened, close this one
+  const accordionAnchorId = props.id;
+
+  // if window hash matches current accordion's id, open it
+  const accordionIdMatchChecked = useRef(false);
   useEffect(() => {
-    if (!isOpen) {
+    if (accordionIdMatchChecked.current) {
+      return;
+    }
+    accordionIdMatchChecked.current = true;
+    const hash = window.location.hash;
+    if (hash && hash === `#${accordionAnchorId}`) {
+      setTimeout(() => {
+        setIsOpen(true);
+        setTimeout(() => {
+          accordionContentRef.current?.scrollIntoView({
+            behavior: "smooth",
+            block: "nearest",
+          });
+        }, 500);
+      }, 500);
+    }
+  }, [accordionAnchorId]);
+
+  // if window hash matches any child accordion's id, open it
+  const accordionContentChecked = useRef(false);
+  useEffect(() => {
+    const accordionContentEl = accordionContentRef.current;
+    if (!accordionContentEl || accordionContentChecked.current) {
       return;
     }
 
-    const selfEl = elRef.current;
+    accordionContentChecked.current = true;
 
-    if (!selfEl) {
+    const hash = window.location.hash;
+    if (!hash) {
       return;
     }
 
-    const allAccordions = selfEl.parentElement?.querySelectorAll(
-      "[data-custom-accordion]",
-    );
+    // if any child element has an anchor tag with href that matches the hash, open the accordion
+    const containsMatchingAnchor = Array.from(
+      accordionContentEl.querySelectorAll("a[href^='#']"),
+    ).find((childAccordion) => {
+      const href = childAccordion.getAttribute("href");
+      return href === hash;
+    });
 
-    if (!allAccordions) {
-      return;
+    if (containsMatchingAnchor) {
+      setTimeout(() => {
+        setIsOpen(true);
+        setTimeout(() => {
+          containsMatchingAnchor.scrollIntoView({
+            behavior: "smooth",
+            block: "nearest",
+          });
+        }, 500);
+      }, 500);
     }
-
-    for (const accordion of allAccordions) {
-      if (!(accordion instanceof HTMLElement)) {
-        continue;
-      }
-
-      if (accordion === selfEl) {
-        continue;
-      }
-
-      accordion.addEventListener("click", () => {
-        if (isOpen) {
-          setIsOpen(false);
-        }
-      });
-    }
-  }, [isOpen]);
+  }, []);
 
   return (
     <div
       className={cn("border-b", props.containerClassName)}
       data-custom-accordion
-      ref={elRef}
     >
       <button
-        type="button"
-        data-open={isOpen}
-        id={buttonId}
         aria-controls={contentId}
         aria-expanded={isOpen}
-        onClick={() => {
-          setIsOpen((c) => !c);
-        }}
         className={cn(
           "flex w-full flex-1 cursor-pointer items-center gap-3",
           props.triggerContainerClassName,
@@ -82,8 +99,14 @@ export function CustomAccordion(props: CustomAccordionProps) {
             ? "flex-row-reverse justify-between"
             : "",
         )}
+        data-open={isOpen}
+        id={buttonId}
+        onClick={() => {
+          setIsOpen((c) => !c);
+        }}
+        type="button"
       >
-        <ChevronDown
+        <ChevronDownIcon
           className={cn(
             "ease size-4 shrink-0 transition-transform duration-300",
             isOpen && "rotate-180",
@@ -91,15 +114,20 @@ export function CustomAccordion(props: CustomAccordionProps) {
           )}
         />
 
-        {props.trigger}
+        {props.id ? (
+          <Anchor id={props.id}> {props.trigger} </Anchor>
+        ) : (
+          props.trigger
+        )}
       </button>
 
       <DynamicHeight>
+        {/** biome-ignore lint/a11y/useAriaPropsSupportedByRole: TODO */}
         <div
-          id={contentId}
           aria-labelledby={buttonId}
-          data-open={isOpen}
           className="overflow-hidden"
+          data-open={isOpen}
+          id={contentId}
         >
           <div
             className={cn(
@@ -107,7 +135,9 @@ export function CustomAccordion(props: CustomAccordionProps) {
               !isOpen && "hidden",
             )}
           >
-            <div className="pt-1 pb-2">{props.children}</div>
+            <div className="pt-1 pb-4" ref={accordionContentRef}>
+              {props.children}
+            </div>
           </div>
         </div>
       </DynamicHeight>

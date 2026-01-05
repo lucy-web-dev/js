@@ -1,21 +1,21 @@
-import { createMetadata } from "@/components/Document";
+import { createMetadata } from "@doc";
 import { DocLayout } from "@/components/Layouts/DocLayout";
 import { sidebar } from "./sidebar";
 
 export default async function Layout(props: { children: React.ReactNode }) {
   return (
-    <DocLayout sideBar={sidebar} editPageButton={true} noIndex>
+    <DocLayout editPageButton={true} sideBar={sidebar}>
       {props.children}
     </DocLayout>
   );
 }
 
 export const metadata = createMetadata({
-  image: {
-    title: "thirdweb Payments",
-    icon: "payment",
-  },
-  title: "thirdweb Payments",
   description:
-    "thirdweb payments delivers the easiest NFT payments experience for you and your buyers",
+    "Monetize your app with thirdweb Payments. Sell products, transfer funds between users, launch tokens, and more.",
+  image: {
+    icon: "payments",
+    title: "thirdweb Payments Docs",
+  },
+  title: "thirdweb Payments Documentation",
 });

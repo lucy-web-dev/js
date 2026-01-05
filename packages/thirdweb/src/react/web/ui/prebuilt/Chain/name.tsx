@@ -45,7 +45,7 @@ export interface ChainNameProps
    * If not passed, the component will return `null`.
    *
    * You can/should pass a descriptive text/component to this prop, indicating that the
-   * name was not fetched succesfully
+   * name was not fetched successfully
    * @example
    * ```tsx
    * <ChainName fallbackComponent={<span>Failed to load</span>}
@@ -157,8 +157,8 @@ export function ChainName({
 }: ChainNameProps) {
   const { chain } = useChainContext();
   const nameQuery = useQuery({
-    queryKey: getQueryKeys({ chainId: chain.id, nameResolver }),
     queryFn: async () => fetchChainName({ chain, nameResolver }),
+    queryKey: getQueryKeys({ chainId: chain.id, nameResolver }),
     ...queryOptions,
   });
 

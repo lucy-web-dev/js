@@ -1,0 +1,16 @@
+import {
+	Tabs,
+	TabsList,
+	TabsTrigger,
+	TabsContent,
+	OpenApiEndpoint,
+} from "@doc";
+import {
+	EngineIcon,
+} from "@/icons";
+
+# Contract Transactions
+
+Query all transactions for any deployed contract on any EVM chain.
+
+<OpenApiEndpoint path="/v1/contracts/{chainId}/{address}/transactions" method="GET" />

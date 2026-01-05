@@ -1,14 +1,17 @@
 import {
   type CoreServiceConfig,
-  type TeamAndProjectResponse,
   fetchTeamAndProject,
+  type ReasonCode,
+  type TeamAndProjectResponse,
+  type TeamResponse,
 } from "../api.js";
 import { authorizeClient } from "./client.js";
 import { authorizeService } from "./service.js";
 import type { AuthorizationResult } from "./types.js";
-import { hashKey } from "./utils.js";
 
 export type AuthorizationInput = {
+  incomingServiceApiKey: string | null;
+  incomingServiceApiKeyHash: string | null;
   secretKey: string | null;
   clientId: string | null;
   ecosystemId: string | null;
@@ -19,6 +22,7 @@ export type AuthorizationInput = {
   jwt: string | null;
   hashedJWT: string | null;
   targetAddress?: string | string[];
+  teamId?: string;
   // IMPORTANT: this is a stringified boolean! Only pass in true or false here. IK it's not ideal, but it's required to pass it in the headers.
   useWalletAuth?: string | null;
 };
@@ -29,7 +33,7 @@ export type CacheOptions = {
   cacheTtlSeconds: number;
 };
 
-type TeamAndProjectCacheWithPossibleTTL =
+export type TeamAndProjectCacheWithPossibleTTL =
   | {
       teamAndProjectResponse: TeamAndProjectResponse;
       updatedAt: number;
@@ -42,16 +46,29 @@ export async function authorize(
   cacheOptions?: CacheOptions,
 ): Promise<AuthorizationResult> {
   let teamAndProjectResponse: TeamAndProjectResponse | null = null;
-  const cacheKey = hashKey(
-    `key_v2_:${authData.secretKeyHash}:${authData.hashedJWT}:${authData.clientId}`,
-  );
+
+  // Use a separate cache key per auth method.
+  const cacheKey = authData.incomingServiceApiKey
+    ? // incoming service key + clientId case
+      `key-v2:service-key:${authData.incomingServiceApiKeyHash}:${authData.clientId ?? "client_default"}`
+    : authData.secretKeyHash
+      ? // secret key case
+        `key-v2:secret-key:${authData.secretKeyHash}`
+      : authData.hashedJWT
+        ? // dashboard jwt case
+          `key-v2:dashboard-jwt:${authData.hashedJWT}:${authData.teamId ?? "team_default"}:${authData.clientId ?? "client_default"}`
+        : authData.clientId
+          ? // clientId case
+            `key-v2:client-id:${authData.clientId}`
+          : null;
+
   // TODO if we have cache options we want to check the cache first
-  if (cacheOptions) {
+  if (cacheOptions && cacheKey) {
     try {
-      const cachedKey = await cacheOptions.get(cacheKey);
-      if (cachedKey) {
+      const cachedValue = await cacheOptions.get(cacheKey);
+      if (cachedValue) {
         const parsed = JSON.parse(
-          cachedKey,
+          cachedValue,
         ) as TeamAndProjectCacheWithPossibleTTL;
         if ("updatedAt" in parsed) {
           // we want to compare the updatedAt time to the current time
@@ -99,7 +116,7 @@ export async function authorize(
       teamAndProjectResponse = data;
 
       // cache the retrieved key if we have cache options
-      if (cacheOptions) {
+      if (cacheOptions && cacheKey) {
         // we await this always because it can be a promise or not
         await cacheOptions.put(cacheKey, data);
       }
@@ -107,30 +124,80 @@ export async function authorize(
       console.warn("failed to fetch key metadata from api", err);
       return {
         authorized: false,
-        status: 500,
+        errorCode: "FAILED_TO_FETCH_KEY",
         errorMessage:
           "Failed to fetch key metadata. Please check your secret-key/clientId.",
-        errorCode: "FAILED_TO_FETCH_KEY",
+        status: 500,
       };
     }
   }
   if (!teamAndProjectResponse) {
     return {
       authorized: false,
-      status: 401,
-      errorMessage: "Key is invalid. Please check your secret-key/clientId.",
       errorCode: "INVALID_KEY",
+      errorMessage: "Key is invalid. Please check your secret-key/clientId.",
+      status: 401,
     };
   }
+  // check if the service is maybe disabled for the team (usually due to a billing issue / exceeding the free plan limit)
+  const disabledReason = getServiceDisabledReason(
+    serviceConfig.serviceScope,
+    teamAndProjectResponse.team.capabilities,
+  );
+  if (disabledReason) {
+    switch (disabledReason) {
+      case "enterprise_plan_required": {
+        return {
+          authorized: false,
+          errorCode: "ENTERPRISE_PLAN_REQUIRED",
+          errorMessage: `You currently do not have access to this feature. Please reach out to us to upgrade your plan to enable this feature: https://thirdweb.com/team/${teamAndProjectResponse.team.slug}/~/support`,
+          status: 402,
+        };
+      }
+      case "free_limit_exceeded": {
+        return {
+          authorized: false,
+          errorCode: "FREE_LIMIT_EXCEEDED",
+          errorMessage: `You have exceeded the free limit for this service. Find a plan that suits your needs to continue using this feature: https://thirdweb.com/team/${teamAndProjectResponse.team.slug}/~/billing?showPlans=true&highlight=growth`,
+          status: 402,
+        };
+      }
+      case "subscription_required": {
+        return {
+          authorized: false,
+          errorCode: "SUBSCRIPTION_REQUIRED",
+          errorMessage: `You need a subscription to use this feature. Find a plan that suits your needs to continue using this feature: https://thirdweb.com/team/${teamAndProjectResponse.team.slug}/~/billing?showPlans=true&highlight=growth`,
+          status: 402,
+        };
+      }
+      case "invoice_past_due": {
+        return {
+          authorized: false,
+          errorCode: "INVOICE_PAST_DUE",
+          errorMessage: `Please pay any outstanding invoices to continue using this feature: https://thirdweb.com/team/${teamAndProjectResponse.team.slug}/~/billing/invoices`,
+          status: 402,
+        };
+      }
+      default: {
+        return {
+          authorized: false,
+          errorCode: "SERVICE_TEMPORARILY_DISABLED",
+          errorMessage: `Access to this feature is temporarily restricted. Please reach out to us to resolve this issue: https://thirdweb.com/team/${teamAndProjectResponse.team.slug}/~/support`,
+          status: 403,
+        };
+      }
+    }
+  }
+
   // now we can validate the key itself
   const clientAuth = authorizeClient(authData, teamAndProjectResponse);
 
   if (!clientAuth.authorized) {
     return {
-      errorCode: clientAuth.errorCode,
       authorized: false,
-      status: 401,
+      errorCode: clientAuth.errorCode,
       errorMessage: clientAuth.errorMessage,
+      status: 401,
     };
   }
 
@@ -139,18 +206,61 @@ export async function authorize(
 
   if (!serviceAuth.authorized) {
     return {
-      errorCode: serviceAuth.errorCode,
       authorized: false,
-      status: 403,
+      errorCode: serviceAuth.errorCode,
       errorMessage: serviceAuth.errorMessage,
+      status: 403,
     };
   }
 
   // if we reach this point we are authorized!
   return {
-    authorized: true,
-    team: teamAndProjectResponse.team,
-    project: teamAndProjectResponse.project,
     authMethod: clientAuth.authMethod,
+    authorized: true,
+    project: teamAndProjectResponse.project,
+    team: teamAndProjectResponse.team,
   };
+}
+
+function getServiceDisabledReason(
+  scope: CoreServiceConfig["serviceScope"],
+  teamCapabilities: TeamResponse["capabilities"],
+): ReasonCode | null {
+  switch (scope) {
+    case "rpc":
+      return teamCapabilities.rpc.enabled
+        ? null
+        : teamCapabilities.rpc.reasonCode;
+    case "bundler":
+      return teamCapabilities.bundler.enabled
+        ? null
+        : teamCapabilities.bundler.reasonCode;
+    case "storage":
+      return teamCapabilities.storage.enabled
+        ? null
+        : teamCapabilities.storage.reasonCode;
+    case "insight":
+      return teamCapabilities.insight.enabled
+        ? null
+        : teamCapabilities.insight.reasonCode;
+    case "nebula":
+      return teamCapabilities.nebula.enabled
+        ? null
+        : teamCapabilities.nebula.reasonCode;
+    case "embeddedWallets":
+      return teamCapabilities.embeddedWallets.enabled
+        ? null
+        : teamCapabilities.embeddedWallets.reasonCode;
+    case "engineCloud":
+      return teamCapabilities.engineCloud.enabled
+        ? null
+        : teamCapabilities.engineCloud.reasonCode;
+    case "pay":
+      return teamCapabilities.pay.enabled
+        ? null
+        : teamCapabilities.pay.reasonCode;
+    default:
+      // always return null for any legacy / un-named services
+      return null;
+  }
 }

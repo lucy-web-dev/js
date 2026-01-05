@@ -1,12 +1,8 @@
 import type { Address } from "abitype";
 import type { Chain } from "../../chains/types.js";
 import type { ThirdwebClient } from "../../client/client.js";
-import { NATIVE_TOKEN_ADDRESS } from "../../constants/addresses.js";
-import { getBytecode } from "../../contract/actions/get-bytecode.js";
-import { getContract } from "../../contract/contract.js";
 import { isAddress } from "../../utils/address.js";
-import { getClientFetch } from "../../utils/fetch.js";
-import { getPayConvertCryptoToFiatEndpoint } from "../utils/definitions.js";
+import { getToken } from "./get-token.js";
 import type { SupportedFiatCurrency } from "./type.js";
 
 /**
@@ -30,7 +26,6 @@ export type ConvertCryptoToFiatParams = {
   chain: Chain;
   /**
    * The fiat symbol. e.g "USD"
-   * Only USD is supported at the moment.
    */
   to: SupportedFiatCurrency;
 };
@@ -60,7 +55,7 @@ export type ConvertCryptoToFiatParams = {
 export async function convertCryptoToFiat(
   options: ConvertCryptoToFiatParams,
 ): Promise<{ result: number }> {
-  const { client, fromTokenAddress, to, chain, fromAmount } = options;
+  const { client, fromTokenAddress, chain, fromAmount, to } = options;
   if (Number(fromAmount) === 0) {
     return { result: 0 };
   }
@@ -77,36 +72,12 @@ export async function convertCryptoToFiat(
       "Invalid fromTokenAddress. Expected a valid EVM contract address",
     );
   }
-  // Make sure it's either a valid contract or a native token address
-  if (fromTokenAddress.toLowerCase() !== NATIVE_TOKEN_ADDRESS.toLowerCase()) {
-    const bytecode = await getBytecode(
-      getContract({
-        address: fromTokenAddress,
-        chain,
-        client,
-      }),
-    ).catch(() => undefined);
-    if (!bytecode || bytecode === "0x") {
-      throw new Error(
-        `Error: ${fromTokenAddress} on chainId: ${chain.id} is not a valid contract address.`,
-      );
-    }
-  }
-  const params = {
-    fromTokenAddress,
-    to,
-    chainId: String(chain.id),
-    fromAmount: String(fromAmount),
-  };
-  const queryString = new URLSearchParams(params).toString();
-  const url = `${getPayConvertCryptoToFiatEndpoint()}?${queryString}`;
-  const response = await getClientFetch(client)(url);
-  if (!response.ok) {
+  const token = await getToken(client, fromTokenAddress, chain.id);
+  const price = token?.prices[to] || 0;
+  if (!token || price === 0) {
     throw new Error(
-      `Failed to fetch ${to} value for token (${fromTokenAddress}) on chainId: ${chain.id}`,
+      `Error: Failed to fetch price for token ${fromTokenAddress} on chainId: ${chain.id}`,
     );
   }
-
-  const data: { result: number } = await response.json();
-  return data;
+  return { result: price * fromAmount };
 }

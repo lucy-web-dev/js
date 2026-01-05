@@ -5,7 +5,7 @@ export const wallet = {
   id: "com.bitcoin",
   name: "Bitcoin.com Wallet",
   homepage: "https://www.bitcoin.com/",
-  image_id: "0d7938e1-9b3b-4d8b-177b-98188c4cf400",
+  image_id: "8c575dec-0401-495f-d217-db965b48bf00",
   app: {
     browser: "https://wallet.bitcoin.com/",
     ios: "https://apps.apple.com/us/app/bitcoin-wallet-by-bitcoin-com/id1252903728",
@@ -27,6 +27,6 @@ export const wallet = {
   },
   desktop: {
     native: null,
-    universal: null,
+    universal: "https://wallet.bitcoin.com/",
   },
 } as const;

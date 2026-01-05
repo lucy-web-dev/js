@@ -37,7 +37,7 @@ type UseContractEventsOptions<
  *
  * ### Using event extensions
  *
- * The `thirdweb/extesions` export contains event definitions for many popular contracts.
+ * The `thirdweb/extensions` export contains event definitions for many popular contracts.
  * You can use these event definitions to watch for specific events with a type-safe API.
  *
  * ```jsx
@@ -92,7 +92,7 @@ export function useContractEvents<
     () =>
       events?.reduce((acc, curr) => {
         // we can use the event hash as a unique identifier?
-        return `${acc}${curr.hash}_`;
+        return `${acc}${curr.hash}${curr.topics.join("")}_`;
       }, "") || "__all__",
     [events],
   );
@@ -103,7 +103,7 @@ export function useContractEvents<
   );
 
   const query = useQuery({
-    queryKey,
+    enabled,
     queryFn: async () => {
       const rpcRequest = getRpcClient(contract);
       const currentBlockNumber = await eth_blockNumber(rpcRequest);
@@ -115,7 +115,7 @@ export function useContractEvents<
       });
       return initialEvents;
     },
-    enabled,
+    queryKey,
   });
 
   useEffect(() => {
@@ -127,6 +127,8 @@ export function useContractEvents<
     // the return is important here because it will unwatch the events
     return watchContractEvents<abi, abiEvents>({
       contract,
+      events,
+      latestBlockNumber: latestBlockNumber.current,
       onEvents: (newEvents) => {
         if (newEvents.length > 0 && newEvents[0]) {
           latestBlockNumber.current = newEvents[0].blockNumber; // Update the latest block number to avoid duplicate events if a new poller is spawned during this block
@@ -137,8 +139,6 @@ export function useContractEvents<
           ...newEvents,
         ]);
       },
-      events,
-      latestBlockNumber: latestBlockNumber.current,
     });
   }, [contract, enabled, events, queryClient, queryKey, watch]);
 

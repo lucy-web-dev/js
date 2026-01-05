@@ -3,6 +3,7 @@ import { concat } from "viem";
 import type { ThirdwebClient } from "../../../../client/client.js";
 import { toBytes } from "../../../../utils/encoding/to-bytes.js";
 import { keccak256 } from "../../../../utils/hashing/keccak256.js";
+import type { AsyncStorage } from "../../../../utils/storage/AsyncStorage.js";
 import { nativeLocalStorage } from "../../../../utils/storage/nativeStorage.js";
 import {
   base64ToString,
@@ -31,25 +32,25 @@ export class PasskeyNativeClient implements PasskeyClient {
   }): Promise<RegisterResult> {
     const { name, challenge, rp } = args;
     const result = await Passkey.create({
-      challenge,
-      user: {
-        displayName: name,
-        name: name,
-        id: keccak256(toBytes(name)),
-      },
       authenticatorSelection: {
         authenticatorAttachment: "platform",
+        requireResidentKey: true,
         residentKey: "required",
         userVerification: "required",
-        requireResidentKey: true,
       },
-      rp,
+      challenge,
       pubKeyCredParams: [
         {
           alg: -7,
           type: "public-key",
         },
       ],
+      rp,
+      user: {
+        displayName: name,
+        id: keccak256(toBytes(name)),
+        name: name,
+      },
     });
 
     const parsedResult =
@@ -64,12 +65,12 @@ export class PasskeyNativeClient implements PasskeyClient {
 
     return {
       authenticatorData: authData,
-      credentialId: parsedResult.id,
       clientData: clientDataB64,
       credential: {
-        publicKey,
         algorithm: "ES256",
+        publicKey,
       },
+      credentialId: parsedResult.id,
       origin: clientDataParsed.origin,
     };
   }
@@ -81,18 +82,18 @@ export class PasskeyNativeClient implements PasskeyClient {
   }): Promise<AuthenticateResult> {
     const { credentialId, challenge, rp } = args;
     const result = await Passkey.get({
-      challenge,
-      rpId: rp.id,
       allowCredentials: credentialId
         ? [
             {
               id: credentialId,
-              type: "public-key",
               // biome-ignore lint/suspicious/noExplicitAny: enum not exported
               transports: ["hybrid" as any],
+              type: "public-key",
             },
           ]
         : [],
+      challenge,
+      rpId: rp.id,
     });
 
     const parsedResult =
@@ -104,10 +105,10 @@ export class PasskeyNativeClient implements PasskeyClient {
 
     return {
       authenticatorData: parsedResult.response.authenticatorData,
-      credentialId: parsedResult.id,
       clientData: clientDataB64,
-      signature: parsedResult.response.signature,
+      credentialId: parsedResult.id,
       origin: clientDataParsed.origin,
+      signature: parsedResult.response.signature,
     };
   }
 }
@@ -121,13 +122,14 @@ export class PasskeyNativeClient implements PasskeyClient {
 export async function hasStoredPasskey(
   client: ThirdwebClient,
   ecosystemId?: EcosystemWalletId,
+  storage?: AsyncStorage,
 ) {
-  const storage = new ClientScopedStorage({
-    storage: nativeLocalStorage,
+  const clientStorage = new ClientScopedStorage({
     clientId: client.clientId,
     ecosystem: ecosystemId ? { id: ecosystemId } : undefined,
+    storage: storage ?? nativeLocalStorage,
   });
-  const credId = await storage.getPasskeyCredentialId();
+  const credId = await clientStorage.getPasskeyCredentialId();
   return !!credId;
 }
 
@@ -201,8 +203,8 @@ async function extractPublicKeyAndAuthData(response: {
   ]);
 
   return {
-    publicKey: uint8ArrayToBase64(pubKey),
     authData: uint8ArrayToBase64(authData),
+    publicKey: uint8ArrayToBase64(pubKey),
   };
 }
 
@@ -258,12 +260,12 @@ function decodeAuthData(authData: Uint8Array) {
   }
 
   return {
-    rpIdHash,
-    flags,
-    signCount,
     aaguid,
-    credentialIdLength,
     credentialId,
+    credentialIdLength,
+    flags,
     publicKey,
+    rpIdHash,
+    signCount,
   };
 }

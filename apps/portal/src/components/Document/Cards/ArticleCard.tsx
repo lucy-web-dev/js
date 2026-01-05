@@ -1,7 +1,7 @@
-import { cn } from "@/lib/utils";
 import type { StaticImport } from "next/dist/shared/lib/get-img-props";
 import Image from "next/image";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 
 export function ArticleCard(props: {
   title: string;
@@ -11,14 +11,17 @@ export function ArticleCard(props: {
   const isExternal = props.href.startsWith("http");
   return (
     <Link
+      className="flex cursor-default bg-card"
+      data-noindex
       href={props.href}
-      className="flex cursor-default bg-b-800"
       target={isExternal ? "_blank" : undefined}
     >
-      <article className="group/article w-full overflow-hidden rounded-lg border transition-colors duration-300 hover:border-accent-500 hover:bg-accent-900">
+      <article className="group/article w-full overflow-hidden rounded-lg border transition-colors hover:border-active-border">
         <div className="p-4">
           <h3 className="mb-1.5 font-semibold text-base">{props.title}</h3>
-          <p className="font-medium text-f-300 text-sm">{props.description}</p>
+          <p className="font-medium text-muted-foreground text-sm">
+            {props.description}
+          </p>
         </div>
       </article>
     </Link>
@@ -36,22 +39,31 @@ export function ArticleIconCard(props: {
   const isExternal = props.href.startsWith("http");
   return (
     <Link
-      href={props.href}
       className={cn(
-        "flex items-center gap-4 rounded-lg border bg-b-800 p-4 transition-colors hover:border-accent-500 hover:bg-accent-900",
+        "flex items-center gap-4 rounded-xl border bg-card px-4 py-6 transition-colors hover:border-active-border",
         props.className,
       )}
+      data-noindex
+      href={props.href}
       target={isExternal ? "_blank" : undefined}
     >
-      {props.icon && <props.icon className="size-8 shrink-0 text-accent-500" />}
-      {props.image && (
-        <Image src={props.image} alt="" className="size-8 shrink-0" />
+      {props.icon && (
+        <div className="shrink-0">
+          <div className="rounded-full p-2.5 bg-background border">
+            <props.icon className="size-3.5 text-muted-foreground" />
+          </div>
+        </div>
       )}
-      <div className="flex flex-col gap-1">
-        <h3 className="font-semibold text-base text-f-100 lg:text-lg">
+      {props.image && (
+        <Image alt="" className="size-6 shrink-0" src={props.image} />
+      )}
+      <div className="flex flex-col gap-1.5">
+        <h3 className="font-semibold text-base text-foreground leading-none">
           {props.title}
         </h3>
-        {props.description && <p className="text-f-300">{props.description}</p>}
+        {props.description && (
+          <p className="text-muted-foreground text-sm">{props.description}</p>
+        )}
       </div>
     </Link>
   );

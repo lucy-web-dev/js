@@ -14,7 +14,6 @@ export function extractMinimalProxyImplementationAddress(
   bytecode: string,
 ): string | undefined {
   if (!bytecode.startsWith("0x")) {
-    // biome-ignore lint/style/noParameterAssign: perf
     bytecode = `0x${bytecode}`;
   }
   // EIP-1167 clone minimal proxy - https://eips.ethereum.org/EIPS/eip-1167
@@ -51,6 +50,12 @@ export function extractMinimalProxyImplementationAddress(
   // EIP-7511 minimal proxy with PUSH0 opcode - https://eips.ethereum.org/EIPS/eip-7511
   if (bytecode.startsWith("0x365f5f375f5f365f73")) {
     const implementationAddress = bytecode.slice(20, 60);
+    return `0x${implementationAddress}`;
+  }
+
+  // EIP-7702 - https://eips.ethereum.org/EIPS/eip-7702#abstract
+  if (bytecode.length === 48 && bytecode.startsWith("0xef0100")) {
+    const implementationAddress = bytecode.slice(8, 48);
     return `0x${implementationAddress}`;
   }
 

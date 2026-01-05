@@ -1,7 +1,7 @@
 import type { Address } from "abitype";
 import {
-  NATIVE_TOKEN_ADDRESS,
   isNativeTokenAddress,
+  NATIVE_TOKEN_ADDRESS,
 } from "../../../../constants/addresses.js";
 import { getContract } from "../../../../contract/contract.js";
 import { eth_getBlockByNumber } from "../../../../rpc/actions/eth_getBlockByNumber.js";
@@ -90,7 +90,6 @@ export function updateListing(
   options: BaseTransactionOptions<UpdateListingParams>,
 ) {
   return generatedUpdateListing({
-    contract: options.contract,
     asyncParams: async () => {
       const { contract, listingId, ...updateParams } = options;
 
@@ -120,25 +119,25 @@ export function updateListing(
       }
 
       // validate the timestamps
-      let startTimestamp = BigInt(
-        Math.floor(
-          (mergedOptions.startTimestamp ?? new Date()).getTime() / 1000,
-        ),
-      );
-      const endTimestamp = BigInt(
-        Math.floor(
-          (
-            mergedOptions.endTimestamp ??
-            new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000)
-          ).getTime() / 1000,
-        ),
-      );
+      let startTimestamp = mergedOptions.startTimestamp
+        ? BigInt(Math.floor(mergedOptions.startTimestamp.getTime() / 1000))
+        : mergedOptions.startTimeInSeconds;
 
-      if (startTimestamp <= lastestBlock.timestamp) {
+      const endTimestamp = mergedOptions.endTimestamp
+        ? BigInt(Math.floor(mergedOptions.endTimestamp.getTime() / 1000))
+        : mergedOptions.endTimeInSeconds;
+
+      if (
+        startTimestamp !== mergedOptions.startTimeInSeconds &&
+        startTimestamp <= lastestBlock.timestamp
+      ) {
         // set the start time to the next block if it is in the past
         startTimestamp = lastestBlock.timestamp + 1n;
       }
-      if (startTimestamp >= endTimestamp) {
+      if (
+        startTimestamp !== mergedOptions.startTimeInSeconds &&
+        startTimestamp >= endTimestamp
+      ) {
         throw new Error("Start time must be before end time.");
       }
 
@@ -183,21 +182,22 @@ export function updateListing(
 
       return {
         listingId,
-        params: {
-          assetContract: mergedOptions.assetContractAddress,
-          tokenId: mergedOptions.tokenId,
-          currency:
-            mergedOptions.currencyContractAddress ?? NATIVE_TOKEN_ADDRESS,
-          quantity,
-          pricePerToken,
-          startTimestamp,
-          endTimestamp,
-          reserved: mergedOptions.isReservedListing ?? false,
-        },
         overrides: {
           extraGas: 50_000n, // add extra gas to account for router call
         },
+        params: {
+          assetContract: mergedOptions.assetContractAddress,
+          currency:
+            mergedOptions.currencyContractAddress ?? NATIVE_TOKEN_ADDRESS,
+          endTimestamp,
+          pricePerToken,
+          quantity,
+          reserved: mergedOptions.isReservedListing ?? false,
+          startTimestamp,
+          tokenId: mergedOptions.tokenId,
+        },
       } as const;
     },
+    contract: options.contract,
   });
 }

@@ -1,35 +1,18 @@
+import "@workspace/ui/global.css";
 import "./globals.css";
-import { createMetadata } from "@/components/Document";
-import { PosthogHeadSetup, PosthogPageView } from "@/lib/posthog/Posthog";
-import { Fira_Code, Inter } from "next/font/google";
-import Script from "next/script";
+import { GeistMono } from "geist/font/mono";
+import { GeistSans } from "geist/font/sans";
+import { ThemeProvider } from "next-themes";
 import NextTopLoader from "nextjs-toploader";
+import { createMetadata } from "@/components/Document";
 import { StickyTopContainer } from "../components/Document/StickyTopContainer";
-import { Banner } from "../components/others/Banner";
 import { EnableSmoothScroll } from "../components/others/SmoothScroll";
-import { SetStoredTheme } from "../components/others/theme/theme";
 import { cn } from "../lib/utils";
 import { Header } from "./Header";
 
-const sansFont = Inter({
-  subsets: ["latin"],
-  variable: "--font-sans",
-  weight: "variable",
-});
-
-const monoFont = Fira_Code({
-  subsets: ["latin"],
-  variable: "--font-mono",
-  weight: "variable",
-});
-
 export const metadata = createMetadata({
-  title: "thirdweb docs",
   description: "thirdweb developer portal",
-  image: {
-    title: "Build apps and games on any EVM chain",
-    icon: "thirdweb",
-  },
+  title: "thirdweb docs",
 });
 
 export default function RootLayout({
@@ -39,41 +22,32 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head>
-        <PosthogHeadSetup />
-        <Script
-          src="https://thirdweb.com/js/pl.js"
-          defer
-          data-domain="portal.thirdweb.com"
-          data-api="https://pl.thirdweb.com/api/event"
-        />
-      </head>
       <body
-        className={cn(sansFont.variable, monoFont.variable, "font-sans")}
+        className={cn(GeistMono.variable, GeistSans.variable, "font-sans")}
         suppressHydrationWarning
       >
-        <SetStoredTheme />
-        <NextTopLoader
-          color="var(--accent-500)"
-          height={2}
-          shadow={false}
-          showSpinner={false}
-        />
-        <PosthogPageView />
-        <EnableSmoothScroll />
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          disableTransitionOnChange
+          enableSystem={false}
+        >
+          <NextTopLoader
+            color="hsl(var(--foreground))"
+            height={2}
+            shadow={false}
+            showSpinner={false}
+          />
+          <EnableSmoothScroll />
 
-        <div className="relative flex min-h-screen flex-col">
-          <StickyTopContainer>
-            {/* Note: Please change id as well when changing text or href so that new banner is shown to user even if user dismissed the older one  */}
-            <Banner
-              id="nebula-alpha"
-              text="Introducing Nebula - the most powerful AI to interact with the blockchain. Join the waitlist."
-              href="https://thirdweb.com/nebula"
-            />
-            <Header />
-          </StickyTopContainer>
-          {children}
-        </div>
+          <div className="relative flex min-h-screen flex-col">
+            <StickyTopContainer>
+              <Header />
+            </StickyTopContainer>
+
+            {children}
+          </div>
+        </ThemeProvider>
       </body>
     </html>
   );

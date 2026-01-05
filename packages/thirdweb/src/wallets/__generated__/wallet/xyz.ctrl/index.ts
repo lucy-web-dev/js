@@ -5,9 +5,9 @@ export const wallet = {
   id: "xyz.ctrl",
   name: "Ctrl Wallet",
   homepage: "https://ctrl.xyz/",
-  image_id: "749856b0-3f0e-4876-4d0f-27835310db00",
+  image_id: "55e59c54-43bf-434a-e966-547514f21500",
   app: {
-    browser: "https://ctrl.xyz/",
+    browser: "",
     ios: "https://apps.apple.com/us/app/ctrl-wallet/id6630386336",
     android: "https://play.google.com/store/apps/details?id=xyz.ctrl.wallet",
     mac: null,
@@ -23,10 +23,10 @@ export const wallet = {
   rdns: "xyz.ctrl",
   mobile: {
     native: "ctrl-mobile://",
-    universal: null,
+    universal: "https://ctrl.xyz/deeplink/wallet",
   },
   desktop: {
-    native: null,
-    universal: null,
+    native: "",
+    universal: "",
   },
 } as const;

@@ -1,30 +1,14 @@
-"use client";
-
-import { WalletIcon, WalletName, WalletProvider } from "thirdweb/react";
 import { CodeExample } from "../code/code-example";
+import {
+  WalletIconBasicPreview,
+  WalletNameBasicPreview,
+  WalletNameFormatPreview,
+} from "./wallet-previews";
 
-export function WalletIconBasic() {
+export function WalletIconExample() {
   return (
-    <>
-      <div className="space-y-2">
-        <h2 className="font-semibold text-2xl tracking-tight sm:text-3xl">
-          WalletIcon
-        </h2>
-        <p className="max-w-[600px] text-lg">
-          Show the icon of a crypto wallet
-        </p>
-      </div>
-
-      <CodeExample
-        preview={
-          <WalletProvider id="io.metamask">
-            <WalletIcon
-              className="h-20 w-20 rounded-full"
-              loadingComponent={<span>Loading...</span>}
-            />
-          </WalletProvider>
-        }
-        code={`import { WalletProvider, WalletIcon } from "thirdweb/react";
+    <CodeExample
+      code={`import { WalletProvider, WalletIcon } from "thirdweb/react";
 
 function App() {
   return (
@@ -36,30 +20,20 @@ function App() {
     </WalletProvider>
   )
 }`}
-        lang="tsx"
-      />
-    </>
+      header={{
+        description: "Show the icon of a crypto wallet",
+        title: "WalletIcon",
+      }}
+      lang="tsx"
+      preview={<WalletIconBasicPreview />}
+    />
   );
 }
 
-export function WalletNameBasic() {
+export function WalletNameExample() {
   return (
-    <>
-      <div className="mt-8 space-y-2">
-        <h2 className="font-semibold text-2xl tracking-tight sm:text-3xl">
-          WalletName
-        </h2>
-        <p className="max-w-[600px] text-lg">
-          Show the name of a crypto wallet
-        </p>
-      </div>
-
+    <div>
       <CodeExample
-        preview={
-          <WalletProvider id="io.metamask">
-            <WalletName loadingComponent={<span>Loading...</span>} />
-          </WalletProvider>
-        }
         code={`import { WalletProvider, WalletName } from "thirdweb/react";
 
 function App() {
@@ -69,41 +43,34 @@ function App() {
     </WalletProvider>
   )
 }`}
+        header={{
+          description: "Show the name of a crypto wallet",
+          title: "WalletName",
+        }}
         lang="tsx"
+        preview={<WalletNameBasicPreview />}
       />
-    </>
-  );
-}
 
-export function WalletNameFormat() {
-  return (
-    <>
-      <div className="mt-8 space-y-2">
-        <p className="max-w-[600px] text-lg">
-          Transform the wallet name using the <b>formatFn</b> prop.
-        </p>
-      </div>
+      <p className="my-4 text-muted-foreground text-sm">
+        Transform the wallet name using the formatFn prop.
+      </p>
 
       <CodeExample
-        preview={
-          <WalletProvider id="io.metamask">
-            <WalletName formatFn={(str: string) => `${str} Wallet`} />
-          </WalletProvider>
-        }
         code={`import { WalletProvider, WalletName } from "thirdweb/react";
 
 function App() {
   return (
     <WalletProvider id="io.metamask">
-      <WalletName 
-        loadingComponent={<span>Loading...</span>} 
+      <WalletName
+        loadingComponent={<span>Loading...</span>}
         formatFn={(str: string) => \`\${str} Wallet\`}
       />
     </WalletProvider>
   )
 }`}
         lang="tsx"
+        preview={<WalletNameFormatPreview />}
       />
-    </>
+    </div>
   );
 }

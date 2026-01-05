@@ -1,21 +1,20 @@
-import type { EthereumProvider } from "@walletconnect/ethereum-provider";
+import type {
+  RequestArguments,
+  UniversalProvider,
+} from "@walletconnect/universal-provider";
 import type { Address } from "abitype";
 import {
+  getTypesForEIP712Domain,
   type ProviderRpcError,
   type SignTypedDataParameters,
   SwitchChainError,
-  UserRejectedRequestError,
-  getTypesForEIP712Domain,
   serializeTypedData,
+  UserRejectedRequestError,
   validateTypedData,
 } from "viem";
 import { trackTransaction } from "../../analytics/track/transaction.js";
 import type { Chain } from "../../chains/types.js";
-import {
-  getCachedChain,
-  getChainMetadata,
-  getRpcUrlForChain,
-} from "../../chains/utils.js";
+import { getCachedChain, getRpcUrlForChain } from "../../chains/utils.js";
 import type { ThirdwebClient } from "../../client/client.js";
 import { getAddress } from "../../utils/address.js";
 import {
@@ -40,15 +39,17 @@ import type {
   Wallet,
 } from "../interfaces/wallet.js";
 import type { DisconnectFn, SwitchChainFn } from "../types.js";
-import { getValidPublicRPCUrl } from "../utils/chains.js";
 import { getDefaultAppMetadata } from "../utils/defaultDappMetadata.js";
 import { normalizeChainId } from "../utils/normalizeChainId.js";
 import type { WalletEmitter } from "../wallet-emitter.js";
+import type { WalletInfo } from "../wallet-info.js";
 import type { WalletId } from "../wallet-types.js";
 import { DEFAULT_PROJECT_ID, NAMESPACE } from "./constants.js";
 import type { WCAutoConnectOptions, WCConnectOptions } from "./types.js";
 
-type WCProvider = InstanceType<typeof EthereumProvider>;
+type WCProvider = InstanceType<typeof UniversalProvider>;
+
+let cachedProvider: WCProvider | null = null;
 
 type SavedConnectParams = {
   optionalChains?: Chain[];
@@ -56,13 +57,9 @@ type SavedConnectParams = {
   pairingTopic?: string;
 };
 
-const ADD_ETH_CHAIN_METHOD = "wallet_addEthereumChain";
-
-const defaultShowQrModal = true;
-
 const storageKeys = {
-  requestedChains: "tw.wc.requestedChains",
   lastUsedChainId: "tw.wc.lastUsedChainId",
+  requestedChains: "tw.wc.requestedChains",
 };
 
 /**
@@ -85,20 +82,22 @@ export async function connectWC(
   emitter: WalletEmitter<WCSupportedWalletIds>,
   walletId: WCSupportedWalletIds | "walletConnect",
   storage: AsyncStorage,
-  sessionHandler?: (uri: string) => void,
+  sessionHandler?: (uri: string) => void | Promise<void>,
 ): Promise<ReturnType<typeof onConnect>> {
   const provider = await initProvider(options, walletId, sessionHandler);
   const wcOptions = options.walletConnect;
 
   let { onDisplayUri } = wcOptions || {};
+  const walletInfo = await getWalletInfo(walletId);
 
   // use default sessionHandler unless onDisplayUri is explicitly provided
-  if (!onDisplayUri && sessionHandler && walletId !== "walletConnect") {
-    const walletInfo = await getWalletInfo(walletId);
+  if (!onDisplayUri && sessionHandler) {
     const deeplinkHandler = (uri: string) => {
       const appUrl = walletInfo.mobile.native || walletInfo.mobile.universal;
       if (!appUrl) {
-        throw new Error("No app url found for wallet connect to redirect to.");
+        // generic wc uri
+        sessionHandler(uri);
+        return;
       }
       const fullUrl = formatWalletConnectUrl(appUrl, uri).redirect;
       sessionHandler(fullUrl);
@@ -121,36 +120,48 @@ export async function connectWC(
     }
   }
 
-  const {
-    rpcMap,
-    requiredChain,
-    optionalChains: chainsToRequest,
-  } = getChainsToRequest({
-    client: options.client,
+  // For UniversalProvider, we still need chain configuration for session management
+  const { chains: chainsToRequest, rpcMap } = getChainsToRequest({
     chain: chainToRequest,
+    client: options.client,
     optionalChains: optionalChains,
   });
 
-  if (provider.session) {
-    await provider.connect({
-      ...(wcOptions?.pairingTopic
-        ? { pairingTopic: wcOptions?.pairingTopic }
-        : {}),
-      optionalChains: chainsToRequest,
-      chains: requiredChain ? [requiredChain.id] : undefined,
-      rpcMap: rpcMap,
-    });
-  }
+  // For UniversalProvider, we need to connect with namespaces
+  await provider.connect({
+    ...(wcOptions?.pairingTopic
+      ? { pairingTopic: wcOptions?.pairingTopic }
+      : {}),
+    optionalNamespaces: {
+      [NAMESPACE]: {
+        chains: chainsToRequest,
+        events: ["chainChanged", "accountsChanged"],
+        methods: [
+          "eth_sendTransaction",
+          "eth_signTransaction",
+          "eth_sign",
+          "personal_sign",
+          "eth_signTypedData",
+          "eth_signTypedData_v4",
+          "wallet_switchEthereumChain",
+          "wallet_addEthereumChain",
+        ],
+        rpcMap,
+      },
+    },
+  });
 
-  setRequestedChainsIds(chainsToRequest, storage);
-  // If session exists and chains are authorized, enable provider for required chain
-  const addresses = await provider.enable();
-  const address = addresses[0];
+  setRequestedChainsIds(
+    chainsToRequest.map((x) => Number(x.split(":")[1])),
+    storage,
+  );
+  const currentChainId = chainsToRequest[0]?.split(":")[1] || 1;
+  const providerChainId = normalizeChainId(currentChainId);
+  const account = firstAccountOn(provider.session, `eip155:1`); // grab the address from mainnet if available
+  const address = account;
   if (!address) {
     throw new Error("No accounts found on provider.");
   }
-
-  const providerChainId = normalizeChainId(provider.chainId);
 
   const chain =
     options.chain && options.chain.id === providerChainId
@@ -159,8 +170,8 @@ export async function connectWC(
 
   if (options) {
     const savedParams: SavedConnectParams = {
-      optionalChains: options.walletConnect?.optionalChains,
       chain: options.chain,
+      optionalChains: options.walletConnect?.optionalChains,
       pairingTopic: options.walletConnect?.pairingTopic,
     };
 
@@ -169,11 +180,124 @@ export async function connectWC(
     }
   }
 
-  if (wcOptions?.onDisplayUri) {
-    provider.events.removeListener("display_uri", wcOptions.onDisplayUri);
+  if (onDisplayUri) {
+    provider.events.removeListener("display_uri", onDisplayUri);
   }
 
-  return onConnect(address, chain, provider, emitter, storage, options.client);
+  return onConnect(
+    address,
+    chain,
+    provider,
+    emitter,
+    storage,
+    options.client,
+    walletInfo,
+    sessionHandler,
+  );
+}
+
+async function ensureTargetChain(
+  provider: Awaited<ReturnType<typeof initProvider>>,
+  chain: Chain,
+  walletInfo: WalletInfo,
+) {
+  if (!provider.session) {
+    throw new Error("No session found on provider.");
+  }
+  const TARGET_CAIP = `eip155:${chain.id}`;
+  const TARGET_HEX = numberToHex(chain.id);
+
+  // Fast path: already enabled
+  if (hasChainEnabled(provider.session, TARGET_CAIP)) {
+    provider.setDefaultChain(TARGET_CAIP);
+    return;
+  }
+
+  // 1) Try switch
+  try {
+    await requestAndOpenWallet({
+      provider,
+      payload: {
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: TARGET_HEX }],
+      },
+      chain: TARGET_CAIP, // route to target
+      walletInfo,
+    });
+    provider.setDefaultChain(TARGET_CAIP);
+    return;
+  } catch (err: any) {
+    const code = err?.code ?? err?.data?.originalError?.code;
+    // 4001 user rejected; stop
+    if (code === 4001) throw new Error("User rejected chain switch");
+    // fall through on 4902 or unknown -> try add
+  }
+
+  // 2) Add the chain via any chain we already have
+  const routeChain = anyRoutableChain(provider.session);
+  if (!routeChain)
+    throw new Error("No routable chain to send wallet_addEthereumChain");
+
+  try {
+    await requestAndOpenWallet({
+      provider,
+      payload: {
+        method: "wallet_addEthereumChain",
+        params: [
+          {
+            chainId: TARGET_HEX,
+            chainName: chain.name,
+            nativeCurrency: chain.nativeCurrency,
+            rpcUrls: [chain.rpc],
+            blockExplorerUrls: [chain.blockExplorers?.[0]?.url ?? ""],
+          },
+        ],
+      },
+      chain: routeChain, // route via known-good chain, not the target
+      walletInfo,
+    });
+  } catch (err: any) {
+    const code = err?.code ?? err?.data?.originalError?.code;
+    if (code === 4001) throw new Error("User rejected add chain");
+    throw new Error(`Add chain failed: ${err?.message || String(err)}`);
+  }
+
+  // 3) Re-try switch after add
+  await requestAndOpenWallet({
+    provider,
+    payload: {
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: TARGET_HEX }],
+    },
+    chain: TARGET_CAIP,
+    walletInfo,
+  });
+  provider.setDefaultChain(TARGET_CAIP);
+
+  // 4) Verify enablement
+  if (!hasChainEnabled(provider.session, TARGET_CAIP)) {
+    throw new Error("Target chain still not enabled by wallet");
+  }
+}
+
+type WCSession = Awaited<ReturnType<typeof UniversalProvider.init>>["session"];
+
+function getNS(session: WCSession) {
+  return session?.namespaces?.eip155;
+}
+function hasChainEnabled(session: WCSession, caip: string) {
+  const ns = getNS(session);
+  return !!ns?.accounts?.some((a) => a.startsWith(`${caip}:`));
+}
+function firstAccountOn(session: WCSession, caip: string): string | null {
+  const ns = getNS(session);
+  const hit =
+    ns?.accounts?.find((a) => a.startsWith(`${caip}:`)) || ns?.accounts[0];
+  return hit ? (hit.split(":")[2] ?? null) : null;
+}
+function anyRoutableChain(session: WCSession): string | null {
+  const ns = getNS(session);
+  return ns?.accounts?.[0]?.split(":")?.slice(0, 2)?.join(":") ?? null; // e.g. "eip155:1"
 }
 
 /**
@@ -185,11 +309,13 @@ export async function autoConnectWC(
   emitter: WalletEmitter<WCSupportedWalletIds>,
   walletId: WCSupportedWalletIds | "walletConnect",
   storage: AsyncStorage,
-  sessionHandler?: (uri: string) => void,
+  sessionHandler?: (uri: string) => void | Promise<void>,
 ): Promise<ReturnType<typeof onConnect>> {
   const savedConnectParams: SavedConnectParams | null = storage
     ? await getSavedConnectParamsFromStorage(storage, walletId)
     : null;
+
+  const walletInfo = await getWalletInfo(walletId);
 
   const provider = await initProvider(
     savedConnectParams
@@ -197,8 +323,8 @@ export async function autoConnectWC(
           chain: savedConnectParams.chain,
           client: options.client,
           walletConnect: {
-            pairingTopic: savedConnectParams.pairingTopic,
             optionalChains: savedConnectParams.optionalChains,
+            pairingTopic: savedConnectParams.pairingTopic,
           },
         }
       : {
@@ -207,23 +333,40 @@ export async function autoConnectWC(
         },
     walletId,
     sessionHandler,
-    true, // is auto connect
   );
 
-  const address = provider.accounts[0];
+  if (!provider.session) {
+    await provider.disconnect();
+    throw new Error("No wallet connect session found on provider.");
+  }
+
+  // For UniversalProvider, get accounts from enable() method
+  const namespaceAccounts = provider.session?.namespaces?.[NAMESPACE]?.accounts;
+  const address = namespaceAccounts?.[0]?.split(":")[2];
 
   if (!address) {
     throw new Error("No accounts found on provider.");
   }
 
-  const providerChainId = normalizeChainId(provider.chainId);
+  // For UniversalProvider, get chainId from the session namespaces or use default
+  const currentChainId = options.chain?.id || 1;
+  const providerChainId = normalizeChainId(currentChainId);
 
   const chain =
     options.chain && options.chain.id === providerChainId
       ? options.chain
       : getCachedChain(providerChainId);
 
-  return onConnect(address, chain, provider, emitter, storage, options.client);
+  return onConnect(
+    address,
+    chain,
+    provider,
+    emitter,
+    storage,
+    options.client,
+    walletInfo,
+    sessionHandler,
+  );
 }
 
 // Connection utils -----------------------------------------------------------------------------------------------
@@ -232,12 +375,15 @@ async function initProvider(
   options: WCConnectOptions,
   walletId: WCSupportedWalletIds | "walletConnect",
   sessionRequestHandler?: (uri: string) => void | Promise<void>,
-  isAutoConnect = false,
 ) {
+  if (cachedProvider) {
+    return cachedProvider;
+  }
+
   const walletInfo = await getWalletInfo(walletId);
   const wcOptions = options.walletConnect;
-  const { EthereumProvider, OPTIONAL_EVENTS, OPTIONAL_METHODS } = await import(
-    "@walletconnect/ethereum-provider"
+  const { UniversalProvider } = await import(
+    "@walletconnect/universal-provider"
   );
 
   let optionalChains: Chain[] | undefined = wcOptions?.optionalChains;
@@ -251,53 +397,25 @@ async function initProvider(
     }
   }
 
-  const {
-    rpcMap,
-    requiredChain,
-    optionalChains: chainsToRequest,
-  } = getChainsToRequest({
-    client: options.client,
-    chain: chainToRequest,
-    optionalChains: optionalChains,
-  });
-
-  const provider = await EthereumProvider.init({
-    showQrModal:
-      wcOptions?.showQrModal === undefined
-        ? sessionRequestHandler
-          ? false
-          : defaultShowQrModal
-        : wcOptions.showQrModal,
-    projectId: wcOptions?.projectId || DEFAULT_PROJECT_ID,
-    optionalMethods: OPTIONAL_METHODS,
-    optionalEvents: OPTIONAL_EVENTS,
-    optionalChains: chainsToRequest,
-    chains: requiredChain ? [requiredChain.id] : undefined,
+  const provider = await UniversalProvider.init({
     metadata: {
-      name: wcOptions?.appMetadata?.name || getDefaultAppMetadata().name,
       description:
         wcOptions?.appMetadata?.description ||
         getDefaultAppMetadata().description,
-      url: wcOptions?.appMetadata?.url || getDefaultAppMetadata().url,
       icons: [
         wcOptions?.appMetadata?.logoUrl || getDefaultAppMetadata().logoUrl,
       ],
+      name: wcOptions?.appMetadata?.name || getDefaultAppMetadata().name,
+      url: wcOptions?.appMetadata?.url || getDefaultAppMetadata().url,
+      redirect: {
+        native: walletInfo.mobile.native || undefined,
+        universal: walletInfo.mobile.universal || undefined,
+      },
     },
-    rpcMap: rpcMap,
-    qrModalOptions: wcOptions?.qrModalOptions,
-    disableProviderPing: true,
+    projectId: wcOptions?.projectId || DEFAULT_PROJECT_ID,
   });
 
   provider.events.setMaxListeners(Number.POSITIVE_INFINITY);
-
-  // disconnect the provider if chains are stale when (if not auto connecting)
-  if (!isAutoConnect) {
-    // const isStale = await isChainsStale(provider, chainsToRequest);
-
-    if (provider.session) {
-      await provider.disconnect();
-    }
-  }
 
   if (walletId !== "walletConnect") {
     async function handleSessionRequest() {
@@ -312,11 +430,15 @@ async function initProvider(
       }
     }
 
-    provider.signer.client.on("session_request_sent", handleSessionRequest);
+    // For UniversalProvider, use different event handling
+    provider.on("session_request_sent", handleSessionRequest);
     provider.events.addListener("disconnect", () => {
-      provider.signer.client.off("session_request_sent", handleSessionRequest);
+      provider.off("session_request_sent", handleSessionRequest);
+      cachedProvider = null;
     });
   }
+
+  cachedProvider = provider;
 
   return provider;
 }
@@ -325,35 +447,47 @@ function createAccount({
   provider,
   address,
   client,
+  chain,
+  sessionRequestHandler,
+  walletInfo,
 }: {
   provider: WCProvider;
   address: string;
   client: ThirdwebClient;
+  chain: Chain;
+  sessionRequestHandler?: (uri: string) => void | Promise<void>;
+  walletInfo: WalletInfo;
 }) {
   const account: Account = {
-    address: address,
+    address: getAddress(address),
     async sendTransaction(tx: SendTransactionOption) {
-      const transactionHash = (await provider.request({
-        method: "eth_sendTransaction",
-        params: [
-          {
-            gas: tx.gas ? numberToHex(tx.gas) : undefined,
-            value: tx.value ? numberToHex(tx.value) : undefined,
-            from: getAddress(address),
-            to: tx.to as Address,
-            data: tx.data,
-          },
-        ],
+      const transactionHash = (await requestAndOpenWallet({
+        provider,
+        payload: {
+          method: "eth_sendTransaction",
+          params: [
+            {
+              data: tx.data,
+              from: getAddress(address),
+              gas: tx.gas ? numberToHex(tx.gas) : undefined,
+              to: tx.to as Address,
+              value: tx.value ? numberToHex(tx.value) : undefined,
+            },
+          ],
+        },
+        chain: `eip155:${tx.chainId}`,
+        walletInfo,
+        sessionRequestHandler,
       })) as Hex;
 
       trackTransaction({
-        client: client,
-        walletAddress: getAddress(address),
-        walletType: "walletConnect",
-        transactionHash,
         chainId: tx.chainId,
+        client: client,
         contractAddress: tx.to ?? undefined,
         gasPrice: tx.gasPrice,
+        transactionHash,
+        walletAddress: getAddress(address),
+        walletType: "walletConnect",
       });
 
       return {
@@ -370,9 +504,15 @@ function createAccount({
         }
         return message.raw;
       })();
-      return provider.request({
-        method: "personal_sign",
-        params: [messageToSign, this.address],
+      return requestAndOpenWallet({
+        provider,
+        payload: {
+          method: "personal_sign",
+          params: [messageToSign, this.address],
+        },
+        chain: `eip155:${chain.id}`,
+        walletInfo,
+        sessionRequestHandler,
       });
     },
     async signTypedData(_data) {
@@ -396,14 +536,45 @@ function createAccount({
         types,
       });
 
-      return await provider.request({
-        method: "eth_signTypedData_v4",
-        params: [this.address, typedData],
+      return await requestAndOpenWallet({
+        provider,
+        payload: {
+          method: "eth_signTypedData_v4",
+          params: [this.address, typedData],
+        },
+        chain: `eip155:${chain.id}`,
+        walletInfo,
+        sessionRequestHandler,
       });
     },
   };
 
   return account;
+}
+
+async function requestAndOpenWallet(args: {
+  provider: WCProvider;
+  payload: RequestArguments;
+  chain?: string;
+  walletInfo: WalletInfo;
+  sessionRequestHandler?: (uri: string) => void | Promise<void>;
+}) {
+  const { provider, payload, chain, walletInfo, sessionRequestHandler } = args;
+  const resultPromise: Promise<`0x${string}`> = provider.request(
+    payload,
+    chain,
+  );
+
+  const walletLinkToOpen =
+    provider.session?.peer?.metadata?.redirect?.native ||
+    walletInfo.mobile.native ||
+    walletInfo.mobile.universal;
+
+  if (sessionRequestHandler && walletLinkToOpen) {
+    await sessionRequestHandler(walletLinkToOpen);
+  }
+
+  return resultPromise;
 }
 
 function onConnect(
@@ -413,14 +584,24 @@ function onConnect(
   emitter: WalletEmitter<WCSupportedWalletIds>,
   storage: AsyncStorage,
   client: ThirdwebClient,
+  walletInfo: WalletInfo,
+  sessionRequestHandler?: (uri: string) => void | Promise<void>,
 ): [Account, Chain, DisconnectFn, SwitchChainFn] {
-  const account = createAccount({ provider, address, client });
+  const account = createAccount({
+    address,
+    chain,
+    client,
+    provider,
+    sessionRequestHandler,
+    walletInfo,
+  });
 
   async function disconnect() {
     provider.removeListener("accountsChanged", onAccountsChanged);
     provider.removeListener("chainChanged", onChainChanged);
     provider.removeListener("disconnect", onDisconnect);
     await provider.disconnect();
+    cachedProvider = null;
   }
 
   function onDisconnect() {
@@ -433,9 +614,12 @@ function onConnect(
   function onAccountsChanged(accounts: string[]) {
     if (accounts[0]) {
       const newAccount = createAccount({
-        provider,
         address: getAddress(accounts[0]),
+        chain,
         client,
+        provider,
+        sessionRequestHandler,
+        walletInfo,
       });
       emitter.emit("accountChanged", newAccount);
       emitter.emit("accountsChanged", accounts);
@@ -459,66 +643,17 @@ function onConnect(
     account,
     chain,
     disconnect,
-    (newChain) => switchChainWC(provider, newChain, storage),
+    (newChain) => switchChainWC(provider, newChain, walletInfo),
   ];
-}
-
-// Storage utils  -----------------------------------------------------------------------------------------------
-
-function getNamespaceMethods(provider: WCProvider) {
-  return provider.session?.namespaces[NAMESPACE]?.methods || [];
-}
-
-function getNamespaceChainsIds(provider: WCProvider): number[] {
-  const chainIds = provider.session?.namespaces[NAMESPACE]?.chains?.map(
-    (chain) => Number.parseInt(chain.split(":")[1] || ""),
-  );
-
-  return chainIds ?? [];
 }
 
 async function switchChainWC(
   provider: WCProvider,
   chain: Chain,
-  storage: AsyncStorage,
+  walletInfo: WalletInfo,
 ) {
-  const chainId = chain.id;
   try {
-    const namespaceChains = getNamespaceChainsIds(provider);
-    const namespaceMethods = getNamespaceMethods(provider);
-    const isChainApproved = namespaceChains.includes(chainId);
-
-    if (!isChainApproved && namespaceMethods.includes(ADD_ETH_CHAIN_METHOD)) {
-      const apiChain = await getChainMetadata(chain);
-
-      const blockExplorerUrls = [
-        ...new Set([
-          ...(chain.blockExplorers?.map((x) => x.url) || []),
-          ...(apiChain.explorers?.map((x) => x.url) || []),
-        ]),
-      ];
-
-      await provider.request({
-        method: ADD_ETH_CHAIN_METHOD,
-        params: [
-          {
-            chainId: numberToHex(apiChain.chainId),
-            chainName: apiChain.name,
-            nativeCurrency: apiChain.nativeCurrency,
-            rpcUrls: getValidPublicRPCUrl(apiChain), // no clientId on purpose
-            blockExplorerUrls:
-              blockExplorerUrls.length > 0 ? blockExplorerUrls : undefined,
-          },
-        ],
-      });
-      const requestedChains = await getRequestedChainsIds(storage);
-      requestedChains.push(chainId);
-      setRequestedChainsIds(requestedChains, storage);
-    }
-    await provider.request({
-      method: "wallet_switchEthereumChain",
-      params: [{ chainId: numberToHex(chainId) }],
-    });
+    await ensureTargetChain(provider, chain, walletInfo);
   } catch (error) {
     const message =
       typeof error === "string" ? error : (error as ProviderRpcError)?.message;
@@ -541,35 +676,23 @@ function setRequestedChainsIds(
   storage?.setItem(storageKeys.requestedChains, stringify(chains));
 }
 
-/**
- * Get the last requested chains from the storage.
- * @internal
- */
-async function getRequestedChainsIds(storage: AsyncStorage): Promise<number[]> {
-  const data = await storage.getItem(storageKeys.requestedChains);
-  return data ? JSON.parse(data) : [];
-}
-
-type ArrayOneOrMore<T> = {
-  0: T;
-} & Array<T>;
-
 function getChainsToRequest(options: {
   chain?: Chain;
   optionalChains?: Chain[];
   client: ThirdwebClient;
 }): {
   rpcMap: Record<number, string>;
-  requiredChain: Chain | undefined;
-  optionalChains: ArrayOneOrMore<number>;
+  chains: string[];
 } {
   const rpcMap: Record<number, string> = {};
+  const chainIds: number[] = [];
 
   if (options.chain) {
     rpcMap[options.chain.id] = getRpcUrlForChain({
       chain: options.chain,
       client: options.client,
     });
+    chainIds.push(options.chain.id);
   }
 
   // limit optional chains to 10
@@ -580,19 +703,20 @@ function getChainsToRequest(options: {
       chain: chain,
       client: options.client,
     });
+    chainIds.push(chain.id);
   }
 
-  if (!options.chain && optionalChains.length === 0) {
+  // always include mainnet
+  // many wallets only support a handful of chains, but mainnet is always supported
+  // we will add additional chains in switchChain if needed
+  if (!chainIds.includes(1)) {
     rpcMap[1] = getCachedChain(1).rpc;
+    chainIds.push(1);
   }
 
   return {
+    chains: chainIds.map((x) => `eip155:${x}`),
     rpcMap,
-    requiredChain: options.chain ? options.chain : undefined,
-    optionalChains:
-      optionalChains.length > 0
-        ? (optionalChains.map((x) => x.id) as ArrayOneOrMore<number>)
-        : [1],
   };
 }
 

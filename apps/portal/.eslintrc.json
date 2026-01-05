@@ -1,16 +1,31 @@
 {
-  "parser": "@typescript-eslint/parser",
-  "plugins": ["@typescript-eslint", "svg-jsx"],
   "extends": [
     "eslint:recommended",
     "plugin:@typescript-eslint/recommended",
     "plugin:@next/next/recommended",
-    "plugin:storybook/recommended"
+    "plugin:mdx/recommended",
+    "plugin:tailwindcss/recommended"
   ],
+  "overrides": [
+    {
+      "files": ["*.ts", "*.tsx"],
+      "rules": {
+        "@typescript-eslint/no-unused-vars": "off"
+      }
+    },
+    // has to go last
+    {
+      "extends": ["biome"],
+      "files": ["*.ts", "*.js", "*.tsx", "*.jsx"]
+    }
+  ],
+  "parser": "@typescript-eslint/parser",
+  "plugins": ["@typescript-eslint", "svg-jsx"],
   "rules": {
-    "no-unused-vars": "off",
-    "@typescript-eslint/no-unused-vars": "error",
     "@typescript-eslint/no-explicit-any": "off",
-    "svg-jsx/camel-case-dash": "error"
+    "@typescript-eslint/no-unused-vars": "error",
+    "no-unused-vars": "off",
+    "svg-jsx/camel-case-dash": "error",
+    "tailwindcss/classnames-order": "off"
   }
 }

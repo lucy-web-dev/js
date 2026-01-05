@@ -1,117 +1,135 @@
 "use server";
-
 import "server-only";
-import { API_SERVER_URL } from "@/constants/env";
-import { redirect } from "next/navigation";
-import { getAuthToken } from "../../app/api/lib/getAuthToken";
-import type { ProductSKU } from "../lib/billing";
 
-export type RedirectCheckoutOptions = {
+import { getAuthToken } from "@/api/auth-token";
+import { NEXT_PUBLIC_THIRDWEB_API_HOST } from "@/constants/public-envs";
+import type { ChainInfraSKU } from "@/types/billing";
+import { getAbsoluteUrl } from "@/utils/vercel";
+
+export async function reSubscribePlan(options: {
+  teamId: string;
+}): Promise<{ status: number }> {
+  const token = await getAuthToken();
+  if (!token) {
+    return {
+      status: 401,
+    };
+  }
+
+  const res = await fetch(
+    new URL(
+      `/v1/teams/${options.teamId}/checkout/resubscribe-plan`,
+      NEXT_PUBLIC_THIRDWEB_API_HOST,
+    ),
+    {
+      body: JSON.stringify({}),
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      method: "PUT",
+    },
+  );
+
+  if (!res.ok) {
+    return {
+      status: res.status,
+    };
+  }
+
+  return {
+    status: 200,
+  };
+}
+
+export async function getChainInfraCheckoutURL(options: {
   teamSlug: string;
-  sku: ProductSKU;
-  redirectUrl: string;
-  metadata?: Record<string, string>;
-};
-
-export async function redirectToCheckout(
-  options: RedirectCheckoutOptions,
-): Promise<{ status: number }> {
-  if (!options.teamSlug) {
-    return {
-      status: 400,
-    };
-  }
+  skus: ChainInfraSKU[];
+  chainId: number;
+  annual: boolean;
+}) {
   const token = await getAuthToken();
 
   if (!token) {
     return {
-      status: 401,
-    };
+      error: "You are not logged in",
+      status: "error",
+    } as const;
   }
 
   const res = await fetch(
-    `${API_SERVER_URL}/v1/teams/${options.teamSlug}/checkout/create-link`,
+    new URL(
+      `/v1/teams/${options.teamSlug}/checkout/create-link`,
+      NEXT_PUBLIC_THIRDWEB_API_HOST,
+    ),
     {
-      method: "POST",
       body: JSON.stringify({
-        sku: options.sku,
-        redirectTo: options.redirectUrl,
-        metadata: options.metadata || {},
+        annual: options.annual,
+        baseUrl: getAbsoluteUrl(),
+        chainId: options.chainId,
+        skus: options.skus,
       }),
       headers: {
-        "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
       },
+      method: "POST",
     },
   );
   if (!res.ok) {
-    return {
-      status: res.status,
-    };
-  }
-  const json = await res.json();
-  if (!json.result) {
-    return {
-      status: 500,
-    };
-  }
-
-  // redirect to the stripe checkout session
-  redirect(json.result);
-}
-
-export type RedirectBillingCheckoutAction = typeof redirectToCheckout;
-
-export type BillingPortalOptions = {
-  teamSlug: string | undefined;
-  redirectUrl: string;
-};
-
-export async function redirectToBillingPortal(
-  options: BillingPortalOptions,
-): Promise<{ status: number }> {
-  if (!options.teamSlug) {
-    return {
-      status: 400,
-    };
-  }
-  const token = await getAuthToken();
-  if (!token) {
-    return {
-      status: 401,
-    };
-  }
-
-  const res = await fetch(
-    `${API_SERVER_URL}/v1/teams/${options.teamSlug}/checkout/create-session-link`,
-    {
-      method: "POST",
-      body: JSON.stringify({
-        redirectTo: options.redirectUrl,
-      }),
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-    },
-  );
-
-  if (!res.ok) {
-    return {
-      status: res.status,
-    };
+    const text = await res.text();
+    console.error("Failed to create checkout link", text, res.status);
+    switch (res.status) {
+      case 402: {
+        return {
+          error:
+            "You have outstanding invoices, please pay these first before re-subscribing.",
+          status: "error",
+        } as const;
+      }
+      case 429: {
+        return {
+          error: "Too many requests, please try again later.",
+          status: "error",
+        } as const;
+      }
+      case 403: {
+        return {
+          error: "You are not authorized to deploy infrastructure.",
+          status: "error",
+        } as const;
+      }
+      default: {
+        return {
+          error: "An unknown error occurred, please try again later.",
+          status: "error",
+        } as const;
+      }
+    }
   }
 
   const json = await res.json();
 
-  if (!json.result) {
+  if (
+    "error" in json &&
+    "message" in json.error &&
+    typeof json.error.message === "string"
+  ) {
     return {
-      status: 500,
-    };
+      error: json.error.message,
+      status: "error",
+    } as const;
   }
 
-  // redirect to the stripe billing portal
-  redirect(json.result);
-}
+  if (!json.result) {
+    return {
+      error: "An unknown error occurred, please try again later.",
+      status: "error",
+    } as const;
+  }
 
-export type BillingBillingPortalAction = typeof redirectToBillingPortal;
+  return {
+    data: json.result as string,
+    status: "success",
+  } as const;
+}

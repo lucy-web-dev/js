@@ -1,17 +1,17 @@
-import type { Hash } from "viem";
+import { Value } from "ox";
+import * as ox__AbiFunction from "ox/AbiFunction";
+import * as Bridge from "../../bridge/index.js";
 import { getCachedChain } from "../../chains/utils.js";
 import type { ThirdwebClient } from "../../client/client.js";
+import { NATIVE_TOKEN_ADDRESS } from "../../constants/addresses.js";
 import { getContract } from "../../contract/contract.js";
-import { approve } from "../../extensions/erc20/write/approve.js";
+import { decimals } from "../../extensions/erc20/read/decimals.js";
 import type { PrepareTransactionOptions } from "../../transaction/prepare-transaction.js";
-import { getClientFetch } from "../../utils/fetch.js";
-import { stringify } from "../../utils/json.js";
-import { getPayBuyWithCryptoQuoteEndpoint } from "../utils/definitions.js";
+import type { PurchaseData } from "../types.js";
 import type {
   QuoteApprovalInfo,
   QuotePaymentToken,
   QuoteTokenInfo,
-  QuoteTransactionRequest,
 } from "./commonTypes.js";
 
 /**
@@ -77,13 +77,18 @@ export type GetBuyWithCryptoQuoteParams = {
    *
    * This details will be stored with the purchase and can be retrieved later via the status API or Webhook
    */
-  purchaseData?: object;
+  purchaseData?: PurchaseData;
 
   /**
    * The maximum slippage in basis points (bps) allowed for the swap.
    * For example, if you want to allow a maximum slippage of 0.5%, you should specify `50` bps.
    */
   maxSlippageBPS?: number;
+
+  /**
+   * @hidden
+   */
+  paymentLinkId?: string;
 } & (
   | {
       /**
@@ -110,47 +115,9 @@ export type GetBuyWithCryptoQuoteParams = {
 /**
  * @buyCrypto
  */
-type BuyWithCryptoQuoteRouteResponse = {
-  transactionRequest: QuoteTransactionRequest;
-  approval?: QuoteApprovalInfo;
-
-  fromAddress: string;
-  toAddress: string;
-
-  fromToken: QuoteTokenInfo;
-  toToken: QuoteTokenInfo;
-
-  fromAmountWei: string;
-  fromAmount: string;
-
-  toAmountMinWei: string;
-  toAmountMin: string;
-  toAmountWei: string;
-  toAmount: string;
-
-  paymentTokens: QuotePaymentToken[];
-  processingFees: QuotePaymentToken[];
-
-  estimated: {
-    fromAmountUSDCents: number;
-    toAmountMinUSDCents: number;
-    toAmountUSDCents: number;
-    slippageBPS: number;
-    feesUSDCents: number;
-    gasCostUSDCents?: number;
-    durationSeconds?: number;
-  };
-
-  maxSlippageBPS: number;
-  bridge?: string;
-};
-
-/**
- * @buyCrypto
- */
 export type BuyWithCryptoQuote = {
   transactionRequest: PrepareTransactionOptions;
-  approval?: PrepareTransactionOptions;
+  approvalData?: QuoteApprovalInfo;
 
   swapDetails: {
     fromAddress: string;
@@ -210,91 +177,233 @@ export type BuyWithCryptoQuote = {
  *  maxSlippageBPS: 50, // optional: max 0.5% slippage
  * });
  * ```
+ * @deprecated
  * @buyCrypto
  */
 export async function getBuyWithCryptoQuote(
   params: GetBuyWithCryptoQuoteParams,
 ): Promise<BuyWithCryptoQuote> {
   try {
-    const clientFetch = getClientFetch(params.client);
-
-    const response = await clientFetch(getPayBuyWithCryptoQuoteEndpoint(), {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      body: stringify({
-        fromAddress: params.fromAddress,
-        toAddress: params.toAddress,
-        fromChainId: params.fromChainId.toString(),
-        fromTokenAddress: params.fromTokenAddress,
-        toChainId: params.toChainId.toString(),
-        toTokenAddress: params.toTokenAddress,
-        fromAmount: params.fromAmount,
-        toAmount: params.toAmount,
-        maxSlippageBPS: params.maxSlippageBPS,
-        intentId: params.intentId,
-        purchaseData: params.purchaseData,
-      }),
-    });
-
-    // Assuming the response directly matches the SwapResponse interface
-    if (!response.ok) {
-      const errorObj = await response.json();
-      if (errorObj && "error" in errorObj) {
-        throw errorObj;
+    const quote = await (async () => {
+      if (params.toAmount) {
+        const destinationTokenContract = getContract({
+          address: params.toTokenAddress,
+          chain: getCachedChain(params.toChainId),
+          client: params.client,
+        });
+        const tokenDecimals =
+          destinationTokenContract.address.toLowerCase() ===
+          NATIVE_TOKEN_ADDRESS
+            ? 18
+            : await decimals({
+                contract: destinationTokenContract,
+              });
+        const amount = Value.from(params.toAmount, tokenDecimals);
+        return Bridge.Buy.prepare({
+          amount: amount,
+          client: params.client,
+          destinationChainId: params.toChainId,
+          destinationTokenAddress: params.toTokenAddress,
+          originChainId: params.fromChainId,
+          originTokenAddress: params.fromTokenAddress,
+          paymentLinkId: params.paymentLinkId,
+          purchaseData: params.purchaseData,
+          receiver: params.toAddress,
+          sender: params.fromAddress,
+        });
+      } else if (params.fromAmount) {
+        const originTokenContract = getContract({
+          address: params.fromTokenAddress,
+          chain: getCachedChain(params.fromChainId),
+          client: params.client,
+        });
+        const tokenDecimals = await decimals({
+          contract: originTokenContract,
+        });
+        const amount = Value.from(params.fromAmount, tokenDecimals);
+        return Bridge.Sell.prepare({
+          amount: amount,
+          client: params.client,
+          destinationChainId: params.toChainId,
+          destinationTokenAddress: params.toTokenAddress,
+          originChainId: params.fromChainId,
+          originTokenAddress: params.fromTokenAddress,
+          paymentLinkId: params.paymentLinkId,
+          purchaseData: params.purchaseData,
+          receiver: params.toAddress,
+          sender: params.fromAddress,
+        });
       }
-      throw new Error(`HTTP error! status: ${response.status}`);
+      throw new Error(
+        "Invalid quote request, must provide either `fromAmount` or `toAmount`",
+      );
+    })();
+
+    // check if the fromAddress already has approval for the given amount
+    const firstStep = quote.steps[0];
+    if (!firstStep) {
+      throw new Error(
+        "This quote is incompatible with getBuyWithCryptoQuote. Please use Bridge.Buy.prepare instead.",
+      );
+    }
+    const approvalTxs = firstStep.transactions.filter(
+      (tx) => tx.action === "approval",
+    );
+    if (approvalTxs.length > 1) {
+      throw new Error(
+        "This quote is incompatible with getBuyWithCryptoQuote. Please use Bridge.Buy.prepare instead.",
+      );
+    }
+    const approvalTx = approvalTxs[0];
+
+    const txs = firstStep.transactions.filter((tx) => tx.action !== "approval");
+    if (txs.length > 1) {
+      throw new Error(
+        "This quote is incompatible with getBuyWithCryptoQuote. Please use Bridge.Buy.prepare instead.",
+      );
+    }
+    const tx = txs[0];
+    if (!tx) {
+      throw new Error(
+        "This quote is incompatible with getBuyWithCryptoQuote. Please use Bridge.Buy.prepare instead.",
+      );
     }
 
-    const data: BuyWithCryptoQuoteRouteResponse = (await response.json())
-      .result;
+    let approvalData: QuoteApprovalInfo | undefined;
+    if (approvalTx) {
+      const abiFunction = ox__AbiFunction.from([
+        "function approve(address spender, uint256 amount)",
+      ]);
+      const [spender, amount] = ox__AbiFunction.decodeData(
+        abiFunction,
+        approvalTx.data,
+      );
+      approvalData = {
+        amountWei: amount.toString(),
+        chainId: firstStep.originToken.chainId,
+        spenderAddress: spender,
+        tokenAddress: firstStep.originToken.address,
+      };
+    }
 
     const swapRoute: BuyWithCryptoQuote = {
-      transactionRequest: {
-        chain: getCachedChain(data.transactionRequest.chainId),
-        client: params.client,
-        data: data.transactionRequest.data as Hash,
-        to: data.transactionRequest.to,
-        value: BigInt(data.transactionRequest.value),
-        gas: BigInt(data.transactionRequest.gasLimit),
-        gasPrice: BigInt(data.transactionRequest.gasPrice),
-      },
-      approval: data.approval
-        ? approve({
-            contract: getContract({
-              client: params.client,
-              address: data.approval.tokenAddress,
-              chain: getCachedChain(data.approval.chainId),
-            }),
-            spender: data.approval?.spenderAddress,
-            amountWei: BigInt(data.approval.amountWei),
-          })
-        : undefined,
-      swapDetails: {
-        fromAddress: data.fromAddress,
-        toAddress: data.toAddress,
-
-        fromToken: data.fromToken,
-        toToken: data.toToken,
-
-        fromAmount: data.fromAmount,
-        fromAmountWei: data.fromAmountWei,
-
-        toAmountMinWei: data.toAmountMinWei,
-        toAmountMin: data.toAmountMin,
-
-        toAmountWei: data.toAmountWei,
-        toAmount: data.toAmount,
-        estimated: data.estimated,
-
-        maxSlippageBPS: data.maxSlippageBPS,
-      },
-
-      paymentTokens: data.paymentTokens,
-      processingFees: data.processingFees,
+      approvalData,
       client: params.client,
+
+      paymentTokens: [
+        {
+          amount: Value.format(
+            quote.originAmount,
+            firstStep.originToken.decimals,
+          ).toString(),
+          amountUSDCents:
+            Number(
+              Value.format(quote.originAmount, firstStep.originToken.decimals),
+            ) *
+            (firstStep.originToken.prices.USD || 0) *
+            100,
+          amountWei: quote.originAmount.toString(),
+          token: {
+            chainId: firstStep.originToken.chainId,
+            decimals: firstStep.originToken.decimals,
+            name: firstStep.originToken.name,
+            priceUSDCents: (firstStep.originToken.prices.USD || 0) * 100,
+            symbol: firstStep.originToken.symbol,
+            tokenAddress: firstStep.originToken.address,
+          },
+        },
+      ],
+      // TODO (UB): add develope and platform fees in API
+      processingFees: [
+        {
+          amount: "0",
+          amountUSDCents: 0,
+          amountWei: "0",
+          token: {
+            chainId: firstStep.originToken.chainId,
+            decimals: firstStep.originToken.decimals,
+            name: firstStep.originToken.name,
+            priceUSDCents: (firstStep.originToken.prices.USD || 0) * 100,
+            symbol: firstStep.originToken.symbol,
+            tokenAddress: firstStep.originToken.address,
+          },
+        },
+      ],
+      swapDetails: {
+        estimated: {
+          durationSeconds: firstStep.estimatedExecutionTimeMs / 1000,
+          feesUSDCents: 0,
+          fromAmountUSDCents:
+            Number(
+              Value.format(quote.originAmount, firstStep.originToken.decimals),
+            ) *
+            (firstStep.originToken.prices.USD || 0) *
+            100,
+          gasCostUSDCents: 0,
+          slippageBPS: 0,
+          toAmountMinUSDCents:
+            Number(
+              Value.format(
+                quote.destinationAmount,
+                firstStep.destinationToken.decimals,
+              ),
+            ) *
+            (firstStep.destinationToken.prices.USD || 0) *
+            100,
+          toAmountUSDCents:
+            Number(
+              Value.format(
+                quote.destinationAmount,
+                firstStep.destinationToken.decimals,
+              ),
+            ) *
+            (firstStep.destinationToken.prices.USD || 0) *
+            100,
+        },
+        fromAddress: quote.intent.sender,
+
+        fromAmount: Value.format(
+          quote.originAmount,
+          firstStep.originToken.decimals,
+        ).toString(),
+        fromAmountWei: quote.originAmount.toString(),
+
+        fromToken: {
+          chainId: firstStep.originToken.chainId,
+          decimals: firstStep.originToken.decimals,
+          name: firstStep.originToken.name,
+          priceUSDCents: (firstStep.originToken.prices.USD || 0) * 100,
+          symbol: firstStep.originToken.symbol,
+          tokenAddress: firstStep.originToken.address,
+        },
+
+        maxSlippageBPS: 0,
+        toAddress: quote.intent.receiver,
+        toAmount: Value.format(
+          quote.destinationAmount,
+          firstStep.destinationToken.decimals,
+        ).toString(),
+        toAmountMin: Value.format(
+          quote.destinationAmount,
+          firstStep.destinationToken.decimals,
+        ).toString(),
+
+        toAmountMinWei: quote.destinationAmount.toString(),
+
+        toAmountWei: quote.destinationAmount.toString(),
+        toToken: {
+          chainId: firstStep.destinationToken.chainId,
+          decimals: firstStep.destinationToken.decimals,
+          name: firstStep.destinationToken.name,
+          priceUSDCents: (firstStep.destinationToken.prices.USD || 0) * 100,
+          symbol: firstStep.destinationToken.symbol,
+          tokenAddress: firstStep.destinationToken.address,
+        },
+      },
+      transactionRequest: {
+        ...tx,
+        extraGas: 50000n, // extra gas buffer
+      },
     };
 
     return swapRoute;

@@ -1,12 +1,12 @@
 "use client";
 
-import { type UseQueryOptions, useQuery } from "@tanstack/react-query";
+import type { UseQueryOptions } from "@tanstack/react-query";
 import type { JSX } from "react";
-import { getWalletInfo } from "../../../../../wallets/__generated__/getWalletInfo.js";
 import type { AuthOption } from "../../../../../wallets/types.js";
-import type { WalletId } from "../../../../../wallets/wallet-types.js";
-import { getSocialIcon } from "../../../../core/utils/walletIcon.js";
-import { useWalletContext } from "./provider.js";
+import {
+  getSocialIcon,
+  useWalletIcon,
+} from "../../../../core/utils/walletIcon.js";
 
 export interface WalletIconProps
   extends Omit<React.ImgHTMLAttributes<HTMLImageElement>, "src"> {
@@ -96,31 +96,7 @@ export function WalletIcon({
   return <img src={imageQuery.data} {...restProps} alt={restProps.alt} />;
 }
 
-/**
- * @internal
- */
-function useWalletIcon(props: {
-  queryOptions?: Omit<UseQueryOptions<string>, "queryFn" | "queryKey">;
-}) {
-  const { id } = useWalletContext();
-  const imageQuery = useQuery({
-    queryKey: ["walletIcon", id],
-    queryFn: async () => fetchWalletImage({ id }),
-    ...props.queryOptions,
-  });
-  return imageQuery;
-}
-
-/**
- * @internal Exported for tests only
- */
-export async function fetchWalletImage(props: {
-  id: WalletId;
-}) {
-  return getWalletInfo(props.id, true);
-}
-
-interface SocialIconProps
+export interface SocialIconProps
   extends Omit<React.ImgHTMLAttributes<HTMLImageElement>, "src"> {
   provider: AuthOption | string;
 }

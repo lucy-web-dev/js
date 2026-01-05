@@ -37,6 +37,7 @@ describe("useUnlinkProfile", () => {
     });
 
     expect(unlinkProfile).toHaveBeenCalledWith({
+      allowAccountDeletion: false,
       client: TEST_CLIENT,
       ecosystem: undefined,
       profileToUnlink: mockProfile,
@@ -48,8 +49,8 @@ describe("useUnlinkProfile", () => {
 
   it("should include ecosystem if ecosystem wallet is found", async () => {
     const mockWallet = {
-      id: "ecosystem.wallet-id",
       getConfig: () => ({ partnerId: "partner-id" }),
+      id: "ecosystem.wallet-id",
     } as unknown as Wallet;
     vi.mocked(useConnectedWallets).mockReturnValue([mockWallet]);
 
@@ -63,6 +64,7 @@ describe("useUnlinkProfile", () => {
     });
 
     expect(unlinkProfile).toHaveBeenCalledWith({
+      allowAccountDeletion: false,
       client: TEST_CLIENT,
       ecosystem: {
         id: mockWallet.id,

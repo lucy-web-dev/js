@@ -5,6 +5,7 @@ import type { BuyWithFiatStatus } from "./getStatus.js";
 
 /**
  * The parameters for [`getBuyWithFiatHistory`](https://portal.thirdweb.com/references/typescript/v5/getBuyWithFiatHistory) function
+ * @deprecated
  * @buyCrypto
  */
 export type BuyWithFiatHistoryParams = {
@@ -60,6 +61,7 @@ export type BuyWithFiatHistoryData = {
  * })
  * ```
  * @returns Object of type [`BuyWithFiatHistoryData`](https://portal.thirdweb.com/references/typescript/v5/BuyWithFiatHistoryData)
+ * @deprecated
  * @buyCrypto
  */
 export async function getBuyWithFiatHistory(
@@ -78,8 +80,10 @@ export async function getBuyWithFiatHistory(
 
     // Assuming the response directly matches the BuyWithFiatStatus response interface
     if (!response.ok) {
-      response.body?.cancel();
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const error = await response.text().catch(() => null);
+      throw new Error(
+        `HTTP error! status: ${response.status} - ${response.statusText}: ${error || "unknown error"}`,
+      );
     }
 
     const data: BuyWithFiatHistoryData = (await response.json()).result;

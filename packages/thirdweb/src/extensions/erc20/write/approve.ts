@@ -1,5 +1,8 @@
 import type { Address } from "abitype";
-import type { BaseTransactionOptions } from "../../../transaction/types.js";
+import type {
+  BaseTransactionOptions,
+  WithOverrides,
+} from "../../../transaction/types.js";
 import type { Prettify } from "../../../utils/type-utils.js";
 import { toUnits } from "../../../utils/units.js";
 import { approve as generatedApprove } from "../__generated__/IERC20/write/approve.js";
@@ -9,14 +12,16 @@ import { approve as generatedApprove } from "../__generated__/IERC20/write/appro
  * @extension ERC20
  */
 export type ApproveParams = Prettify<
-  { spender: Address } & (
-    | {
-        amount: number | string;
-      }
-    | {
-        amountWei: bigint;
-      }
-  )
+  WithOverrides<
+    { spender: Address } & (
+      | {
+          amount: number | string;
+        }
+      | {
+          amountWei: bigint;
+        }
+    )
+  >
 >;
 
 /**
@@ -40,7 +45,6 @@ export type ApproveParams = Prettify<
  */
 export function approve(options: BaseTransactionOptions<ApproveParams>) {
   return generatedApprove({
-    contract: options.contract,
     asyncParams: async () => {
       let amount: bigint;
       if ("amount" in options) {
@@ -54,15 +58,17 @@ export function approve(options: BaseTransactionOptions<ApproveParams>) {
         amount = options.amountWei;
       }
       return {
-        spender: options.spender,
-        value: amount,
         overrides: {
           erc20Value: {
             amountWei: amount,
             tokenAddress: options.contract.address,
           },
+          ...options.overrides,
         },
+        spender: options.spender,
+        value: amount,
       } as const;
     },
+    contract: options.contract,
   });
 }

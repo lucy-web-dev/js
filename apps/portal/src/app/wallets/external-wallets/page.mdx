@@ -1,0 +1,22 @@
+import { Breadcrumb, createMetadata } from "@doc";
+import { WalletCard, WalletCardGrid } from "@/components/others/WalletCard";
+import SmartWalletIcon from "@public/icons/wallets/smartwallet.svg";
+import EmbeddedWalletIcon from "@public/icons/wallets/embeddedwallet.svg";
+import { AllSupportedWallets } from "@/components/others/AllSupportedWallets";
+
+export const metadata = createMetadata({
+	image: {
+		title: "External Wallets",
+		icon: "wallets",
+	},
+	title: "External Wallets | thirdweb Documentation",
+	description: "Connect 500+ wallets with thirdweb—including all EIP-6963 compatible wallets with native UI components and customizable APIs. Native support for top wallets with simple integration.",
+});
+
+# External Wallets
+
+thirdweb natively supports 500+ first-party wallets and all wallets that implement EIP-6963 (Multi-injected Provider Discovery).
+
+Select a wallet in the list below to see how to connect it with thirdweb.
+
+<AllSupportedWallets />

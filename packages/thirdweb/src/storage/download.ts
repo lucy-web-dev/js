@@ -1,6 +1,8 @@
 import { getClientFetch } from "../utils/fetch.js";
 import { type ResolveSchemeOptions, resolveScheme } from "../utils/ipfs.js";
+import { IS_TEST } from "../utils/process.js";
 import type { Prettify } from "../utils/type-utils.js";
+import { getFromMockStorage } from "./mock.js";
 
 export type DownloadOptions = Prettify<
   ResolveSchemeOptions & {
@@ -9,7 +11,7 @@ export type DownloadOptions = Prettify<
 >;
 
 /**
- * @description Downloads a file from the specified IPFS, Arweave, or HTTP URI.
+ * Downloads a file from the specified IPFS, Arweave, or HTTP URI.
  *
  * `download` will parse the provided URI based on its scheme (ipfs://, ar://, https://) and convert it to a URL to fetch the file from thirdweb's storage service.
  *
@@ -25,7 +27,7 @@ export type DownloadOptions = Prettify<
  * Download a file from IPFS:
  * ```ts
  * import { download } from "thirdweb/storage";
- * import { createThirdwebClient } from "@thirdweb-dev/sdk";
+ * import { createThirdwebClient } from "thirdweb";
  *
  * const client = createThirdwebClient({ clientId: "YOUR_CLIENT_ID" });
  *
@@ -38,7 +40,7 @@ export type DownloadOptions = Prettify<
  * Download a file from Arweave:
  * ```ts
  * import { download } from "thirdweb/storage";
- * import { createThirdwebClient } from "@thirdweb-dev/sdk";
+ * import { createThirdwebClient } from "thirdweb";
  *
  * const client = createThirdwebClient({ clientId: "YOUR_CLIENT_ID" });
  *
@@ -51,7 +53,7 @@ export type DownloadOptions = Prettify<
  * Download a file from HTTP:
  * ```ts
  * import { download } from "thirdweb/storage";
- * import { createThirdwebClient } from "@thirdweb-dev/sdk";
+ * import { createThirdwebClient } from "thirdweb";
  *
  * const client = createThirdwebClient({ clientId: "YOUR_CLIENT_ID" });
  *
@@ -64,6 +66,21 @@ export type DownloadOptions = Prettify<
  * @storage
  */
 export async function download(options: DownloadOptions) {
+  if (IS_TEST) {
+    const hash = options.uri.split("://")[1];
+    if (!hash) {
+      throw new Error("Invalid hash");
+    }
+    const data = getFromMockStorage(hash);
+    if (data) {
+      return {
+        json: () => Promise.resolve(data),
+        ok: true,
+        status: 200,
+      } as Response;
+    }
+  }
+
   let url: string;
   if (options.uri.startsWith("ar://")) {
     const { resolveArweaveScheme } = await import("../utils/arweave.js");
@@ -73,8 +90,8 @@ export async function download(options: DownloadOptions) {
   }
 
   const res = await getClientFetch(options.client)(url, {
-    keepalive: options.client.config?.storage?.fetch?.keepalive,
     headers: options.client.config?.storage?.fetch?.headers,
+    keepalive: options.client.config?.storage?.fetch?.keepalive,
     requestTimeoutMs:
       options.requestTimeoutMs ??
       options.client.config?.storage?.fetch?.requestTimeoutMs ??
@@ -82,8 +99,10 @@ export async function download(options: DownloadOptions) {
   });
 
   if (!res.ok) {
-    res.body?.cancel();
-    throw new Error(`Failed to download file: ${res.statusText}`);
+    const error = await res.text();
+    throw new Error(
+      `Failed to download file: ${res.status} ${res.statusText} ${error || ""}`,
+    );
   }
   return res;
 }

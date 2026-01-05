@@ -3,6 +3,7 @@ import { decodeAbiParameters, formatTransactionRequest } from "viem";
 import { eth_call } from "../../rpc/actions/eth_call.js";
 import { getRpcClient } from "../../rpc/rpc.js";
 import type { PreparedMethod } from "../../utils/abi/prepare-method.js";
+import { getAddress } from "../../utils/address.js";
 import { resolvePromisedValue } from "../../utils/promise/resolve-promised-value.js";
 import type { Prettify } from "../../utils/type-utils.js";
 import type { Account } from "../../wallets/interfaces/wallet.js";
@@ -60,11 +61,11 @@ export async function simulateTransaction<
   const from = options.from ?? options.account?.address ?? undefined;
 
   const serializedTx = formatTransactionRequest({
-    data,
-    from,
-    to,
-    value,
     accessList,
+    data,
+    from: from ? getAddress(from) : undefined,
+    to: to ? getAddress(to) : undefined,
+    value,
   });
 
   const rpcRequest = getRpcClient(options.transaction);
@@ -86,8 +87,9 @@ export async function simulateTransaction<
     return decoded as ReadContractResult<PreparedMethod<abiFn>[2]>;
   } catch (error) {
     throw await extractError({
-      error,
       contract: options.transaction.__contract,
+      error,
+      fromAddress: from,
     });
   }
 }

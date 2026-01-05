@@ -132,13 +132,14 @@ export function NFTMedia({
 }: NFTMediaProps) {
   const { contract, tokenId } = useNFTContext();
   const mediaQuery = useQuery({
+    queryFn: async (): Promise<NFTMediaInfo> =>
+      fetchNftMedia({ contract, mediaResolver, tokenId }),
     queryKey: getQueryKey({
       chainId: contract.chain.id,
-      tokenId,
+      contractAddress: contract.address,
       mediaResolver,
+      tokenId,
     }),
-    queryFn: async (): Promise<NFTMediaInfo> =>
-      fetchNftMedia({ mediaResolver, contract, tokenId }),
     ...queryOptions,
   });
 
@@ -153,8 +154,8 @@ export function NFTMedia({
   return (
     <MediaRenderer
       client={contract.client}
-      src={mediaQuery.data.src}
       poster={mediaQuery.data.poster}
+      src={mediaQuery.data.src}
       {...mediaRendererProps}
     />
   );
@@ -164,6 +165,7 @@ export function NFTMedia({
  * @internal
  */
 export function getQueryKey(props: {
+  contractAddress: string;
   chainId: number;
   tokenId: bigint;
   mediaResolver?:
@@ -171,10 +173,11 @@ export function getQueryKey(props: {
     | (() => NFTMediaInfo)
     | (() => Promise<NFTMediaInfo>);
 }) {
-  const { chainId, tokenId, mediaResolver } = props;
+  const { chainId, tokenId, mediaResolver, contractAddress } = props;
   return [
     "_internal_nft_media_",
     chainId,
+    contractAddress,
     tokenId.toString(),
     {
       resolver:
@@ -213,14 +216,14 @@ export async function fetchNftMedia(props: {
   const image = nft.metadata.image || nft.metadata.image_url;
   if (animation_url) {
     return {
-      src: animation_url,
       poster: image || undefined,
+      src: animation_url,
     };
   }
   if (image) {
     return {
-      src: image,
       poster: undefined,
+      src: image,
     };
   }
   throw new Error("Failed to resolve NFT media");

@@ -3,7 +3,7 @@ import { Anchor } from "../ui/Anchor";
 
 export function Heading(props: {
   children: React.ReactNode;
-  id: string;
+  anchorId: string;
   level: number;
   className?: string;
   anchorClassName?: string;
@@ -14,7 +14,7 @@ export function Heading(props: {
       return (
         <h1
           className={cn(
-            "mb-7 break-words font-bold text-3xl text-f-100 tracking-tight md:text-4xl",
+            "mb-5 break-words font-bold text-3xl text-foreground tracking-tight",
             props.className,
           )}
           data-noindex={props.noIndex}
@@ -27,13 +27,13 @@ export function Heading(props: {
     case 2: {
       return (
         <Anchor
-          id={props.id}
           className={cn("mt-10 mb-3", props.anchorClassName)}
           data-noindex={props.noIndex}
+          id={props.anchorId}
         >
           <h2
             className={cn(
-              "break-words font-semibold text-2xl text-f-100 tracking-tight md:text-3xl",
+              "break-words font-semibold text-2xl text-foreground tracking-tight",
               props.className,
             )}
           >
@@ -46,13 +46,13 @@ export function Heading(props: {
     case 3: {
       return (
         <Anchor
-          id={props.id}
-          className={cn("mt-10 mb-3", props.anchorClassName)}
+          className={cn("mt-10 mb-2", props.anchorClassName)}
           data-noindex={props.noIndex}
+          id={props.anchorId}
         >
           <h3
             className={cn(
-              "break-words font-semibold text-f-200 text-xl md:text-2xl",
+              "break-words font-semibold text-foreground text-xl",
               props.className,
             )}
           >
@@ -65,13 +65,13 @@ export function Heading(props: {
     case 4: {
       return (
         <Anchor
-          id={props.id}
-          className={cn("mt-10 mb-3", props.anchorClassName)}
+          className={cn("mt-8 mb-3", props.anchorClassName)}
           data-noindex={props.noIndex}
+          id={props.anchorId}
         >
           <h4
             className={cn(
-              "break-words font-semibold text-f-200 text-lg md:text-xl",
+              "break-words font-semibold text-foreground text-lg",
               props.className,
             )}
           >
@@ -84,13 +84,13 @@ export function Heading(props: {
     case 5: {
       return (
         <Anchor
-          id={props.id}
-          className={cn("mt-10 mb-3", props.anchorClassName)}
+          className={cn("mt-8 mb-3", props.anchorClassName)}
           data-noindex={props.noIndex}
+          id={props.anchorId}
         >
           <h5
             className={cn(
-              "break-words font-semibold text-f-200 text-lg",
+              "break-words font-medium text-foreground text-lg",
               props.className,
             )}
           >
@@ -103,13 +103,13 @@ export function Heading(props: {
     default: {
       return (
         <Anchor
-          id={props.id}
-          className={cn("mt-10 mb-3", props.anchorClassName)}
+          className={cn("mt-8 mb-3", props.anchorClassName)}
           data-noindex={props.noIndex}
+          id={props.anchorId}
         >
           <h6
             className={cn(
-              "break-words font-semibold text-f-200 text-lg",
+              "break-words font-medium text-foreground text-lg",
               props.className,
             )}
           >

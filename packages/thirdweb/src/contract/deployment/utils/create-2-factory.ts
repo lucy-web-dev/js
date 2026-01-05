@@ -1,4 +1,4 @@
-import { getContractAddress } from "viem";
+import * as ox__ContractAddress from "ox/ContractAddress";
 import { getGasPrice } from "../../../gas/get-gas-price.js";
 import { eth_getBalance } from "../../../rpc/actions/eth_getBalance.js";
 import { eth_sendRawTransaction } from "../../../rpc/actions/eth_sendRawTransaction.js";
@@ -6,6 +6,7 @@ import { getRpcClient } from "../../../rpc/rpc.js";
 import { sendTransaction } from "../../../transaction/actions/send-transaction.js";
 import { waitForReceipt } from "../../../transaction/actions/wait-for-tx-receipt.js";
 import { prepareTransaction } from "../../../transaction/prepare-transaction.js";
+import { getAddress } from "../../../utils/address.js";
 import { isEIP155Enforced } from "../../../utils/any-evm/is-eip155-enforced.js";
 import { getKeylessTransaction } from "../../../utils/any-evm/keyless-transaction.js";
 import { isContractDeployed } from "../../../utils/bytecode/is-contract-deployed.js";
@@ -27,9 +28,9 @@ const CREATE2_FACTORY_BYTECODE =
  * @internal
  */
 const SIGNATURE = {
-  v: 27n,
   r: "0x2222222222222222222222222222222222222222222222222222222222222222",
   s: "0x2222222222222222222222222222222222222222222222222222222222222222",
+  v: 27n,
 } as const;
 
 type Create2FactoryDeploymentInfo = {
@@ -52,6 +53,9 @@ export async function computeCreate2FactoryAddress(
 
   return withCache(
     async () => {
+      if (FACTORIES[chainId.toString()]) {
+        return FACTORIES[chainId.toString()] as string;
+      }
       // special handling for chains with hardcoded gasPrice and gasLimit
       if (CUSTOM_GAS_FOR_CHAIN[chainId]) {
         const enforceEip155 = await isEIP155Enforced(options);
@@ -62,8 +66,8 @@ export async function computeCreate2FactoryAddress(
         const deploymentInfo = await _getCreate2FactoryDeploymentInfo(
           eipChain,
           {
-            gasPrice,
             gasLimit,
+            gasPrice,
           },
         );
 
@@ -158,8 +162,8 @@ export async function deployCreate2Factory(options: ClientAndChainAndAccount) {
   const eipChain = enforceEip155 ? chainId : 0;
 
   const rpcRequest = getRpcClient({
-    client: client,
     chain,
+    client: client,
   });
 
   let gasPrice: bigint | undefined;
@@ -174,8 +178,8 @@ export async function deployCreate2Factory(options: ClientAndChainAndAccount) {
   }
 
   const deploymentInfo = await _getCreate2FactoryDeploymentInfo(eipChain, {
-    gasPrice,
     gasLimit,
+    gasPrice,
   });
 
   const balance = await eth_getBalance(rpcRequest, {
@@ -189,7 +193,7 @@ export async function deployCreate2Factory(options: ClientAndChainAndAccount) {
       to: deploymentInfo.signerAddress,
       value: deploymentInfo.valueToSend,
     });
-    const res = await sendTransaction({ transaction, account });
+    const res = await sendTransaction({ account, transaction });
     await waitForReceipt(res);
   }
   const transactionHash = await eth_sendRawTransaction(
@@ -217,24 +221,24 @@ async function _getCreate2FactoryDeploymentInfo(
   const gasPrice = gasOptions.gasPrice ? gasOptions.gasPrice : 100n * 10n ** 9n;
   const gas = gasOptions.gasLimit ? gasOptions.gasLimit : 100000n;
   const deploymentTransaction = await getKeylessTransaction({
-    transaction: {
-      gasPrice,
-      gas,
-      nonce: 0,
-      data: CREATE2_FACTORY_BYTECODE,
-      chainId: chainId !== 0 ? Number(chainId) : undefined,
-    },
     signature: SIGNATURE,
+    transaction: {
+      chainId: chainId !== 0 ? Number(chainId) : undefined,
+      data: CREATE2_FACTORY_BYTECODE,
+      gas,
+      gasPrice,
+      nonce: 0,
+    },
   });
-  const create2FactoryAddress = getContractAddress({
+  const create2FactoryAddress = ox__ContractAddress.from({
     from: deploymentTransaction.signerAddress,
     nonce: 0n,
   });
 
   return {
     ...deploymentTransaction,
+    predictedAddress: getAddress(create2FactoryAddress),
     valueToSend: gasPrice * gas,
-    predictedAddress: create2FactoryAddress,
   };
 }
 
@@ -250,69 +254,76 @@ type CustomChain = {
 };
 
 const CUSTOM_GAS_FOR_CHAIN: Record<string, CustomChain> = {
-  "5001": {
-    name: "Mantle Testnet",
-    gasPrice: 1n,
-  },
-  "71402": {
-    name: "Godwoken Mainnet",
-    gasPrice: 40000n * 10n ** 9n,
-  },
-  "1351057110": {
-    name: "Chaos (SKALE Testnet)",
-    gasPrice: 100000n,
-  },
-  "361": {
-    name: "Theta Mainnet",
-    gasPrice: 4000n * 10n ** 9n,
-  },
-  "365": {
-    name: "Theta Testnet",
-    gasPrice: 4000n * 10n ** 9n,
-  },
-  "7700": {
-    name: "Canto",
-    gasPrice: 1000n * 10n ** 9n,
-  },
-  "7701": {
-    name: "Canto Testnet",
-    gasPrice: 1000n * 10n ** 9n,
+  "199": {
+    gasPrice: 300000n * 10n ** 9n,
+    name: "BitTorrent Chain",
   },
   "338": {
-    name: "Cronos Testnet",
     gasPrice: 2000n * 10n ** 9n,
+    name: "Cronos Testnet",
   },
-  "199": {
-    name: "BitTorrent Chain",
-    gasPrice: 300000n * 10n ** 9n,
+  "361": {
+    gasPrice: 4000n * 10n ** 9n,
+    name: "Theta Mainnet",
+  },
+  "365": {
+    gasPrice: 4000n * 10n ** 9n,
+    name: "Theta Testnet",
+  },
+  "5001": {
+    gasPrice: 1n,
+    name: "Mantle Testnet",
+  },
+  "7700": {
+    gasPrice: 1000n * 10n ** 9n,
+    name: "Canto",
+  },
+  "7701": {
+    gasPrice: 1000n * 10n ** 9n,
+    name: "Canto Testnet",
+  },
+  "71402": {
+    gasPrice: 40000n * 10n ** 9n,
+    name: "Godwoken Mainnet",
   },
   "88882": {
-    name: "Spicy Chain",
-    gasPrice: 2500n * 10n ** 9n,
     gasLimit: 200000n,
+    gasPrice: 2500n * 10n ** 9n,
+    name: "Spicy Chain",
   },
   "88888": {
-    name: "Chiliz Chain",
-    gasPrice: 2500n * 10n ** 9n,
     gasLimit: 200000n,
+    gasPrice: 2500n * 10n ** 9n,
+    name: "Chiliz Chain",
   },
   // SKALE chains
   "1350216234": {
-    name: "Titan",
     gasPrice: 110000n,
+    name: "Titan",
+  },
+  "1351057110": {
+    gasPrice: 100000n,
+    name: "Chaos (SKALE Testnet)",
   },
   "1482601649": {
-    name: "Nebula",
     gasPrice: 110000n,
+    name: "Nebula",
   },
   "1564830818": {
-    name: "Calypso",
     gasPrice: 110000n,
+    name: "Calypso",
   },
   "2046399126": {
-    name: "Europa",
     gasPrice: 110000n,
+    name: "Europa",
   },
+};
+
+const FACTORIES: Record<string, string> = {
+  "88888": "0xc501b9abf5540de1dd24f66633b1ecf35ff7101f",
+  "267": "0x4e59b44847b379578588920cA78FbF26c0B4956C",
+  "420120000": COMMON_FACTORY_ADDRESS,
+  "420120001": COMMON_FACTORY_ADDRESS, // EIP155 is enforced, but the check fails, hence we hardcode the address here instead of computing dynamically
 };
 
 const CUSTOM_GAS_BINS = [

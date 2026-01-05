@@ -1,7 +1,7 @@
 import type { Chain } from "../../chains/types.js";
 import { cacheChains } from "../../chains/utils.js";
 import type { ThirdwebClient } from "../../client/client.js";
-import { hasSmartAccount } from "../../react/core/utils/isSmartWallet.js";
+import type { OnConnectCallback } from "../../react/core/hooks/connection/types.js";
 import { computedStore } from "../../reactive/computedStore.js";
 import { effect } from "../../reactive/effect.js";
 import { createStore } from "../../reactive/store.js";
@@ -9,12 +9,17 @@ import { stringify } from "../../utils/json.js";
 import type { AsyncStorage } from "../../utils/storage/AsyncStorage.js";
 import { deleteConnectParamsFromStorage } from "../../utils/storage/walletStorage.js";
 import type { Account, Wallet } from "../interfaces/wallet.js";
+import { isSmartWallet } from "../smart/index.js";
 import { smartWallet } from "../smart/smart-wallet.js";
 import type { SmartWalletOptions } from "../smart/types.js";
 import type { WalletId } from "../wallet-types.js";
 
 type WalletIdToConnectedWalletMap = Map<string, Wallet>;
-export type ConnectionStatus = "connected" | "disconnected" | "connecting";
+export type ConnectionStatus =
+  | "connected"
+  | "disconnected"
+  | "connecting"
+  | "unknown";
 
 const CONNECTED_WALLET_IDS = "thirdweb:connected-wallet-ids";
 const LAST_ACTIVE_EOA_ID = "thirdweb:active-wallet-id";
@@ -24,7 +29,8 @@ export type ConnectionManager = ReturnType<typeof createConnectionManager>;
 export type ConnectManagerOptions = {
   client: ThirdwebClient;
   accountAbstraction?: SmartWalletOptions;
-  onConnect?: (wallet: Wallet) => void;
+  setWalletAsActive?: boolean;
+  onConnect?: OnConnectCallback;
 };
 
 /**
@@ -45,7 +51,7 @@ export function createConnectionManager(storage: AsyncStorage) {
   const activeAccountStore = createStore<Account | undefined>(undefined);
   const activeWalletChainStore = createStore<Chain | undefined>(undefined);
   const activeWalletConnectionStatusStore =
-    createStore<ConnectionStatus>("disconnected");
+    createStore<ConnectionStatus>("unknown");
 
   const definedChainsStore = createStore<Map<number, Chain>>(new Map());
 
@@ -129,7 +135,7 @@ export function createConnectionManager(storage: AsyncStorage) {
     }
 
     const activeWallet = await (async () => {
-      if (options?.accountAbstraction && !hasSmartAccount(wallet)) {
+      if (options?.accountAbstraction && !isSmartWallet(wallet)) {
         return await handleSmartWalletConnection(
           wallet,
           options.client,
@@ -146,12 +152,14 @@ export function createConnectionManager(storage: AsyncStorage) {
     // add personal wallet to connected wallets list even if it's not the active one
     addConnectedWallet(wallet);
 
-    handleSetActiveWallet(activeWallet);
+    if (options?.setWalletAsActive !== false) {
+      handleSetActiveWallet(activeWallet);
+    }
 
     wallet.subscribe("accountChanged", async () => {
       // We reimplement connect here to prevent memory leaks
       const newWallet = await handleConnection(wallet, options);
-      options?.onConnect?.(newWallet);
+      options?.onConnect?.(newWallet, connectedWallets.getValue());
     });
 
     return activeWallet;
@@ -160,7 +168,7 @@ export function createConnectionManager(storage: AsyncStorage) {
   const connect = async (wallet: Wallet, options?: ConnectManagerOptions) => {
     // connectedWallet can be either wallet or smartWallet
     const connectedWallet = await handleConnection(wallet, options);
-    options?.onConnect?.(connectedWallet);
+    options?.onConnect?.(connectedWallet, connectedWallets.getValue());
     return connectedWallet;
   };
 
@@ -231,13 +239,12 @@ export function createConnectionManager(storage: AsyncStorage) {
   // save last connected wallet ids to storage
   effect(
     async () => {
-      const prevAccounts = (await getStoredConnectedWalletIds(storage)) || [];
       const accounts = connectedWallets.getValue();
       const ids = accounts.map((acc) => acc?.id).filter((c) => !!c) as string[];
 
       storage.setItem(
         CONNECTED_WALLET_IDS,
-        stringify(Array.from(new Set([...prevAccounts, ...ids]))),
+        stringify(Array.from(new Set([...ids]))),
       );
     },
     [connectedWallets],
@@ -254,7 +261,7 @@ export function createConnectionManager(storage: AsyncStorage) {
       throw new Error("Wallet does not support switching chains");
     }
 
-    if (wallet.id === "smart") {
+    if (isSmartWallet(wallet)) {
       // also switch personal wallet
       const personalWalletId = await getStoredActiveWalletId(storage);
       if (personalWalletId) {
@@ -263,10 +270,14 @@ export function createConnectionManager(storage: AsyncStorage) {
           .find((w) => w.id === personalWalletId);
         if (personalWallet) {
           await personalWallet.switchChain(chain);
+          await wallet.switchChain(chain);
+          // reset the active wallet as switch chain recreates a new smart account
+          handleSetActiveWallet(wallet);
+          return;
         }
       }
+      // If we couldn't find the personal wallet, just switch the smart wallet
       await wallet.switchChain(chain);
-      // reset the active wallet as switch chain recreates a new smart account
       handleSetActiveWallet(wallet);
     } else {
       await wallet.switchChain(chain);
@@ -298,20 +309,20 @@ export function createConnectionManager(storage: AsyncStorage) {
   }
 
   return {
-    activeWalletStore,
     activeAccountStore,
-    connectedWallets,
-    addConnectedWallet,
-    disconnectWallet,
-    setActiveWallet,
-    connect,
-    handleConnection,
     activeWalletChainStore,
-    switchActiveWalletChain,
     activeWalletConnectionStatusStore,
+    activeWalletStore,
+    addConnectedWallet,
+    connect,
+    connectedWallets,
+    defineChains,
+    disconnectWallet,
+    handleConnection,
     isAutoConnecting,
     removeConnectedWallet,
-    defineChains,
+    setActiveWallet,
+    switchActiveWalletChain,
   };
 }
 
@@ -382,9 +393,9 @@ export const handleSmartWalletConnection = async (
   const wallet = smartWallet(options);
 
   await wallet.connect({
-    personalAccount: signer,
-    client: client,
     chain: options.chain,
+    client: client,
+    personalAccount: signer,
   });
 
   // Disconnect the active wallet when the EOA disconnects if it the active wallet is a smart wallet

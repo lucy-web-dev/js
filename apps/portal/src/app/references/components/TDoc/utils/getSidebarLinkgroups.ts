@@ -1,5 +1,5 @@
-import type { SomeDoc } from "@/app/references/components/TDoc/types";
 import type { BlockTag, TransformedDoc } from "typedoc-better-json";
+import type { SomeDoc } from "@/app/references/components/TDoc/types";
 import type {
   LinkGroup,
   SidebarLink,
@@ -8,40 +8,44 @@ import { subgroups } from "./subgroups";
 import { uniqueSlugger } from "./uniqueSlugger";
 
 const tagsToGroup = {
-  "@contract": "Contract",
-  "@claimConditions": "Claim Conditions",
-  "@nftDrop": "NFT Drop",
-  "@platformFees": "Royalty & Fees",
-  "@nft": "NFT",
-  "@metadata": "Metadata",
-  "@permissionControl": "Permissions Control",
-  "@networkConnection": "Network Connection",
-  "@delayedReveal": "Delayed Reveal",
-  "@marketplace": "Marketplace",
-  "@walletConnection": "Wallet Connection",
-  "@walletUtils": "Wallet Utilities",
-  "@token": "Tokens",
-  "@auth": "Auth",
-  "@smartWallet": "Smart Wallet",
-  "@connectWallet": "Connect Wallet",
+  "@abstractWallet": "Abstract Wallets",
+  "@account": "Account",
   "@appURI": "App URI",
-  "@storage": "Storage",
+  "@auth": "Auth",
+  "@bridge": "Payments",
+  "@x402": "x402",
+  "@chain": "Chain",
+  "@claimConditions": "Claim Conditions",
+  "@client": "Client",
+  "@connectWallet": "Connect Wallet",
+  "@contract": "Contract",
+  "@delayedReveal": "Delayed Reveal",
+  "@engine": "Engine",
+  "@extension": "Extensions",
+  "@insight": "Insight",
+  "@locale": "Locale",
+  "@marketplace": "Marketplace",
+  "@metadata": "Metadata",
+  "@modules": "Modules",
+  "@nebula": "Nebula",
+  "@networkConnection": "Network Connection",
+  "@nft": "NFT",
+  "@nftDrop": "NFT Drop",
   "@others": "Miscellaneous",
+  "@permissionControl": "Permissions Control",
+  "@platformFees": "Royalty & Fees",
+  "@rpc": "RPC",
+  "@smartWallet": "Smart Wallet",
+  "@social": "Social API",
+  "@storage": "Storage",
+  "@theme": "Theme",
+  "@token": "Tokens",
+  "@transaction": "Transactions",
+  "@utils": "Utils",
   "@wallet": "Wallets",
   "@walletConfig": "WalletConfig",
-  "@theme": "Theme",
-  "@locale": "Locale",
-  "@abstractWallet": "Abstract Wallets",
-  "@extension": "Extensions",
-  "@rpc": "RPC",
-  "@transaction": "Transactions",
-  "@buyCrypto": "Buy Crypto",
-  "@utils": "Utils",
-  "@chain": "Chain",
-  "@social": "Social API",
-  "@modules": "Modules",
-  "@client": "Client",
-  "@account": "Account",
+  "@walletConnection": "Wallet Connection",
+  "@walletUtils": "Wallet Utilities",
 } as const;
 
 type TagKey = keyof typeof tagsToGroup;
@@ -56,12 +60,17 @@ const sidebarGroupOrder: TagKey[] = [
   "@walletConnection",
   "@walletUtils",
   "@chain",
+  "@account",
   "@contract",
   "@transaction",
+  "@insight",
+  "@engine",
+  "@x402",
+  "@bridge",
+  "@nebula",
   "@social",
   "@auth",
   "@nft",
-  "@buyCrypto",
   "@nftDrop",
   "@claimConditions",
   "@delayedReveal",
@@ -80,7 +89,6 @@ const sidebarGroupOrder: TagKey[] = [
   "@theme",
   "@utils",
   "@others",
-  "@account",
 ];
 
 function findTag(
@@ -163,6 +171,11 @@ export function getSidebarLinkGroups(doc: TransformedDoc, path: string) {
       return tag === "@modules";
     });
 
+    const bridge = docs.filter((d) => {
+      const [tag] = getCustomTag(d) || [];
+      return tag === "@bridge";
+    });
+
     // sort extensions into their own groups
     if (extensions.length) {
       const extensionGroups = extensions.reduce(
@@ -181,26 +194,26 @@ export function getSidebarLinkGroups(doc: TransformedDoc, path: string) {
       const extensionLinkGroups = Object.entries(extensionGroups).map(
         ([extensionName, docs]) => {
           const links = docs.map((d) => ({
-            name: d.name,
             href: getLink(`${path}/${extensionName.toLowerCase()}/${d.name}`),
+            name: d.name,
           }));
           return {
-            name: extensionName,
             links,
+            name: extensionName,
           };
         },
       );
       if (!linkGroups.find((group) => group.name === name)) {
         linkGroups.push({
-          name: name,
           href: getLink(`${path}/${key}`),
-          links: [{ name: "Extensions", links: extensionLinkGroups }],
           isCollapsible: false,
+          links: [{ links: extensionLinkGroups, name: "Extensions" }],
+          name: name,
         });
       } else {
         linkGroups
           .find((group) => group.name === name)
-          ?.links.push({ name: "Extensions", links: extensionLinkGroups });
+          ?.links.push({ links: extensionLinkGroups, name: "Extensions" });
       }
     }
 
@@ -221,31 +234,88 @@ export function getSidebarLinkGroups(doc: TransformedDoc, path: string) {
       const extensionLinkGroups = Object.entries(extensionGroups).map(
         ([extensionName, docs]) => {
           const links = docs.map((d) => ({
-            name: d.name,
             href: getLink(`${path}/${extensionName.toLowerCase()}/${d.name}`),
+            name: d.name,
           }));
           return {
-            name: extensionName,
             links,
+            name: extensionName,
           };
         },
       );
       if (!linkGroups.find((group) => group.name === name)) {
         linkGroups.push({
-          name: name,
           href: getLink(`${path}/${key}`),
-          links: [{ name: "modules", links: extensionLinkGroups }],
+          links: [{ links: extensionLinkGroups, name: "modules" }],
+          name: name,
         });
       } else {
         linkGroups
           .find((group) => group.name === name)
-          ?.links.push({ name: "Modules", links: extensionLinkGroups });
+          ?.links.push({ links: extensionLinkGroups, name: "Modules" });
+      }
+    }
+
+    if (bridge.length) {
+      const bridgeGroups = bridge.reduce(
+        (acc, d) => {
+          const [, moduleName] = getCustomTag(d) || [];
+          if (!acc[moduleName ?? "common"]) {
+            acc[moduleName ?? "common"] = [];
+          }
+          acc[moduleName ?? "common"]?.push(d);
+          return acc;
+        },
+        {} as Record<string, SomeDoc[]>,
+      );
+      const bridgeLinkGroups: {
+        name: string;
+        href: string;
+        links?: { name: string; href?: string }[];
+      }[] = Object.entries(bridgeGroups)
+        .filter(([namespaceName]) => namespaceName.toLowerCase() !== "common")
+        .map(([namespaceName, docs]) => {
+          const links = docs.map((d) => ({
+            href: getLink(`${path}/${namespaceName.toLowerCase()}/${d.name}`),
+            name: d.name,
+          }));
+          return {
+            href: "",
+            links,
+            name: namespaceName,
+          };
+        });
+
+      // Add the top-level functions
+      for (const group of Object.entries(bridgeGroups).filter(
+        ([namespaceName]) => namespaceName.toLowerCase() === "common",
+      )) {
+        const docs = group[1];
+        for (const doc of docs) {
+          bridgeLinkGroups.push({
+            href: getLink(`${path}/${doc.name}`),
+            name: doc.name,
+          });
+        }
+      }
+
+      if (!linkGroups.find((group) => group.name === name)) {
+        linkGroups.push({
+          href: getLink(`${path}/${key}`),
+          isCollapsible: false,
+          links: [{ links: bridgeLinkGroups, name: "Payments" }],
+          name: name,
+        });
+      } else {
+        linkGroups
+          .find((group) => group.name === name)
+          ?.links.push({ links: bridgeLinkGroups, name: "Payments" });
       }
     }
 
     const nonExtensions = docs.filter((d) => {
       const [tag] = getCustomTag(d) || [];
-      return tag !== "@extension" && tag !== "@modules";
+      return tag !== "@extension" && tag !== "@modules" && tag !== "@bridge";
     });
 
     // sort into groups
@@ -283,11 +353,11 @@ export function getSidebarLinkGroups(doc: TransformedDoc, path: string) {
       }
 
       links.push({
-        name: tagsToGroup[tag],
         links: groupDocs.map((d) => ({
-          name: d.name,
           href: getLink(`${path}/${d.name}`),
+          name: d.name,
         })),
+        name: tagsToGroup[tag],
       });
     };
 
@@ -297,8 +367,8 @@ export function getSidebarLinkGroups(doc: TransformedDoc, path: string) {
 
     for (const d of ungroupedLinks) {
       links.push({
-        name: d.name,
         href: getLink(`${path}/${d.name}`),
+        name: d.name,
       });
     }
 
@@ -311,10 +381,10 @@ export function getSidebarLinkGroups(doc: TransformedDoc, path: string) {
     // create new group
     else {
       linkGroups.push({
-        name: name,
-        links: links,
         href: getLink(`${path}/${key}`),
         isCollapsible: false,
+        links: links,
+        name: name,
       });
     }
   }
@@ -338,12 +408,17 @@ export function getExtensionName(
   extensionBlockTag: BlockTag,
 ): string | undefined {
   try {
-    const extensionNameString =
-      extensionBlockTag?.summary?.[0]?.children?.[0]?.value || "Common";
-
-    if (typeof extensionNameString === "string" && extensionNameString) {
-      return extensionNameString;
+    const summary = extensionBlockTag.summary?.[0];
+    if (summary && "children" in summary) {
+      const firstChild = summary.children[0];
+      if (firstChild && "value" in firstChild) {
+        const extensionNameString = firstChild.value || "Common";
+        if (typeof extensionNameString === "string" && extensionNameString) {
+          return extensionNameString;
+        }
+      }
     }
+    return undefined;
   } catch {
     return undefined;
   }

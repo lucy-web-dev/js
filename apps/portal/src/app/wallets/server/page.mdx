@@ -1,0 +1,202 @@
+import { Tabs, TabsList, TabsTrigger, TabsContent, OpenApiEndpoint } from "@doc";
+import { TypeScriptIcon, EngineIcon, DotNetIcon } from "@/icons";
+import { createMetadata } from "@doc";
+
+export const metadata = createMetadata({
+    image: {
+        title: "Server Wallets",
+        icon: "wallets",
+    },
+    title: "Server Wallets | thirdweb Documentation",
+    description: "Create server wallets or developer wallets to let your application manage and sign transactions programmatically. Use them for admin actions, treasury management, or sending transactions directly from your backend.",
+});
+
+# Server Wallets
+
+Server wallets are wallets that are managed by your own application, like a treasury wallet or admin wallet. They are used to send transactions from the server.
+
+<Tabs defaultValue="http">
+  <TabsList>
+    <TabsTrigger value="http" className="flex items-center gap-2 [&>p]:mb-0">
+      <EngineIcon className="w-4 h-4" />
+      HTTP
+    </TabsTrigger>
+    <TabsTrigger value="typescript" className="flex items-center gap-2 [&>p]:mb-0">
+      <TypeScriptIcon className="w-4 h-4" />
+      TypeScript
+    </TabsTrigger>
+    <TabsTrigger value="dotnet" className="flex items-center gap-2 [&>p]:mb-0">
+      <DotNetIcon className="w-4 h-4" />
+      .NET
+    </TabsTrigger>
+  </TabsList>
+
+  <TabsContent value="http">
+
+### Use an existing Server Wallet
+
+Once created, you can use your server wallet by passing it as the `from` field of the [thirdweb API](/reference#tag/wallets/post/v1/transactions).
+
+### Create a new Server Wallet
+
+You can create new server wallets via API by just passing an identifier. This can be any string, but we recommend using a descriptive name.
+
+<OpenApiEndpoint path="/v1/wallets/server" method="POST" />
+
+### List all Server Wallets
+
+You can also list all server wallets for your project to get their addresses and identifiers.
+
+<OpenApiEndpoint path="/v1/wallets/server" method="GET" responseExampleOverride={{
+    result: {
+      pagination: {
+        hasMore: false,
+        limit: 20,
+        page: 1,
+      },
+      wallets: [
+        {
+          address: "string",
+          profiles: [
+            {
+              type: "server",
+              identifier: "string",
+            },
+          ],
+          createdAt: "string",
+          smartWalletAddress: "string",
+        },
+      ],
+    }
+}} />
+
+  </TabsContent>
+
+  <TabsContent value="typescript">
+
+    ### Use an existing Server Wallet
+
+    For existing server wallets, you can get a wallet object with the `serverWallet` function.
+
+    ```typescript
+        import { Engine, createThirdwebClient } from "thirdweb";
+
+        const client = createThirdwebClient({
+            secretKey: "...", // your project secret key
+        });
+
+        const wallet = Engine.serverWallet({
+            client,
+            address: "0x...", // your server wallet address
+        });
+    ```
+
+    You can then use this wallet to send transactions just like user wallets with the thirdweb SDK.
+
+    ### Create a new Server Wallet Programmatically
+
+    You can also create new server wallets programmatically with a label.
+
+    ```typescript
+        import { Engine } from "thirdweb";
+
+        const wallet = Engine.createServerWallet({
+            client,
+            label: "My Server Wallet",
+        });
+    ```
+
+    ### List all Server Wallets
+
+    You can list all server wallets for your project.
+
+    ```typescript
+        import { Engine } from "thirdweb";
+
+        const wallets = await Engine.getServerWallets({
+            client,
+        });
+    ```
+  </TabsContent>
+
+  <TabsContent value="dotnet">
+
+    ### Create a Server Wallet
+
+    Before using a server wallet in code, create it in the [thirdweb dashboard](https://thirdweb.com/dashboard/connect/account-abstraction) (Transactions → Server wallets) and note the label you assign.
+
+    ```csharp
+    using Thirdweb;
+
+    var client = ThirdwebClient.Create(secretKey: "YOUR_SECRET_KEY");
+
+    var wallet = await ServerWallet.Create(
+        client: client,
+        label: "production-deployer" // The label from your dashboard
+    );
+
+    Console.WriteLine($"Server wallet address: {await wallet.GetAddress()}");
+    ```
+
+    ### Use with Transactions
+
+    Server wallets implement `IThirdwebWallet`, so you can use them anywhere you need a wallet:
+
+    ```csharp
+    // Get a contract instance
+    var contract = await ThirdwebContract.Create(
+        client,
+        "0x...", // contract address
+        chainId: 1
+    );
+
+    // Write to the contract using the server wallet
+    var receipt = await contract.Write(
+        wallet,
+        "transfer",
+        weiValue: 0,
+        "0x...", // to address
+        1000000000000000000 // amount
+    );
+
+    Console.WriteLine($"Transaction hash: {receipt.TransactionHash}");
+    ```
+
+    ### Advanced Execution Options
+
+    Control how the wallet submits transactions with execution options:
+
+    ```csharp
+    // EIP-7702 sponsored execution (recommended)
+    var wallet = await ServerWallet.Create(
+        client: client,
+        label: "production-deployer",
+        executionOptions: new EIP7702ExecutionOptions()
+    );
+
+    // ERC-4337 smart account execution
+    var smartWallet = await ServerWallet.Create(
+        client: client,
+        label: "production-deployer",
+        executionOptions: new ERC4337ExecutionOptions(
+            chainId: new BigInteger(8453),
+            signerAddress: "0x..." // your server wallet signer address
+        )
+    );
+    ```
+
+    ### List Server Wallets
+
+    Retrieve all server wallets for your project:
+
+    ```csharp
+    var wallets = await ServerWallet.GetAll(client);
+
+    foreach (var walletInfo in wallets)
+    {
+        Console.WriteLine($"Label: {walletInfo.Label}, Address: {walletInfo.Address}");
+    }
+    ```
+
+  </TabsContent>
+</Tabs>

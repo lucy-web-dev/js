@@ -1,5 +1,5 @@
 "use client";
-import type { AutoConnectProps } from "../../../core/hooks/connection/types.js";
+import type { AutoConnectProps } from "../../../../wallets/connection/types.js";
 import { useAutoConnect } from "../../hooks/wallets/useAutoConnect.js";
 
 /**
@@ -41,5 +41,5 @@ import { useAutoConnect } from "../../hooks/wallets/useAutoConnect.js";
  */
 export function AutoConnect(props: AutoConnectProps) {
   useAutoConnect(props);
-  return <></>;
+  return null;
 }
